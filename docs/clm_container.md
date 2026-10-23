@@ -1,272 +1,293 @@
-# `clm_container` — ID-Addressed Typed Containers
+# CLM Container — Language-Agnostic Specification
 
+**Module:** `clm_container`  
 **Project:** CLM — Cross Language Modules  
 **Repository:** https://github.com/deeperlevel/clm  
-**Module:** `clm_container`  
-**Interface style:** Procedural-first; optional language-native convenience facade
+**Contact:** deeparchive@outlook.com  
+**License:** CC0 1.0 Universal — https://creativecommons.org/publicdomain/zero/1.0/
 
-## Overview
+> Don't start from scratch, bro.
 
-`clm_container` provides **typed, ID-addressed storage** for applications, libraries, and other CLM modules. A container is identified by a numeric **container ID**; entries within that container are identified by numeric **entry keys**. A container's type is chosen when it is created and remains fixed until the container is destroyed.
+## 1. Purpose and scope
 
-CLM is designed for multiple programming languages from the outset. Implementations may use native maps, arrays, structures, pointer storage, or other appropriate mechanisms. **The public operations, numeric constants, and observable behavior are the shared contract—not the underlying data structure.**
+`clm_container` is a procedural, **typed key/value collection registry**. A numeric **container ID** identifies each collection. Within it, caller-defined numeric **entry keys** identify values. Container keys are **not** positional array indices; gaps in the numeric key space are permitted.
 
-Common uses include configuration storage, route-handler tables, dependency registrations, message-handler registries, and other ID-indexed data. `clm_container` itself is a storage primitive: it does not perform dependency injection, dispatch messages, or translate names to IDs.
+The module supplies:
 
-> **Portability note:** This document describes the cross-language contract derived from the current module's public API. Certain implementation-dependent details (especially object ownership, floating-point representation, error return syntax, and concurrency) must be specified by each language implementation. A language-specific implementation should document any intentional deviation.
+- Typed keyed storage and explicit create/clear/destroy operations.
+- One per-container **positional navigation cursor**, independent of entry keys.
+- A detached metadata snapshot (`ContainerInfo`).
+- Copy-based, key-preserving **slicing** of entries by navigation position.
+- **Manual reference counts** and explicit, deferred disposal of zero-reference containers.
 
-## Fundamental model
+`clm_container` **does not** implement unkeyed arrays, caller-selected initial capacity, fixed-width arena allocation, multidimensional blocks/atlases, data shuffling, or collection sampling. Those belong to **`clm_storage`**, as discussed for the CLM roadmap. `clm_container` does not allocate entry IDs or map text names to keys; the separate `clm_id` module supports name-to-ID mappings.
 
-```text
-Container Registry
-  ├─ Container ID 0x100  [STRING]
-  │    ├─ Key 0x01 → "localhost"
-  │    └─ Key 0x02 → "example.org"
-  │
-  ├─ Container ID 0x200  [INTEGER]
-  │    ├─ Key 0x01 → 8080
-  │    └─ Key 0x02 → 9090
-  │
-  └─ Container ID 0x300  [OBJECT]
-       ├─ Key 0xA101 → handler reference
-       └─ Key 0xA102 → handler reference
-```
+This document specifies externally observable behavior. Individual language ports choose their own native collection representations and result conventions, but should preserve the same operations, type codes, status codes, and lifetime rules.
 
-- **Container IDs are unique within one container registry**, regardless of type.
-- **Entry keys are unique only within their own container.** Different containers may use the same key.
-- **Container types are fixed at creation.** Typed entry operations reject a mismatched container type.
-- **Insertion and replacement are separate operations.** `add` does not overwrite; `edit` does not insert.
-- IDs and keys are numeric. Human-readable names can be managed separately through `clm_id`.
+## 2. Supported types
 
-## Quick start
-
-The examples below use **language-neutral pseudocode**. Adapt return handling and variable declarations to the target language.
-
-```text
-CONTAINER_SETTINGS = 0x100
-FIELD_HOST         = 0x01
-
-status = clm_container_create(CONTAINER_SETTINGS, CONTAINER_TYPE_STRING)
-require(status == CONTAINER_SUCCESS)
-
-status = clm_container_add_string(CONTAINER_SETTINGS, FIELD_HOST, "localhost")
-require(status == CONTAINER_SUCCESS)
-
-(status, host) = clm_container_get_string(CONTAINER_SETTINGS, FIELD_HOST)
-require(status == CONTAINER_SUCCESS)
-print(host)   // localhost
-
-status = clm_container_destroy(CONTAINER_SETTINGS)
-require(status == CONTAINER_SUCCESS)
-```
-
-Operations that modify state return a **status code**. Retrieval and inspection operations conceptually return both a **status** and an **output value**. The representation can vary by language: a tuple, an output parameter, or another documented native equivalent.
-
-## Container types
-
-| Constant | Value | Logical value type | Accessor suffix |
-|---|---:|---|---|
-| `CONTAINER_TYPE_STRING` | `0x01` | Text/string | `string` |
-| `CONTAINER_TYPE_BYTE` | `0x02` | Signed 8-bit integer (−128 to 127) | `byte` |
-| `CONTAINER_TYPE_SHORT` | `0x03` | Signed 16-bit integer (−32,768 to 32,767) | `short` |
-| `CONTAINER_TYPE_INTEGER` | `0x04` | Signed 32-bit integer (−2³¹ to 2³¹−1) | `integer` |
-| `CONTAINER_TYPE_LONG_INTEGER` | `0x05` | Signed 64-bit integer (−2⁶³ to 2⁶³−1) | `long` |
-| `CONTAINER_TYPE_FLOAT` | `0x06` | Floating-point value, nominally single precision | `float` |
-| `CONTAINER_TYPE_DOUBLE` | `0x07` | Floating-point value, nominally double precision | `double` |
-| `CONTAINER_TYPE_OBJECT` | `0xFF` | Language-native object, opaque value, reference, or handle | `object` |
-
-A typed `add` or `edit` must validate that a value is acceptable for the container's declared type. An invalid value returns `CONTAINER_ERROR_INVALID_VALUE`.
-
-**Language-dependent considerations:**
-
-- Some languages do not have separate runtime numeric types for every entry above; they must still enforce the intended integer ranges.
-- The current Python implementation validates finite `FLOAT` values against approximately the maximum binary32 magnitude but does not quantize them to binary32 precision. Cross-language bit-for-bit floating-point equivalence is therefore **not yet guaranteed**.
-- Rules for non-finite floating-point values (`NaN`, infinities), implicit numeric conversions, and string encoding should be documented by each port until a stricter common contract is established.
-- An `OBJECT` entry may contain a callable, service instance, structure handle, opaque pointer, or equivalent. Its representation and ownership are language-specific.
-
-## Status codes
-
-These numeric codes are part of the shared API:
-
-| Constant | Value | Meaning |
+| Constant | Code | Value category |
 |---|---:|---|
-| `CONTAINER_SUCCESS` | `0x00` | Operation succeeded. |
-| `CONTAINER_ERROR_DUPLICATE_ID` | `0x01` | Container ID already exists, or an entry key already exists during `add`. |
-| `CONTAINER_ERROR_ID_NOT_FOUND` | `0x02` | Entry key is absent, or the iterator has no valid requested position. |
-| `CONTAINER_ERROR_TYPE_NOT_SUPPORTED` | `0x03` | Unsupported container type during creation. |
-| `CONTAINER_ERROR_TYPE_NOT_MATCHED` | `0x04` | Typed operation does not match container's declared type. |
-| `CONTAINER_ERROR_NOT_FOUND` | `0x05` | Container ID does not exist. |
-| `CONTAINER_ERROR_INVALID_VALUE` | `0x06` | Supplied value fails type/range validation. |
+| `CONTAINER_TYPE_STRING` | `0x01` | Text string |
+| `CONTAINER_TYPE_BYTE` | `0x02` | Signed 8-bit integer |
+| `CONTAINER_TYPE_SHORT` | `0x03` | Signed 16-bit integer |
+| `CONTAINER_TYPE_INTEGER` | `0x04` | Signed 32-bit integer |
+| `CONTAINER_TYPE_LONG_INTEGER` | `0x05` | Signed 64-bit integer |
+| `CONTAINER_TYPE_FLOAT` | `0x06` | Floating-point value, nominally 32-bit |
+| `CONTAINER_TYPE_DOUBLE` | `0x07` | Floating-point value, nominally 64-bit |
+| `CONTAINER_TYPE_DYNAMIC` | `0xFE` | Reserved for binary storage; **not supported by current Container** |
+| `CONTAINER_TYPE_OBJECT` | `0xFF` | Language-native object/reference/opaque value |
 
-**Distinguish the two not-found statuses:** `ERROR_NOT_FOUND` refers to the **container**; `ERROR_ID_NOT_FOUND` refers to an **entry or cursor position**.
+The declared type is immutable for the lifetime of a container. All entries in a container share the declared value category. Object value ownership is **not automatically transferred** to Container; the language port must specify how object references are held and released. Python's implementation holds ordinary references, without invoking object-specific destruction.
 
-## API reference
+Floating-point representation, precision, and behavior of non-finite values may be language-specific. The supplied Python implementation accepts floating-point values (including non-finite values) and checks finite `FLOAT` values against the representable single-precision magnitude, but does not coerce stored values to 32-bit precision.
 
-### Container lifecycle
+## 3. Numeric result codes
 
-| Operation | Parameters | Output | Behavior |
-|---|---|---|---|
-| `clm_container_create` | `(container_id, container_type)` | `status` | Creates an empty typed container; rejects an existing ID. |
-| `clm_container_clear` | `(container_id)` | `status` | Removes all entries, retains ID/type, resets cursor. |
-| `clm_container_destroy` | `(container_id)` | `status` | Removes the container and cursor; ID becomes available for reuse. |
-| `clm_container_count` | `(container_id)` | `status, count` | Counts stored entries. |
-| `clm_container_contains` | `(container_id, key)` | `status, exists` | Reports whether an entry key is present. |
+| Status | Code | Meaning |
+|---|---:|---|
+| `CONTAINER_SUCCESS` | `0x00` | Operation succeeded |
+| `CONTAINER_ERROR_DUPLICATE_ID` | `0x01` | Container ID or entry key already in use |
+| `CONTAINER_ERROR_ID_NOT_FOUND` | `0x02` | Requested entry/cursor position is absent or navigation cannot proceed |
+| `CONTAINER_ERROR_TYPE_NOT_SUPPORTED` | `0x03` | Unknown or unsupported container type |
+| `CONTAINER_ERROR_TYPE_NOT_MATCHED` | `0x04` | Operation requires another declared container type |
+| `CONTAINER_ERROR_NOT_FOUND` | `0x05` | Container ID does not exist |
+| `CONTAINER_ERROR_INVALID_VALUE` | `0x06` | Invalid typed value, index, range, or reference-count operation |
 
-### Typed entry operations
+Operations that return values conceptually return **status plus value**. A language may implement this using a result record, out parameter, tuple, or equivalent. Every failure must remain distinguishable from a legitimate stored null/object value.
 
-Each type exposes four operations. Replace `<type>` with `string`, `byte`, `short`, `integer`, `long`, `float`, `double`, or `object`:
+## 4. Container metadata
 
-| Operation | Signature | Output | Behavior |
-|---|---|---|---|
-| Add | `clm_container_add_<type>(container_id, key, value)` | `status` | Inserts a new entry; duplicate keys fail. |
-| Edit | `clm_container_edit_<type>(container_id, key, value)` | `status` | Replaces an existing value; absent keys fail. |
-| Delete | `clm_container_delete_<type>(container_id, key)` | `status` | Removes an existing entry. |
-| Get | `clm_container_get_<type>(container_id, key)` | `status, value` | Retrieves an entry of the declared type. |
+`clm_container_get_info(container_id)` returns a **read-only snapshot** of:
 
-Examples of real operation names:
-
-```text
-clm_container_add_string(container_id, key, value)
-clm_container_edit_integer(container_id, key, value)
-clm_container_delete_double(container_id, key)
-clm_container_get_object(container_id, key)
-```
-
-**Validation order and expected behavior:**
-
-- Missing container: `CONTAINER_ERROR_NOT_FOUND`.
-- Existing container with wrong declared type: `CONTAINER_ERROR_TYPE_NOT_MATCHED`.
-- `add` with existing key: `CONTAINER_ERROR_DUPLICATE_ID`.
-- `edit`, `delete`, or `get` with missing key: `CONTAINER_ERROR_ID_NOT_FOUND`.
-- `add` or `edit` with invalid value: `CONTAINER_ERROR_INVALID_VALUE`.
-
-When an operation fails, callers must not use an unspecified output value. Languages without multi-value returns should expose the result through an output parameter or other documented mechanism.
-
-### Navigation and iteration
-
-| Operation | Parameters | Output | Behavior |
-|---|---|---|---|
-| `clm_container_first` | `(container_id)` | `status, key` | Positions cursor at first inserted entry. |
-| `clm_container_previous` | `(container_id)` | `status, key` | Moves cursor one entry backward. |
-| `clm_container_next` | `(container_id)` | `status, key` | Moves cursor one entry forward. |
-| `clm_container_last` | `(container_id)` | `status, key` | Positions cursor at last inserted entry. |
-
-**Iteration follows insertion order, not numeric key order.** Each container has one shared cursor.
-
-```text
-clm_container_create(0x400, CONTAINER_TYPE_STRING)
-clm_container_add_string(0x400, 30, "A")
-clm_container_add_string(0x400, 10, "B")
-clm_container_add_string(0x400, 20, "C")
-
-(status, key) = clm_container_first(0x400)
-while status == CONTAINER_SUCCESS:
-    (value_status, value) = clm_container_get_string(0x400, key)
-    require(value_status == CONTAINER_SUCCESS)
-    print(key, value)
-    (status, key) = clm_container_next(0x400)
-
-clm_container_destroy(0x400)
-
-// Iteration order: 30/A, 10/B, 20/C
-```
-
-Cursor rules:
-
-- `first` or `last` establishes a valid starting position.
-- An empty container or an unpositioned cursor produces `CONTAINER_ERROR_ID_NOT_FOUND`.
-- Moving beyond either end returns `CONTAINER_ERROR_ID_NOT_FOUND` **without advancing from the last valid position**.
-- Deleting the selected entry resets its cursor; deleting another entry does not.
-- `clear` and `destroy` reset/remove the cursor.
-- Concurrent or interleaved traversals of a shared container do **not** have independent cursors. Use external coordination when necessary.
-
-## Object containers
-
-`CONTAINER_TYPE_OBJECT` supports application-defined values. This permits CLM modules such as `clm_depend`, `clm_dispatch`, and SPIder route registries to store callable references, state handles, or other resources using numeric keys.
-
-```text
-ROUTE_HANDLERS = 0x500
-METHOD_GET     = 0xA101
-
-clm_container_create(ROUTE_HANDLERS, CONTAINER_TYPE_OBJECT)
-clm_container_add_object(ROUTE_HANDLERS, METHOD_GET, get_employees)
-
-(status, handler) = clm_container_get_object(ROUTE_HANDLERS, METHOD_GET)
-if status == CONTAINER_SUCCESS:
-    invoke(handler, request_context)   // Invocation syntax is language-specific.
-
-clm_container_destroy(ROUTE_HANDLERS)
-```
-
-**Object lifecycle is not defined by the container API alone.** The module does not assign dependency-injection lifetimes, automatically call domain-specific destructors, or ensure a retrieved reference remains valid after removal. Each port must explain how ownership, references, and cleanup work. `clm_depend` can build a higher-level lifetime-management policy on top of storage.
-
-## Relationship to other CLM modules
-
-| Module | Responsibility |
+| Field | Meaning |
 |---|---|
-| `clm_container` | Stores typed, ID-keyed entries. |
-| `clm_id` | Resolves meaningful names or labels to numeric IDs. |
-| `clm_depend` | Registers constructors, resolves dependencies, and manages service lifetimes. |
-| `clm_dispatch` | Registers and invokes message handlers. |
-| SPIder | Uses CLM facilities for routes, handlers, and application infrastructure. |
+| `id` | Container ID |
+| `type` | Declared element type code |
+| `committed` | Current number of stored key/value entries |
+| `reserved` | Internally reportable reserved capacity, or `-1` when unavailable |
+| `references` | Explicit, manually managed owner/reference count |
+| `index` | Current **zero-based positional cursor**, or `-1` when unpositioned |
 
-No name-based lookup is required by `clm_container`. If an application uses names such as `"employees"` or `"host"`, it should convert them into appropriate IDs separately.
+An entry's numeric key and its positional index are different. For example:
 
-## Optional convenience facade
+| Insertion position | Key | Value |
+|---:|---:|---|
+| 0 | 100 | Alpha |
+| 1 | 900 | Beta |
+| 2 | 17 | Gamma |
 
-CLM is **procedural-first**, not anti-OOP. A language implementation may offer a convenience facade (for example, a static class or namespace) that forwards to the procedural operations:
+At the second position, `index = 1` while the key is `900`. Key iteration follows **insertion order**, not sorted key order. Updating an existing value leaves its position unchanged; deleting and reinserting a key places it at the end.
+
+The Python implementation's native dictionary does not expose a meaningful reserved element capacity through this API, so its `reserved` snapshot is `-1`. The caller cannot set `reserved` on Container creation. No particular growth/allocation strategy is prescribed.
+
+Metadata snapshots do **not** grant mutation authority. Cursor movement and reference count changes must use their dedicated functions.
+
+## 5. Key/value lifecycle and operations
+
+### 5.1 Registry lifecycle
+
+| Function | Contract |
+|---|---|
+| `clm_container_create(id, type)` | Create one empty container, `references = 1`, unpositioned cursor |
+| `clm_container_clear(id)` | Remove every entry and unposition cursor; preserve ID, type, and reference count |
+| `clm_container_destroy(id)` | Explicitly destroy the named container and release its registry storage; ID becomes reusable |
+| `clm_container_count(id)` | Get the number of stored entries |
+| `clm_container_get_count(id)` | Alias of `count` with the same return behavior |
+| `clm_container_contains(id, key)` | Determine whether an entry key exists |
+| `clm_container_get_info(id)` | Obtain metadata snapshot |
+
+**Current explicit-destroy policy:** `destroy(id)` is unconditional when the ID exists, even if `references` is positive. This preserves compatibility with earlier versions, which had no reference tracking. By contrast, `dispose()` destroys only zero-reference containers. Applications must not use `destroy()` on resources still held by other users.
+
+### 5.2 Typed entry operations
+
+For each suffix listed below, the module offers:
 
 ```text
-Container.create(ID, CONTAINER_TYPE_INTEGER)
-Container.add_integer(ID, KEY, 42)
-(status, value) = Container.get_integer(ID, KEY)
-Container.destroy(ID)
+clm_container_add_SUFFIX(container_id, entry_key, value)
+clm_container_edit_SUFFIX(container_id, entry_key, value)
+clm_container_get_SUFFIX(container_id, entry_key) -> status, value
+clm_container_delete_SUFFIX(container_id, entry_key)
 ```
 
-This facade is optional and must not create a separate storage model or alter the semantics of the underlying functions. Languages without classes can simply expose the procedural API.
+| Suffix | Type |
+|---|---|
+| `string` | `CONTAINER_TYPE_STRING` |
+| `byte` | `CONTAINER_TYPE_BYTE` |
+| `short` | `CONTAINER_TYPE_SHORT` |
+| `integer` | `CONTAINER_TYPE_INTEGER` |
+| `long` | `CONTAINER_TYPE_LONG_INTEGER` |
+| `float` | `CONTAINER_TYPE_FLOAT` |
+| `double` | `CONTAINER_TYPE_DOUBLE` |
+| `object` | `CONTAINER_TYPE_OBJECT` |
 
-## Portability and implementation guidance
+`add` rejects duplicate keys; `edit` rejects keys not yet present; `delete` rejects missing keys. A typed operation applied to a different declared type returns `CONTAINER_ERROR_TYPE_NOT_MATCHED`. Value validation is performed at the insertion/update boundary. `OBJECT` may contain native objects or null values, as supported by the implementation.
 
-The following are **implementation choices**, not mandates of the public API:
+## 6. Navigation and current-item access
 
-- **Storage:** native dictionary/hash table, dense vector with an ID index, dynamic array, or another suitable structure. Sparse numeric IDs should not be treated as dense array offsets without considering memory use.
-- **Memory management:** garbage collection, reference counting, smart pointers, explicit allocation/free, or language-native ownership. Define object cleanup and borrowed-reference validity clearly.
-- **Return convention:** tuple, multiple return values, status plus output pointer, or another native form while preserving status meanings.
-- **Type representation:** native integer widths, appropriate range checks, floating-point representation, and an opaque object/reference type.
-- **Thread safety:** the current API does not promise synchronization. Implementations must document whether concurrent access is safe; an application should not assume it is.
-- **Iteration cost:** internal representation may change iteration complexity, but insertion-order behavior and cursor semantics should remain consistent.
+Container owns one mutable navigation cursor per container ID. No independent iterator handles are exposed in the current contract. Do not interleave two independent traversals of the same container without coordinating the shared cursor.
 
-The shared contract does **not** require reflection, generics/templates, inheritance, decorators, or a custom memory allocator. A language may use these internally where they are natural, provided consumers are not required to adopt them.
+### 6.1 Legacy key-returning operations, preserved
 
-## Recommended usage practices
+```text
+clm_container_first(id)      -> status, entry_key
+clm_container_next(id)       -> status, entry_key
+clm_container_previous(id)   -> status, entry_key
+clm_container_last(id)       -> status, entry_key
+```
 
-1. Allocate distinct container IDs for logically separate registries.
-2. Use stable numeric constants for well-known entry keys.
-3. Check status codes before interpreting output values.
-4. Prefer typed containers over object containers when the stored value has a uniform primitive type.
-5. Treat object ownership and service lifetimes as separate design responsibilities.
-6. Destroy containers when they are no longer needed; coordinate cleanup with their consumers.
-7. Avoid simultaneous traversals of the same container unless cursor access is coordinated.
+### 6.2 Positional navigation operations
 
-## Compatibility checklist for language ports
+```text
+clm_container_iterate(id)             -> status  # move first
+clm_container_iterate_backward(id)    -> status  # move last
+clm_container_move_first(id)          -> status
+clm_container_move_last(id)           -> status
+clm_container_move_next(id)           -> status
+clm_container_move_previous(id)       -> status
+clm_container_get(id)                 -> status, current_value
+clm_container_get_key(id)             -> status, current_entry_key
+clm_container_get_index(id)           -> status, zero_based_index_or_minus_one
+clm_container_set_index(id, index)    -> status
+clm_container_is_first(id)            -> status, boolean
+clm_container_is_last(id)             -> status, boolean
+```
 
-A conforming implementation should be tested for:
+- `iterate` and `move_first` are equivalent; `iterate_backward` and `move_last` are equivalent.
+- `set_index` uses a **zero-based position**, never the numeric entry key.
+- `get` returns the current entry **value** without advancing, whereas `get_key` returns its key.
+- An empty container or unpositioned cursor has index `-1`. `get`/`get_key` return `ID_NOT_FOUND` if unpositioned.
+- Moving beyond either end returns `ID_NOT_FOUND` and **leaves the cursor on the last valid entry**.
+- Out-of-bounds `set_index` returns `INVALID_VALUE` without modifying the cursor.
+- `is_first`/`is_last` return false when the container exists but has no positioned cursor.
+- Deleting the currently selected entry unpositions the cursor; other deletions leave the cursor attached to the same entry key (its positional index may change).
+- `clear`, successful `slice` replacement, and `destroy` invalidate the corresponding cursor.
 
-- Duplicate container IDs and duplicate entry keys.
-- Identical entry keys in different containers.
-- Type mismatch and invalid-value handling.
-- Signed integer range boundaries.
-- Add/edit/delete/get semantics for every supported type.
-- Clear and destroy behavior, including container-ID reuse.
-- Entry count and membership queries.
-- Insertion-order cursor navigation and boundary behavior.
-- Cursor invalidation after selected-entry deletion or clearing.
-- Object/reference storage and documented lifetime behavior.
+### Example (language-neutral pseudocode)
 
-Where language implementations differ (for example, binary32 conversion or object cleanup), document the differences explicitly rather than silently assuming identical behavior.
+```text
+create(MY_CONTAINER, INTEGER)
+add_integer(MY_CONTAINER, 100, 10)
+add_integer(MY_CONTAINER, 400, 40)
+
+if iterate(MY_CONTAINER) == SUCCESS:
+    repeat:
+        status, key = get_key(MY_CONTAINER)
+        status, value = get(MY_CONTAINER)
+        process(key, value)
+    until move_next(MY_CONTAINER) != SUCCESS
+```
+
+## 7. Copy-based slicing
+
+```text
+clm_container_slice(source_id, destination_id, start, count) -> status
+```
+
+A slice selects `count` entries beginning at **zero-based navigation position** `start` and copies the **original keys and values** to an already existing destination container.
+
+- Source and destination must exist, have the **same declared type**, and be distinct IDs.
+- Source is unchanged, including its cursor and reference count.
+- Destination contents are **replaced**, never appended; its cursor becomes unpositioned.
+- Destination ID, type, and reference count remain unchanged.
+- `start >= 0`, `count >= 0`, and `start + count <= committed` are required.
+- `start == committed` with `count == 0` is permitted and clears the destination.
+- Invalid arguments or a type mismatch leave the destination unchanged.
+- Container storage is independent after copying. For `OBJECT` values, values are **shallow references**, not deep-cloned objects.
+- Key insertion order is preserved in the destination.
+
+Example:
+
+```text
+Source:      { 100: "A", 200: "B", 300: "C", 400: "D" }
+slice(source, destination, start=1, count=2)
+Destination: { 200: "B", 300: "C" }
+```
+
+Current Python implementation constructs a temporary dictionary and replaces the destination only after it is successfully populated. For low-level ports, validate ranges and prepare destination storage before committing changes to avoid partially overwritten destinations on allocation failure.
+
+## 8. Explicit reference counting and deferred disposal
+
+The container registry tracks **manual** reference counts. It never attempts to determine reachability from language variables, stack frames, pointers, or closures.
+
+```text
+clm_container_reference(container_id)    -> status
+clm_container_unreference(container_id)  -> status
+clm_container_dispose()                  -> status, disposed_count
+```
+
+Lifecycle:
+
+1. `create` starts with `references = 1` for the creating owner.
+2. `reference` increments the count when another owner explicitly retains it.
+3. `unreference` decrements the count; it **does not destroy** the container.
+4. At `references = 0`, `dispose()` can reclaim the container.
+5. `dispose()` scans all registered containers and destroys only those with zero references.
+
+An `unreference` on an existing zero-reference container returns `INVALID_VALUE` and never makes the count negative. `reference` can reacquire a zero-reference container while it still exists, before disposal. After disposal, attempts to access its ID return `NOT_FOUND` until a new container is created under that ID.
+
+**Important:** a forgotten `unreference` prevents automatic disposal. This is intentional: CLM respects explicit owner tracking rather than guessing. A container with zero references remains registered and accessible until disposal, but callers must retain it before relying on it across a potential collection cycle.
+
+`dispose()` is suitable for an explicit call or for invocation from future `clm_managed`. It is **not** a tracing or cyclic garbage collector. It does not free arbitrary allocations reachable through stored object pointers; object ownership remains a separate concern.
+
+## 9. Portability, ownership, concurrency
+
+- **Storage:** Use the language's native keyed map/hash/dictionary, or an equivalent. Do not mandate an allocator or object model.
+- **Type checking:** Keep signed integer width rules. Reject invalid types rather than silently coerce them.
+- **Cursor:** Insertion order must be observable. If the native map does not preserve order, maintain an ordered key index.
+- **Object ownership:** Container owns its registry/storage bookkeeping. It does not automatically own externally allocated objects. Define destructor callbacks separately if a port needs them.
+- **Capacity:** `reserved` is informative where meaningful; `-1` indicates capacity is unspecified/unavailable. Container does not accept a `reserved` creation argument.
+- **Reference safety:** Manual reference counts are advisory ownership records, not automatic pointer/lifetime detection.
+- **Concurrency:** The current Python module is **not synchronized** for concurrent mutation, iteration, or disposal. Callers must coordinate concurrent access. A future port may add internal synchronization, provided semantics remain consistent.
+- **Stale IDs:** An ID may be reused after destroy. A stale numeric ID could then identify a different container; generation handles are not part of this release.
+- **Status handling:** All normal operation failures use the documented status codes. Do not substitute silent failures.
+
+## 10. Implementation checklist / regression tests
+
+- [ ] Unique container IDs across declared types; unsupported type rejected.
+- [ ] Typed add/edit/get/delete operations retain their original contracts.
+- [ ] Sparse integer keys supported; traversal uses insertion order.
+- [ ] Creation sets references to one and index to `-1`.
+- [ ] Metadata snapshots are detached/read-only.
+- [ ] `committed` follows entry count; `reserved` uses `-1` if not observable.
+- [ ] Both legacy and new cursor APIs traverse the same position.
+- [ ] Position is independent of entry key, including nonconsecutive keys.
+- [ ] Invalid position changes do not move the cursor.
+- [ ] Out-of-range next/previous calls leave cursor on boundary.
+- [ ] Slicing preserves keys/order and shallow object values, replaces destination, leaves source intact.
+- [ ] Failed slicing does not modify destination.
+- [ ] Reference/unreference do not destroy; unreference cannot underflow.
+- [ ] Dispose reclaims only zero-reference containers; nonzero-reference containers remain.
+- [ ] Explicit destroy works independently of reference count (current compatibility policy).
+- [ ] Cleared/destroyed IDs invalidate cursors; destroyed IDs may be reused.
+- [ ] Container never requires `clm_storage`, `clm_depend`, or `clm_managed` for basic operations.
+
+## 11. Python reference implementation and tests
+
+The Python port provides the procedural operations plus the optional `Container` static-method facade. The facade is **not required** by the language-neutral contract.
+
+Run the reference tests:
+
+```shell
+python -m unittest -v test_clm_container test_clm_container_extended
+```
+
+The corresponding `clm_storage` and `clm_depend` revisions are separate projects and are **not** implemented by this Container update.
 
 ---
 
 **CLM — Cross Language Modules**  
-*Different languages. Shared technologies. No borders.*  
+Public Domain — CC0 1.0 Universal  
 *Don't start from scratch, bro.*
+
+
+## Pending-disposal metadata (extension)
+
+`clm_container_pending_count()` returns the number of containers with zero
+manual references. It does not modify or collect any resource. This counter
+is used by `clm_managed` for threshold/hybrid scheduling.
+
+
+### Python return contract
+
+`clm_container_pending_count() -> integer` returns a plain nonnegative integer (not a `(status, count)` tuple). It counts registered resources with `references == 0`, including empty resources; it does not collect, mutate or change their reference counts. New resources start with one reference and are not pending until unreferenced. Explicit destruction removes a resource from the registry immediately. The count is a point-in-time snapshot and requires external synchronization if registries are shared across threads.

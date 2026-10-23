@@ -1,109 +1,148 @@
-# =============================================================================
-# CLM — Cross Language Modules
-#
-# An initiative by deeperlevel, developed with community contributions.
-# https://github.com/deeperlevel/clm
-# Contact: deeparchive@outlook.com
-#
-# Public Domain — CC0 1.0 Universal
-# https://creativecommons.org/publicdomain/zero/1.0/
-#
-# Free to use, modify, redistribute, and bundle for any purpose.
-# Attribution and retention of this notice are appreciated, not required.
-#
-# Provided AS IS, without warranty or liability.
-#
-# Don't start from scratch, bro.
-# =============================================================================
-
-"""Tests for CLA Path procedural functions and their convenience facade."""
-
+"""CLM Path ID registry and transformations integration tests."""
 import os
+import re
 import tempfile
 import unittest
 
-import clm_path
+import clm_path as p
+from clm_storage import (STORAGE_SUCCESS, STORAGE_TYPE_STRING, clm_storage_create,
+                         clm_storage_append, clm_storage_get_index,
+                         clm_storage_set_index, clm_storage_destroy)
 
 
 class PathTests(unittest.TestCase):
-    def test_extension_and_filename(self):
-        p = os.path.join('folder', 'archive.tar.gz')
-        self.assertEqual(clm_path.cla_path_get_file_extension(p), '.gz')
-        self.assertEqual(clm_path.cla_path_get_filename(p), 'archive.tar.gz')
-        self.assertEqual(clm_path.cla_path_get_file_name_without_extension(p), 'archive.tar')
-        self.assertEqual(clm_path.cla_path_change_extension(p, 'zip'), os.path.join('folder', 'archive.tar.zip'))
-        self.assertEqual(clm_path.cla_path_change_extension(p, '.txt'), os.path.join('folder', 'archive.tar.txt'))
-        self.assertEqual(clm_path.cla_path_change_extension(p, ''), os.path.join('folder', 'archive.tar'))
-        self.assertFalse(clm_path.cla_path_has_extension('.gitignore'))
-        self.assertTrue(clm_path.cla_path_has_extension(p))
+    def setUp(self):
+        p.clm_path_destroy()
+        p.clm_path_initialize()
 
-    def test_join_directory_and_full_path(self):
-        expected = os.path.join('parent', 'child.txt')
-        self.assertEqual(clm_path.cla_path_join('parent', 'child.txt'), expected)
-        self.assertEqual(clm_path.cla_path_get_directory_name(expected), 'parent')
-        self.assertEqual(clm_path.cla_path_get_full_path('..'), os.path.abspath('..'))
-        self.assertTrue(clm_path.cla_path_is_full_path(os.path.abspath('..')))
-        self.assertFalse(clm_path.cla_path_is_full_path('relative.txt'))
+    def tearDown(self):
+        p.clm_path_destroy()
 
-    def test_relative_path(self):
+    def test_map_replace_unmap(self):
+        p.clm_path_map(100, 'a')
+        self.assertTrue(p.clm_path_is_mapped(100))
+        p.clm_path_map(100, 'b')
+        self.assertEqual(p.clm_path_get(100), 'b')
+        p.clm_path_unmap(100)
+        self.assertFalse(p.clm_path_is_mapped(100))
+        with self.assertRaises(p.PathError): p.clm_path_get(100)
+
+    def test_join_default_destination(self):
+        p.clm_path_map(1, 'c:/media')
+        p.clm_path_map(2, 'movies')
+        p.clm_path_join(1, 2)
+        self.assertEqual(p.clm_path_get(1), 'c:/media/movies')
+        self.assertEqual(p.clm_path_get(2), 'movies')
+
+    def test_join_destination_alias_second(self):
+        p.clm_path_map(1, 'c:/media')
+        p.clm_path_map(2, 'movies')
+        p.clm_path_join(1, 2, destination=2)
+        self.assertEqual(p.clm_path_get(1), 'c:/media')
+        self.assertEqual(p.clm_path_get(2), 'c:/media/movies')
+
+    def test_sanitize_drive_and_relative(self):
+        p.clm_path_map(3, 'd:/programs/../movies/movie.mkv')
+        p.clm_path_sanitize(3)
+        self.assertEqual(p.clm_path_get(3), 'd:/movies/movie.mkv')
+        p.clm_path_map(4, 'a/./b/../c')
+        p.clm_path_sanitize(4, destination=5)
+        self.assertEqual(p.clm_path_get(5), 'a/c')
+        self.assertEqual(p.clm_path_get(4), 'a/./b/../c')
+
+    def test_extension_with_mapped_fragment(self):
+        p.clm_path_map(11, 'program.exx')
+        p.clm_path_map(12, 'exe')
+        p.clm_path_change_extension(11, 12)
+        self.assertEqual(p.clm_path_get(11), 'program.exe')
+        p.clm_path_map(12, '')
+        p.clm_path_change_extension(11, 12, destination=13)
+        self.assertEqual(p.clm_path_get(13), 'program')
+
+    def test_extension_and_components(self):
+        p.clm_path_map(1, 'folder/archive.tar.gz')
+        p.clm_path_get_file_extension(1, 2)
+        p.clm_path_get_filename(1, 3)
+        p.clm_path_get_file_name_without_extension(1, 4)
+        p.clm_path_get_directory_name(1, 5)
+        self.assertEqual([p.clm_path_get(i) for i in (2,3,4,5)], ['.gz','archive.tar.gz','archive.tar','folder'])
+        self.assertTrue(p.clm_path_has_extension(1))
+        p.clm_path_map(6,'.gitignore')
+        self.assertFalse(p.clm_path_has_extension(6))
+
+    def test_map_from_storage_preserves_cursor(self):
+        sid=543210
+        self.assertEqual(clm_storage_create(sid, STORAGE_TYPE_STRING, size=512), STORAGE_SUCCESS)
+        try:
+            self.assertEqual(clm_storage_append(sid,'c:/one'), STORAGE_SUCCESS)
+            self.assertEqual(clm_storage_append(sid,'c:/two'), STORAGE_SUCCESS)
+            self.assertEqual(clm_storage_set_index(sid,1), STORAGE_SUCCESS)
+            p.clm_path_map_from_storage(99,sid,0)
+            self.assertEqual(p.clm_path_get(99),'c:/one')
+            self.assertEqual(clm_storage_get_index(sid),(STORAGE_SUCCESS,1))
+            self.assertEqual(clm_storage_destroy(sid), STORAGE_SUCCESS)
+            self.assertEqual(p.clm_path_get(99),'c:/one')
+        finally:
+            clm_storage_destroy(sid)
+
+    def test_map_from_storage_failures_are_atomic(self):
+        p.clm_path_map(1,'original')
+        with self.assertRaises(p.PathError): p.clm_path_map_from_storage(1,123456789,0)
+        self.assertEqual(p.clm_path_get(1),'original')
+        sid=543211
+        clm_storage_create(sid, STORAGE_TYPE_STRING, size=512)
+        try:
+            with self.assertRaises(p.PathError): p.clm_path_map_from_storage(1,sid,0)
+            self.assertEqual(p.clm_path_get(1),'original')
+        finally: clm_storage_destroy(sid)
+
+    def test_errors_do_not_change_sources(self):
+        p.clm_path_map(1,'original.txt')
+        p.clm_path_map(2,'bad/extension')
+        with self.assertRaises(p.PathError): p.clm_path_change_extension(1,2)
+        self.assertEqual(p.clm_path_get(1),'original.txt')
+        with self.assertRaises(p.PathError): p.clm_path_join(1,404)
+        self.assertEqual(p.clm_path_get(1),'original.txt')
+        with self.assertRaises(p.PathError): p.clm_path_map(7,'bad\x00name')
+        self.assertFalse(p.clm_path_is_mapped(7))
+
+    def test_relative_absolute_and_roots(self):
+        p.clm_path_map(1,'/tmp/a/b')
+        p.clm_path_map(2,'/tmp/a/b/c.txt')
+        p.clm_path_get_relative_path(1,2)
+        self.assertEqual(p.clm_path_get(2),'c.txt')
+        p.clm_path_map(3,'/tmp/x/')
+        p.clm_path_get_path_root(3,4)
+        self.assertEqual(p.clm_path_get(4),'/')
+        self.assertTrue(p.clm_path_is_full_path(3))
+        p.clm_path_trim_ending_separator(3)
+        self.assertEqual(p.clm_path_get(3),'/tmp/x')
+
+    def test_full_path(self):
+        p.clm_path_map(1,'.')
+        p.clm_path_get_full_path(1)
+        self.assertEqual(p.clm_path_get(1),os.path.abspath('.').replace('\\','/'))
+
+    def test_filesystem_and_temporary_dir(self):
         with tempfile.TemporaryDirectory() as root:
-            target = os.path.join(root, 'sub', 'name.txt')
-            self.assertEqual(clm_path.cla_path_get_relative_path(root, target), os.path.join('sub', 'name.txt'))
+            p.clm_path_map(1, root)
+            self.assertTrue(p.clm_path_exists(1))
+            p.clm_path_get_temporary_directory(1,2)
+            directory = p.clm_path_get(2)
+            self.assertTrue(os.path.isdir(directory))
+            os.rmdir(directory)
 
-    def test_separator_and_root_preservation(self):
-        sep = os.sep
-        self.assertEqual(clm_path.cla_path_get_directory_separator(), sep)
-        self.assertTrue(clm_path.cla_path_ends_in_directory_separator('folder' + sep))
-        self.assertFalse(clm_path.cla_path_ends_in_directory_separator('folder'))
-        self.assertEqual(clm_path.cla_path_trim_ending_separator(sep), sep)
-        self.assertEqual(clm_path.cla_path_trim_ending_separator('folder' + sep * 3), 'folder')
-        self.assertEqual(clm_path.cla_path_trim_ending_separator(''), '')
-        self.assertEqual(clm_path.cla_path_get_path_root(sep + 'folder'), sep)
-        self.assertEqual(clm_path.cla_path_get_path_root('relative/folder'), '')
+    def test_random_filename_and_facade(self):
+        p.clm_path_map(1,'mkv')
+        p.Path.get_random_filename(2,1)
+        self.assertRegex(p.Path.get(2),r'^[0-9a-f]{12}\.mkv$')
+        self.assertIn('\x00',p.clm_path_get_invalid_path_characters())
 
-    @unittest.skipUnless(os.name == 'nt', 'Windows-specific drive semantics')
-    def test_windows_roots(self):
-        self.assertEqual(clm_path.cla_path_get_path_root('C:\\some\\file'), 'C:\\')
-        self.assertEqual(clm_path.cla_path_get_path_root('C:relative'), 'C:')
-        self.assertEqual(clm_path.cla_path_trim_ending_separator('C:\\'), 'C:\\')
+    def test_destroy_and_reinitialize(self):
+        p.clm_path_map(1,'a')
+        p.clm_path_destroy()
+        self.assertFalse(p.clm_path_is_mapped(1))
+        p.clm_path_map(1,'new')
+        self.assertEqual(p.clm_path_get(1),'new')
 
-    def test_random_filename(self):
-        first = clm_path.cla_path_get_random_filename('txt')
-        second = clm_path.cla_path_get_random_filename('.txt')
-        self.assertRegex(first, r'^[0-9a-f]{12}\.txt$')
-        self.assertRegex(second, r'^[0-9a-f]{12}\.txt$')
-        self.assertNotEqual(first, second)
-        self.assertRegex(clm_path.cla_path_get_random_filename(), r'^[0-9a-f]{12}$')
-
-    def test_exists_and_temporary_directory(self):
-        with tempfile.TemporaryDirectory() as root:
-            destination = os.path.join(root, 'new', 'nested')
-            created = clm_path.cla_path_get_temporary_directory(destination)
-            self.assertTrue(os.path.isdir(created))
-            self.assertEqual(os.path.dirname(created), os.path.abspath(destination))
-            self.assertTrue(clm_path.cla_path_exists(created))
-            self.assertFalse(clm_path.cla_path_exists(os.path.join(root, 'missing')))
-
-    def test_invalid_path_characters(self):
-        chars = clm_path.cla_path_get_invalid_path_characters()
-        self.assertIn('\x00', chars)
-        if os.name == 'nt':
-            self.assertIn('?', chars)
-            self.assertIn('*', chars)
-        else:
-            self.assertEqual(chars, ['\x00'])
-
-    def test_facade_matches_procedural_api(self):
-        self.assertEqual(clm_path.Path.join('a', 'b'), clm_path.cla_path_join('a', 'b'))
-        self.assertEqual(clm_path.Path.get_filename('a.txt'), clm_path.cla_path_get_filename('a.txt'))
-        self.assertEqual(clm_path.Path.get_path_root(os.sep + 'a'), clm_path.cla_path_get_path_root(os.sep + 'a'))
-        self.assertEqual(clm_path.Path.get_directory_separator(), os.sep)
-        self.assertEqual(clm_path.Path.change_extension('a.txt', 'json'), 'a.json')
-        self.assertEqual(
-            clm_path.Path.get_relative_path('a', os.path.join('a', 'b')),
-            clm_path.cla_path_get_relative_path('a', os.path.join('a', 'b'))
-        )
-
-
-if __name__ == '__main__':
-    unittest.main()
+if __name__=='__main__': unittest.main()

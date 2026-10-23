@@ -24,6 +24,7 @@ The optional :class:`Container` facade forwards directly to the functions.
 """
 
 from typing import Any
+from dataclasses import dataclass
 import math
 
 CONTAINER_TYPE_STRING = 0x01
@@ -33,6 +34,7 @@ CONTAINER_TYPE_INTEGER = 0x04
 CONTAINER_TYPE_LONG_INTEGER = 0x05
 CONTAINER_TYPE_FLOAT = 0x06
 CONTAINER_TYPE_DOUBLE = 0x07
+CONTAINER_TYPE_DYNAMIC = 0xFE
 CONTAINER_TYPE_OBJECT = 0xFF
 
 CONTAINER_SUCCESS = 0x00
@@ -48,6 +50,7 @@ class _Containers:
     """Private holder for typed container dictionaries and their ID-to-type index."""
 
     indexes: dict[int, int] = {}
+    references: dict[int, int] = {}
     cursors: dict[int, int] = {}  # Current key per container, when positioned.
     containers_string: dict[int, dict[int, str]] = {}
     containers_i8: dict[int, dict[int, int]] = {}
@@ -104,7 +107,6 @@ def _clm_container_lookup(container_id: int, container_type: int):
         return CONTAINER_ERROR_TYPE_NOT_MATCHED, None
     return CONTAINER_SUCCESS, _TYPE_STORES[container_type][container_id]
 
-
 def clm_container_create(container_id: int, container_type: int) -> int:
     """Create an empty typed container with a unique integer ID; return a status code."""
     if container_id in _Containers.indexes:
@@ -113,8 +115,8 @@ def clm_container_create(container_id: int, container_type: int) -> int:
         return CONTAINER_ERROR_TYPE_NOT_SUPPORTED
     _TYPE_STORES[container_type][container_id] = {}
     _Containers.indexes[container_id] = container_type
+    _Containers.references[container_id] = 1
     return CONTAINER_SUCCESS
-
 
 def _clm_container_add(container_id: int, container_type: int, key: int, value: Any) -> int:
     """Insert a new indexed value, rejecting missing IDs, type mismatches, and duplicate keys."""
@@ -128,7 +130,6 @@ def _clm_container_add(container_id: int, container_type: int, key: int, value: 
     values[key] = value
     return CONTAINER_SUCCESS
 
-
 def _clm_container_edit(container_id: int, container_type: int, key: int, value: Any) -> int:
     """Replace an existing indexed value without inserting a missing key."""
     status, values = _clm_container_lookup(container_id, container_type)
@@ -140,7 +141,6 @@ def _clm_container_edit(container_id: int, container_type: int, key: int, value:
         return CONTAINER_ERROR_INVALID_VALUE
     values[key] = value
     return CONTAINER_SUCCESS
-
 
 def _clm_container_delete(container_id: int, container_type: int, key: int) -> int:
     """Delete an existing entry; do not remove the container itself."""
@@ -154,7 +154,6 @@ def _clm_container_delete(container_id: int, container_type: int, key: int) -> i
         _Containers.cursors.pop(container_id, None)
     return CONTAINER_SUCCESS
 
-
 def _clm_container_get(container_id: int, container_type: int, key: int) -> tuple[int, Any]:
     """Retrieve an entry as (status, value); a missing entry returns (ID_NOT_FOUND, None)."""
     status, values = _clm_container_lookup(container_id, container_type)
@@ -164,7 +163,6 @@ def _clm_container_get(container_id: int, container_type: int, key: int) -> tupl
         return CONTAINER_ERROR_ID_NOT_FOUND, None
     return CONTAINER_SUCCESS, values[key]
 
-
 def clm_container_contains(container_id: int, key: int) -> tuple[int, bool]:
     """Check whether an index exists; return (status, exists)."""
     container_type = _Containers.indexes.get(container_id)
@@ -172,14 +170,12 @@ def clm_container_contains(container_id: int, key: int) -> tuple[int, bool]:
         return CONTAINER_ERROR_NOT_FOUND, False
     return CONTAINER_SUCCESS, key in _TYPE_STORES[container_type][container_id]
 
-
 def clm_container_count(container_id: int) -> tuple[int, int]:
     """Return (status, number of entries) for a container."""
     container_type = _Containers.indexes.get(container_id)
     if container_type is None:
         return CONTAINER_ERROR_NOT_FOUND, 0
     return CONTAINER_SUCCESS, len(_TYPE_STORES[container_type][container_id])
-
 
 def clm_container_clear(container_id: int) -> int:
     """Remove all entries without deleting the container's ID or declared type."""
@@ -190,7 +186,6 @@ def clm_container_clear(container_id: int) -> int:
     _Containers.cursors.pop(container_id, None)
     return CONTAINER_SUCCESS
 
-
 def clm_container_destroy(container_id: int) -> int:
     """Remove a container and release its Python references; its ID becomes reusable."""
     container_type = _Containers.indexes.pop(container_id, None)
@@ -198,8 +193,8 @@ def clm_container_destroy(container_id: int) -> int:
         return CONTAINER_ERROR_NOT_FOUND
     del _TYPE_STORES[container_type][container_id]
     _Containers.cursors.pop(container_id, None)
+    _Containers.references.pop(container_id, None)
     return CONTAINER_SUCCESS
-
 
 def _clm_container_move(container_id: int, direction: str) -> tuple[int, int | None]:
     """Move the container's cursor in insertion order and return (status, key).
@@ -236,11 +231,9 @@ def _clm_container_move(container_id: int, direction: str) -> tuple[int, int | N
     _Containers.cursors[container_id] = key
     return CONTAINER_SUCCESS, key
 
-
 def clm_container_first(container_id: int) -> tuple[int, int | None]:
     """Position at the first inserted entry and return (status, entry_key)."""
     return _clm_container_move(container_id, "first")
-
 
 def clm_container_previous(container_id: int) -> tuple[int, int | None]:
     """Move to the previous entry and return (status, entry_key).
@@ -250,7 +243,6 @@ def clm_container_previous(container_id: int) -> tuple[int, int | None]:
     """
     return _clm_container_move(container_id, "previous")
 
-
 def clm_container_next(container_id: int) -> tuple[int, int | None]:
     """Move to the next entry and return (status, entry_key).
 
@@ -259,11 +251,9 @@ def clm_container_next(container_id: int) -> tuple[int, int | None]:
     """
     return _clm_container_move(container_id, "next")
 
-
 def clm_container_last(container_id: int) -> tuple[int, int | None]:
     """Position at the last inserted entry and return (status, entry_key)."""
     return _clm_container_move(container_id, "last")
-
 
 def clm_container_add_string(container_id: int, key: int, value: str) -> int:
     """Add a new entry in a string container."""
@@ -394,6 +384,199 @@ def clm_container_get_object(container_id: int, key: int) -> tuple[int, Any]:
     return _clm_container_get(container_id, CONTAINER_TYPE_OBJECT, key)
 
 
+
+@dataclass(frozen=True)
+class ContainerInfo:
+    """Detached, read-only snapshot; reserved=-1 means capacity is not exposed."""
+    id: int
+    type: int
+    committed: int
+    reserved: int
+    references: int
+    index: int
+
+
+def _clm_container_values(container_id: int):
+    kind = _Containers.indexes.get(container_id)
+    if kind is None:
+        return None
+    return _TYPE_STORES[kind][container_id]
+
+
+def _clm_container_position(container_id: int) -> int:
+    values = _clm_container_values(container_id)
+    if values is None:
+        return -1
+    key = _Containers.cursors.get(container_id)
+    if key is None or key not in values:
+        return -1
+    return list(values).index(key)
+
+
+def clm_container_get_info(container_id: int) -> tuple[int, ContainerInfo | None]:
+    """Return a detached metadata snapshot, or (NOT_FOUND, None)."""
+    kind = _Containers.indexes.get(container_id)
+    if kind is None:
+        return CONTAINER_ERROR_NOT_FOUND, None
+    values = _TYPE_STORES[kind][container_id]
+    return CONTAINER_SUCCESS, ContainerInfo(
+        container_id, kind, len(values), -1,
+        _Containers.references[container_id], _clm_container_position(container_id)
+    )
+
+
+def clm_container_reference(container_id: int) -> int:
+    """Retain one explicit owner of a container, including zero-reference containers."""
+    if container_id not in _Containers.indexes:
+        return CONTAINER_ERROR_NOT_FOUND
+    _Containers.references[container_id] += 1
+    return CONTAINER_SUCCESS
+
+
+def clm_container_unreference(container_id: int) -> int:
+    """Release one explicit owner, without destroying the container."""
+    refs = _Containers.references.get(container_id)
+    if refs is None:
+        return CONTAINER_ERROR_NOT_FOUND
+    if refs == 0:
+        return CONTAINER_ERROR_INVALID_VALUE
+    _Containers.references[container_id] = refs - 1
+    return CONTAINER_SUCCESS
+
+
+def clm_container_pending_count() -> int:
+    """Count registered containers eligible for disposal (references == 0).
+
+    This is a read-only snapshot; it neither decrements references nor disposes.
+    Do not call concurrently with mutations of the module registry.
+    """
+    return sum(refs == 0 for refs in _Containers.references.values())
+
+
+def clm_container_dispose() -> tuple[int, int]:
+    """Destroy zero-reference containers; return (status, destroyed_count).
+
+    Do not run concurrently with registry mutation. Explicit destroy() remains
+    unconditional for backward compatibility.
+    """
+    eligible = [cid for cid, refs in tuple(_Containers.references.items()) if refs == 0]
+    disposed = 0
+    for cid in eligible:
+        if _Containers.references.get(cid) == 0:
+            if clm_container_destroy(cid) == CONTAINER_SUCCESS:
+                disposed += 1
+    return CONTAINER_SUCCESS, disposed
+
+
+def clm_container_iterate(container_id: int) -> int:
+    """Position the shared cursor at the first key; return status only."""
+    return clm_container_first(container_id)[0]
+
+
+def clm_container_iterate_backward(container_id: int) -> int:
+    """Position the shared cursor at the last key; return status only."""
+    return clm_container_last(container_id)[0]
+
+
+def clm_container_move_first(container_id: int) -> int:
+    return clm_container_first(container_id)[0]
+
+
+def clm_container_move_last(container_id: int) -> int:
+    return clm_container_last(container_id)[0]
+
+
+def clm_container_move_next(container_id: int) -> int:
+    return clm_container_next(container_id)[0]
+
+
+def clm_container_move_previous(container_id: int) -> int:
+    return clm_container_previous(container_id)[0]
+
+
+def clm_container_get(container_id: int) -> tuple[int, Any]:
+    """Get the value at the current cursor without moving it."""
+    values = _clm_container_values(container_id)
+    if values is None:
+        return CONTAINER_ERROR_NOT_FOUND, None
+    key = _Containers.cursors.get(container_id)
+    if key is None or key not in values:
+        return CONTAINER_ERROR_ID_NOT_FOUND, None
+    return CONTAINER_SUCCESS, values[key]
+
+
+def clm_container_get_key(container_id: int) -> tuple[int, int | None]:
+    """Get the entry key at the current cursor without moving it."""
+    values = _clm_container_values(container_id)
+    if values is None:
+        return CONTAINER_ERROR_NOT_FOUND, None
+    key = _Containers.cursors.get(container_id)
+    if key is None or key not in values:
+        return CONTAINER_ERROR_ID_NOT_FOUND, None
+    return CONTAINER_SUCCESS, key
+
+
+def clm_container_is_first(container_id: int) -> tuple[int, bool]:
+    status, index = clm_container_get_index(container_id)
+    return status, status == CONTAINER_SUCCESS and index == 0
+
+
+def clm_container_is_last(container_id: int) -> tuple[int, bool]:
+    status, index = clm_container_get_index(container_id)
+    if status != CONTAINER_SUCCESS:
+        return status, False
+    return CONTAINER_SUCCESS, index == len(_clm_container_values(container_id)) - 1
+
+
+def clm_container_get_count(container_id: int) -> tuple[int, int]:
+    return clm_container_count(container_id)
+
+
+def clm_container_get_index(container_id: int) -> tuple[int, int]:
+    """Get positional index (zero-based), or -1 if unpositioned."""
+    if container_id not in _Containers.indexes:
+        return CONTAINER_ERROR_NOT_FOUND, -1
+    return CONTAINER_SUCCESS, _clm_container_position(container_id)
+
+
+def clm_container_set_index(container_id: int, index: int) -> int:
+    """Position the cursor by insertion-order index; reject invalid indices."""
+    values = _clm_container_values(container_id)
+    if values is None:
+        return CONTAINER_ERROR_NOT_FOUND
+    if type(index) is not int or not 0 <= index < len(values):
+        return CONTAINER_ERROR_INVALID_VALUE
+    _Containers.cursors[container_id] = list(values)[index]
+    return CONTAINER_SUCCESS
+
+
+def clm_container_slice(
+    source: int, destination: int, start: int, count: int
+) -> int:
+    """Copy a keyed insertion-order range, replacing destination atomically.
+
+    Original entry keys are retained. Object values are shallow references.
+    Neither cursor changes on error; destination cursor resets on success.
+    """
+    src = _clm_container_values(source)
+    dst = _clm_container_values(destination)
+    if src is None or dst is None:
+        return CONTAINER_ERROR_NOT_FOUND
+    if source == destination or type(start) is not int or type(count) is not int:
+        return CONTAINER_ERROR_INVALID_VALUE
+    if _Containers.indexes[source] != _Containers.indexes[destination]:
+        return CONTAINER_ERROR_TYPE_NOT_MATCHED
+    if start < 0 or count < 0 or start > len(src) or count > len(src) - start:
+        return CONTAINER_ERROR_INVALID_VALUE
+    try:
+        selected = dict(list(src.items())[start:start + count])
+    except MemoryError:
+        return CONTAINER_ERROR_INVALID_VALUE
+    _TYPE_STORES[_Containers.indexes[destination]][destination] = selected
+    _Containers.cursors.pop(destination, None)
+    return CONTAINER_SUCCESS
+
+
 class Container:
     """Convenience facade for the procedural CLM container API."""
 
@@ -438,3 +621,23 @@ class Container:
     previous = staticmethod(clm_container_previous)
     next = staticmethod(clm_container_next)
     last = staticmethod(clm_container_last)
+
+    get_info = staticmethod(clm_container_get_info)
+    reference = staticmethod(clm_container_reference)
+    unreference = staticmethod(clm_container_unreference)
+    dispose = staticmethod(clm_container_dispose)
+    pending_count = staticmethod(clm_container_pending_count)
+    iterate = staticmethod(clm_container_iterate)
+    iterate_backward = staticmethod(clm_container_iterate_backward)
+    move_first = staticmethod(clm_container_move_first)
+    move_last = staticmethod(clm_container_move_last)
+    move_next = staticmethod(clm_container_move_next)
+    move_previous = staticmethod(clm_container_move_previous)
+    get = staticmethod(clm_container_get)
+    get_key = staticmethod(clm_container_get_key)
+    is_first = staticmethod(clm_container_is_first)
+    is_last = staticmethod(clm_container_is_last)
+    get_count = staticmethod(clm_container_get_count)
+    get_index = staticmethod(clm_container_get_index)
+    set_index = staticmethod(clm_container_set_index)
+    slice = staticmethod(clm_container_slice)

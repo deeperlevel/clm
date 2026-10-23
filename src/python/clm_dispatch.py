@@ -1,24 +1,6 @@
-# =============================================================================
-# CLM — Cross Language Modules
-#
-# An initiative by Deeperlevel, developed with community contributions.
-# https://github.com/deeperlevel/clm
-# Contact: deeparchive@outlook.com
-#
-# Public Domain — CC0 1.0 Universal
-# https://creativecommons.org/publicdomain/zero/1.0/
-#
-# Free to use, modify, redistribute, and bundle for any purpose.
-# Attribution and retention of this notice are appreciated, not required.
-#
-# Provided AS IS, without warranty or liability.
-#
-# Don't start from scratch, bro.
-# =============================================================================
-
 """ID-based async message dispatch using CLM Container and CLM Depend.
 
-Handlers accept (*resolved_dependencies, message). Optional loggers accept a
+Handlers accept (resolved_dependencies, message). Optional loggers accept a
 Message envelope. Each public dispatch operation creates a correlation chain;
 nested dispatches inherit the correlation using a context variable.
 """
@@ -32,15 +14,12 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from clm_container import (
-    CONTAINER_SUCCESS,
-    CONTAINER_TYPE_OBJECT,
-    clm_container_add_object,
-    clm_container_create,
-    clm_container_delete_object,
-    clm_container_destroy,
-    clm_container_get_object,
+    CONTAINER_SUCCESS, CONTAINER_TYPE_OBJECT, clm_container_add_object,
+    clm_container_contains, clm_container_create, clm_container_delete_object,
+    clm_container_destroy, clm_container_get_object,
 )
-from clm_depend import clm_depend_invoke_async
+from clm_depend import (clm_depend_resolve, clm_depend_get,
+    clm_depend_get_info, clm_depend_unreference, DependLifetime)
 
 HANDLER_CONTAINER = 0xFED001
 LOGGER_CONTAINER = 0xFED002
@@ -74,7 +53,7 @@ class DispatchError(RuntimeError):
 class DispatchHandler:
     """A callback and the numeric DI service IDs it consumes."""
     dependencies: tuple[int, ...]
-    handler: Callable[..., Any]
+    handler: Callable[[list[Any], Any], Any]
 
 
 class _DispatchStates:
@@ -125,7 +104,7 @@ def clm_dispatch_destroy() -> None:
 def clm_dispatch_register_handler(
     message_id: int,
     dependencies: list[int],
-    callback: Callable[..., Any],
+    callback: Callable[[list[Any], Any], Any],
 ) -> None:
     """Register exactly one handler per message ID; reject duplicate IDs."""
     if type(message_id) is not int or message_id < 0:
@@ -134,8 +113,6 @@ def clm_dispatch_register_handler(
         raise ValueError("dependencies must contain nonnegative integer IDs")
     if not callable(callback):
         raise TypeError("callback must be callable")
-    if not inspect.iscoroutinefunction(callback):
-        raise TypeError("handler must be an async function")
     clm_dispatch_init()
     with _DispatchStates.lock:
         status = clm_container_add_object(
@@ -186,11 +163,24 @@ async def clm_dispatch_invoke(message_id: int, message: Any) -> Any:
     status, handler = clm_container_get_object(HANDLER_CONTAINER, message_id)
     if status != CONTAINER_SUCCESS:
         raise DispatchError(f"{message_id} has no handler")
-    # Depend resolves arguments and awaits the handler; no duplicated DI logic.
-    return await clm_depend_invoke_async(list(handler.dependencies), handler.handler, message)
+    # Do not hold dispatch registry locks across DI resolution or awaits.
+    # Resolve one at a time so partial failures do not leak transient references.
+    # Handler receives VALUES (historic Dispatch contract), not Depend IDs.
+    acquired = []
+    try:
+        for service_id in handler.dependencies:
+            iid = clm_depend_resolve(service_id)
+            acquired.append(iid)
+        values = [clm_depend_get(iid) for iid in acquired]
+        return await _await_if_needed(handler.handler(values, message))
+    finally:
+        # Depend caches own their lifetimes; only transient resolves acquire an
+        # invocation-owned reference. Run this on exception and cancellation too.
+        for iid in reversed(acquired):
+            if clm_depend_get_info(iid).lifetime == DependLifetime.TRANSIENT:
+                clm_depend_unreference(iid)
 
 
-# noinspection broad-exception
 async def _dispatch(
     message_id: int, message: Any, logger_id: int, context: str,
     log: bool = True, *, chain: Chain | None = None,

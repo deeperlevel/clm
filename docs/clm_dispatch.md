@@ -390,3 +390,24 @@ The shared contract defines **observable behavior**, not a common runtime or ide
 **CLM — Cross Language Modules**  
 *Different languages. Shared technologies. No borders.*  
 **Don't start from scratch, bro.**
+
+
+## Tracked Depend interoperability (revised)
+
+`clm_dispatch_invoke(message_id, payload)` resolves each declared Depend service ID,
+obtains the corresponding **value** with `clm_depend_get(instance_id)`, and invokes
+`handler(dependency_values, payload)` (one ordered collection, then payload).
+
+- A transient resolution owns one reference for the duration of the handler, including async awaits.
+- All invocation-owned transient references are released in reverse order on completion,
+  dependency-resolution failure, handler exception, or cancellation.
+- Cached singleton, lazy and scoped instances are not automatically unreferenced by Dispatch.
+- Released transient records stay tracked until `clm_depend_dispose()` (or Managed) collects them.
+- A handler that retains any transient value **beyond the callback** must explicitly acquire
+  an additional reference to the instance ID through Depend; merely retaining a Python value
+  does not pin its CLM resource. For retained ownership, use an explicit Depend handle.
+- Exactly one registered handler per message ID; `emit` is not a fan-out bus.
+- Logger failures are best-effort and do not suppress handler failures.
+
+Concurrent async callbacks are possible; Depend's current single active scope remains
+process-global, and must not be mistaken for an async-request-local scope.

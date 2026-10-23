@@ -1,21 +1,3 @@
-# =============================================================================
-# CLM — Cross Language Modules
-#
-# An initiative by Deeperlevel, developed with community contributions.
-# https://github.com/deeperlevel/clm
-# Contact: deeparchive@outlook.com
-#
-# Public Domain — CC0 1.0 Universal
-# https://creativecommons.org/publicdomain/zero/1.0/
-#
-# Free to use, modify, redistribute, and bundle for any purpose.
-# Attribution and retention of this notice are appreciated, not required.
-#
-# Provided AS IS, without warranty or liability.
-#
-# Don't start from scratch, bro.
-# =============================================================================
-
 """Run with: python -m unittest -v test_clm_container.py"""
 import unittest
 import clm_container as c
@@ -33,7 +15,6 @@ class ContainerTests(unittest.TestCase):
         self.ids.append(container_id)
         self.assertEqual(c.Container.create(container_id, kind), c.CONTAINER_SUCCESS)
 
-    # noinspection bad-argument-type
     def test_every_variant_add_get_edit_delete(self):
         values = [
             (c.CONTAINER_TYPE_STRING, 'string', 'hello', 'world'),
@@ -57,7 +38,6 @@ class ContainerTests(unittest.TestCase):
                 self.assertEqual(getattr(c.Container, 'delete_'+suffix)(i, 2), c.CONTAINER_SUCCESS)
                 self.assertEqual(c.Container.count(i), (c.CONTAINER_SUCCESS, 0))
 
-    # noinspection bad-argument-type
     def test_errors(self):
         self.create(200, c.CONTAINER_TYPE_INTEGER)
         self.assertEqual(c.Container.create(200, c.CONTAINER_TYPE_INTEGER), c.CONTAINER_ERROR_DUPLICATE_ID)
@@ -70,7 +50,6 @@ class ContainerTests(unittest.TestCase):
         self.assertEqual(c.Container.edit_integer(200, 7, 5), c.CONTAINER_ERROR_ID_NOT_FOUND)
         self.assertEqual(c.Container.delete_integer(200, 7), c.CONTAINER_ERROR_ID_NOT_FOUND)
 
-    # noinspection bad-argument-type
     def test_type_bounds(self):
         self.create(300, c.CONTAINER_TYPE_BYTE)
         for value in (128, -129, True, '7'):
@@ -78,7 +57,6 @@ class ContainerTests(unittest.TestCase):
         self.create(301, c.CONTAINER_TYPE_FLOAT)
         self.assertEqual(c.Container.add_float(301, 0, 1e100), c.CONTAINER_ERROR_INVALID_VALUE)
 
-    # noinspection bad-argument-type
     def test_clear_destroy_reuse(self):
         self.create(400, c.CONTAINER_TYPE_STRING)
         c.Container.add_string(400, 0, 'x')
@@ -88,7 +66,6 @@ class ContainerTests(unittest.TestCase):
         self.assertEqual(c.Container.count(400), (c.CONTAINER_ERROR_NOT_FOUND, 0))
         self.assertEqual(c.Container.create(400, c.CONTAINER_TYPE_INTEGER), c.CONTAINER_SUCCESS)
 
-    # noinspection bad-argument-type
     def test_iterator_forward_backward_insertion_order(self):
         self.create(500, c.CONTAINER_TYPE_OBJECT)
         for key, value in ((20, "b"), (5, None), (100, {"name": "Asia"})):
@@ -107,7 +84,6 @@ class ContainerTests(unittest.TestCase):
         self.assertEqual(c.Container.previous(500), (c.CONTAINER_ERROR_ID_NOT_FOUND, None))
         self.assertEqual(c.Container.next(500), (c.CONTAINER_SUCCESS, 5))
 
-    # noinspection bad-argument-type
     def test_iterator_empty_missing_and_independent_cursors(self):
         self.create(501, c.CONTAINER_TYPE_INTEGER)
         self.create(502, c.CONTAINER_TYPE_STRING)
@@ -122,7 +98,6 @@ class ContainerTests(unittest.TestCase):
         self.assertEqual(c.Container.next(501), (c.CONTAINER_SUCCESS, 8))
         self.assertEqual(c.Container.previous(502), (c.CONTAINER_SUCCESS, 30))
 
-    # noinspection bad-argument-type
     def test_iterator_mutations_and_id_reuse(self):
         self.create(503, c.CONTAINER_TYPE_INTEGER)
         for key in (1, 2, 3):
