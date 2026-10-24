@@ -1,12 +1,4 @@
-# CLM — Cross Language Modules
-
-Public domain (CC0 1.0 Universal). https://github.com/deeperlevel/clm
-
-> Don't start from scratch, bro.
-
-# clm_toml
-
-**One-line description:** Parse and serialize tables, scalar fields, and arrays in a practical TOML subset.
+# CLM TOML
 
 ## Public API
 

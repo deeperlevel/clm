@@ -1,14 +1,5 @@
 # CLM UA — User-Agent Parser
 
-**Module:** `clm_ua`  
-**Project:** CLM — Cross Language Modules  
-**Official repository:** https://github.com/deeperlevel/clm  
-**License:** CC0 1.0 Universal  
-**Design:** Procedural-first, language-agnostic, dependency-free heuristic parsing
-
-> Different languages. Shared technologies. No borders.  
-> Don't start from scratch, bro.
-
 ## Overview
 
 `clm_ua` examines a raw HTTP **User-Agent** string and produces a reusable record describing the browser, operating system, device category, and whether the string resembles a web crawler. The module provides both a complete parse operation and focused helper operations.

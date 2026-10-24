@@ -1,9 +1,4 @@
-# CLM ID — Cross Language Name-to-ID Registry
-
-**Module:** `clm_id`  
-**Project:** CLM — Cross Language Modules  
-**Repository:** https://github.com/deeperlevel/clm  
-**License:** CC0 1.0 Universal
+# CLM ID
 
 ## Overview
 

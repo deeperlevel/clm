@@ -55,14 +55,25 @@ CLM is developed incrementally, based on actual use in frameworks and libraries.
 
 | Module | Purpose |
 | --- | --- |
-| [`clm_console`](./docs/clm_console.md) | Console and terminal operations beyond basic print/read, such as cursor and input-mode controls. |
-| [`clm_container`](./docs/clm_container.md) | Non-generic, ID/index-based containers with typed operations and traversal. |
+| [`clm_console`](./docs/clm_console.md) | Provides a small, procedural interface for interactive terminal input, output, screen control, and console lifecycle management. |
+| [`clm_container`](./docs/clm_container.md) | A procedural, **typed key/value collection registry**. A numeric **container ID** identifies each collection. Within it, caller-defined numeric **entry keys** identify values. Container keys are **not** positional array indices; gaps in the numeric key space are permitted. |
+| [`clm_storage`](./docs/clm_storage.md) | ID-addressed, typed sequential and multidimensional storage with explicit allocation, navigation, transformations, and manually managed lifetimes. |
 | [`clm_id`](./docs/clm_id.md) | Map readable names to integer IDs; optionally use case-insensitive matching. |
-| [`clm_depend`](./docs/clm_depend.md) | ID-based dependency registration, resolution, invocation, and service lifetimes. |
-| [`clm_dispatch`](./docs/clm_dispatch.md) | Asynchronous command, event, query, and exception dispatch with dependency injection and optional best-effort logging. |
-| [`clm_path`](./docs/clm_path.md) | Useful filesystem path operations, backed by native facilities where available. |
+| [`clm_depend`](./docs/clm_depend.md) | Procedural, ID-based dependency injection and factories with tracked instance identities, explicit references, and deferred transient disposal. |
+| [`clm_ecs`](./docs/clm_ecs.md) | ID-based entity and component composition with system queries built on CLM Depend's tracked transient factories. |
+| [`clm_dispatch`](./docs/clm_dispatch.md) | A procedural, ID-based, asynchronous message dispatcher |
+| [`clm_path`](./docs/clm_path.md) | ID-addressed filesystem path mapping, composition and transformation using CLM-owned string containers. |
 | [`clm_formats`](./docs/clm_formats.md) | Provides reusable lexical processing, a common document-tree representation, and parsing and serialization of several text-based data formats. |
+| [`clm_format`](./docs/clm_format.md) | Reusable lexical rules, tokenization, and ID-mapped owned document trees shared by independent data-format codecs. |
+| [`clm_ini`](./docs/clm_ini.md) | Parse and serialize sectioned INI data as string-valued CLM objects. |
+| [`clm_csv`](./docs/clm_csv.md) | Parse and serialize header-based CSV into CLM arrays of string-valued row objects. |
+| [`clm_json`](./docs/clm_json.md) | Parse and serialize JSON using CLM-owned document trees and registered numeric field IDs. |
+| [`clm_yaml`](./docs/clm_yaml.md) | Parse and serialize a deliberately limited block-oriented YAML subset. |
+| [`clm_toml`](./docs/clm_toml.md) | Parse and serialize tables, scalar fields, and arrays in a practical TOML subset. |
 | [`clm_platform`](./docs/clm_platform.md) | Focused operating-system and platform capabilities. |
+| [`clm_directory`](./docs/clm_directory.md) | Provides directory operations only through registered CLM Path IDs. It never requires callers to pass mutable output buffers or raw path strings to directory functions. |
+| [`clm_file`](./docs/clm_file.md) | Provides whole-file, text/line, and block-streaming file operations through mapped **CLM Path IDs** and caller-created **CLM Storage IDs**. |
+| [`clm_managed`](./docs/clm_managed.md) | Optional manual or interval-based coordinator for deferred disposal of CLM Depend, Container and Storage resources. |
 | [`clm_ua`](./docs/clm_ua.md) | Lightweight User-Agent parsing. |
 | [`clm_size`](./docs/clm_size.md) | A simple size object. |
 | [`clm_position`](./docs/clm_position.md) | A simple position object. |

@@ -1,13 +1,4 @@
-# `clm_position` — Position Representation
-
-**CLM — Cross Language Modules**  
-An initiative by Deeperlevel, developed with community contributions.  
-Official repository: https://github.com/deeperlevel/clm  
-Contact: deeparchive@outlook.com  
-License: [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/)  
-
-> Different languages. Shared technologies. No borders.  
-> Don't start from scratch, bro.
+# CLM Position
 
 ## Overview
 

@@ -1,11 +1,6 @@
-# CLM Managed — Language-Agnostic Specification
+# CLM Managed
 
-**One-line description:** Optional manual or interval-based coordinator for deferred disposal of CLM Depend, Container and Storage resources.
-
-**Project:** CLM — Cross Language Modules · Deeperlevel · CC0 1.0 Universal  
-**Motto:** Don't start from scratch, bro.
-
-## Goal
+## Overview
 
 `clm_managed` is **not** a tracing, cycle-detecting or host-language garbage collector. It is an optional scheduler invoking resource-owning CLM modules' `dispose()` operations. No stack scanning, pointer discovery, scope inference, automatic reference counting, arbitrary object cleanup or forced reclamation occurs.
 

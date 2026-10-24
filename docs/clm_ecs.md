@@ -1,9 +1,4 @@
-# CLM ECS — Language-Agnostic Specification
-
-**One-line description:** ID-based entity and component composition with system queries built on CLM Depend's tracked transient factories.
-
-**Project:** CLM — Cross Language Modules · Deeperlevel · CC0 1.0 Universal  
-**Motto:** Don't start from scratch, bro.
+# CLM ECS
 
 ## Purpose and boundaries
 

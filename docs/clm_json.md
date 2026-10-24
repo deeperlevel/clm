@@ -1,12 +1,4 @@
-# CLM — Cross Language Modules
-
-Public domain (CC0 1.0 Universal). https://github.com/deeperlevel/clm
-
-> Don't start from scratch, bro.
-
-# clm_json
-
-**One-line description:** Parse and serialize JSON using CLM-owned document trees and registered numeric field IDs.
+# CLM JSON
 
 ## Public API
 

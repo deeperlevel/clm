@@ -1,9 +1,4 @@
-# CLM Storage — Language-agnostic specification
-
-**One-line description:** ID-addressed, typed sequential and multidimensional storage with explicit allocation, navigation, transformations, and manually managed lifetimes.
-
-CLM — Cross Language Modules · Deeperlevel · https://github.com/deeperlevel/clm · deeparchive@outlook.com  
-Public Domain — CC0 1.0 Universal · Provided AS IS · **Don't start from scratch, bro.**
+# CLM Storage
 
 ## 1. Purpose and boundaries
 

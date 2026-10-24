@@ -1,11 +1,4 @@
-# CLM Formats (`clm_formats`)
-
-> **Cross Language Modules — language-agnostic specification**  
-> **Initiative:** Deeperlevel and community contributors  
-> **Repository:** https://github.com/deeperlevel/clm  
-> **License:** CC0 1.0 Universal (see the repository's `LICENSE`)  
-> **Philosophy:** Different languages. Shared technologies. No borders.  
-> *Don't start from scratch, bro.*
+# CLM Formats
 
 ## 1. Overview
 

@@ -1,15 +1,5 @@
 # CLM Dispatch
 
-**Cross Language Modules · Language-agnostic module reference**
-
-CLM is an initiative by **Deeperlevel**, developed with community contributions.  
-Official repository: https://github.com/deeperlevel/clm  
-Contact: deeparchive@outlook.com  
-License: [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) — subject to the rights applicable to each contribution.
-
-> **Different languages. Shared technologies. No borders.**  
-> *Don't start from scratch, bro.*
-
 ## Overview
 
 `clm_dispatch` is a **procedural, ID-based, asynchronous message dispatcher**. Applications associate numeric message IDs with handler functions, declare which registered services each handler needs, and dispatch messages without requiring inheritance, reflection, decorators, or a particular object model.

@@ -1,12 +1,4 @@
-# CLM — Cross Language Modules
-
-Public domain (CC0 1.0 Universal). https://github.com/deeperlevel/clm
-
-> Don't start from scratch, bro.
-
-# clm_ini
-
-**One-line description:** Parse and serialize sectioned INI data as string-valued CLM objects.
+# CLM INI
 
 ## Public API
 

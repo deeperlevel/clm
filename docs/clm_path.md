@@ -1,10 +1,4 @@
-# CLM Path (`clm_path`)
-
-> **One-line description:** ID-addressed filesystem path mapping, composition and transformation using CLM-owned string containers.
-
-**CLM — Cross Language Modules** · Deeperlevel · https://github.com/deeperlevel/clm  
-Contact: deeparchive@outlook.com · Public Domain (CC0 1.0 Universal)  
-*Don't start from scratch, bro.*
+# CLM Path
 
 ## Purpose and design
 

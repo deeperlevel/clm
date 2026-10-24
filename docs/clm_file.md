@@ -1,8 +1,4 @@
-# CLM File — Language-agnostic contract (v0.1)
-
-**CLM — Cross Language Modules** · Deeperlevel · [github.com/deeperlevel/clm](https://github.com/deeperlevel/clm) · Public Domain [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/).
-
-*Don't start from scratch, bro.*
+# CLM File
 
 ## Purpose
 

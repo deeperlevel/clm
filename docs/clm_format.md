@@ -1,12 +1,4 @@
-# CLM — Cross Language Modules
-
-Public domain (CC0 1.0 Universal). https://github.com/deeperlevel/clm
-
-> Don't start from scratch, bro.
-
-# clm_format
-
-**One-line description:** Reusable lexical rules, tokenization, and ID-mapped owned document trees shared by independent data-format codecs.
+# CLM Format
 
 ## Functions and types
 

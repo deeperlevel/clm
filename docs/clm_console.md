@@ -1,12 +1,5 @@
 # CLM Console
 
-**Module:** `clm_console`  
-**Project:** CLM — Cross Language Modules  
-**Official repository:** https://github.com/deeperlevel/clm  
-**License:** CC0 1.0 Universal (subject to the repository's applicable licensing terms)
-
-> **Different languages. Shared technologies. No borders.**
-
 ## Overview
 
 CLM Console provides a small, procedural interface for interactive terminal input, output, screen control, and console lifecycle management. It defines *what an operation does*, not which operating-system calls, terminal sequences, libraries, or language features must implement it.

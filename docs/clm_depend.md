@@ -1,11 +1,5 @@
 # CLM Depend
 
-**One-line description:** Procedural, ID-based dependency injection and factories with tracked instance identities, explicit references, and deferred transient disposal.
-
-Cross Language Modules (CLM) · Deeperlevel · https://github.com/deeperlevel/clm · deeparchive@outlook.com  
-**License:** Public Domain — CC0 1.0 Universal · https://creativecommons.org/publicdomain/zero/1.0/  
-*Don't start from scratch, bro.*
-
 ## Purpose
 
 `clm_depend` registers constructors by integer **service ID**, resolves their dependencies in order, stores produced instances in an internal `clm_container` object container, and returns integer **instance IDs**. It is procedural-first and does not require classes, reflection, generics, service locators, or language-specific lifetime detection.

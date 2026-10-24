@@ -1,12 +1,4 @@
-# CLM — Cross Language Modules
-
-Public domain (CC0 1.0 Universal). https://github.com/deeperlevel/clm
-
-> Don't start from scratch, bro.
-
-# clm_yaml
-
-**One-line description:** Parse and serialize a deliberately limited block-oriented YAML subset.
+# CLM YAML
 
 ## Public API
 

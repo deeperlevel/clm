@@ -1,12 +1,4 @@
-# CLM Container — Language-Agnostic Specification
-
-**Module:** `clm_container`  
-**Project:** CLM — Cross Language Modules  
-**Repository:** https://github.com/deeperlevel/clm  
-**Contact:** deeparchive@outlook.com  
-**License:** CC0 1.0 Universal — https://creativecommons.org/publicdomain/zero/1.0/
-
-> Don't start from scratch, bro.
+# CLM Container
 
 ## 1. Purpose and scope
 
