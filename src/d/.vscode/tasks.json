@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build D (debug)",
+      "dependsOn": ["Clean D outputs", "Compile D (debug)"],
+      "dependsOrder": "sequence"
+    },
+    {
+      "label": "Clean D outputs",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "New-Item -ItemType Directory -Path 'bin' -Force | Out-Null; $files = @('bin/main.obj', 'bin/main.o', 'bin/main', 'bin/main.exe', 'bin/main.pdb'); foreach ($file in $files) { if (Test-Path $file) { Remove-Item $file -ErrorAction Stop } }"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Compile D (debug)",
+      "type": "process",
+      "command": "ldc2",
+      "args": ["-i", "main.d", "-od=bin", "-of=bin/main.exe", "-g"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

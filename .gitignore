@@ -219,3 +219,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 /src/python/.idea
+/src/cpp/.idea
+/src/go/.idea
+/src/c/.idea

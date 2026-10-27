@@ -289,6 +289,44 @@ A conforming implementation should verify that:
 - [ ] `clear` removes mappings but preserves the matching mode.
 - [ ] The procedural API remains usable without OOP or reflection.
 
+## C reference implementation
+
+The C binding is provided by `src/c/clm/id.h` and uses `clm_dictionary`/BPA for
+its shared process-local state. Define `CLM_ID_IMPLEMENTATION` in exactly one
+C source file, in addition to the one definition required by `clm/bpa.h`.
+`clm_id_clear` retains allocated registry storage; `clm_id_shutdown` releases
+the module's private dictionaries and scratch storage.
+
+The C procedural API is:
+
+| Function | Behavior |
+|---|---|
+| `clm_id_register(name, id)` | Adds a mapping; rejects an existing effective name. |
+| `clm_id_map(name, id)` | Convenience alias for `clm_id_register`. |
+| `clm_id_set(name, id)` | Adds a mapping or updates its ID while preserving original spelling. |
+| `clm_id_get(name)` | Returns the mapped ID or `CLM_ID_NOT_FOUND`. |
+| `clm_id_try_get(name, &id)` | Status-returning alternative that can distinguish a missing name from any `clm_id` value. |
+| `clm_id_remove(name)` / `clm_id_unmap_name(name)` | Removes one mapping by name. |
+| `clm_id_unmap(id)` | Removes all names (aliases) associated with the ID. |
+| `clm_id_set_case_sensitive(enabled)` | Rebuilds the name index, failing atomically if names collide. |
+| `clm_id_is_case_sensitive()` | Returns the active matching mode. |
+| `clm_id_clear()` | Removes mappings without changing the matching mode. |
+| `clm_id_gen_reset()` / `clm_id_gen_next()` | Resets or advances the sequential generator, whose first result is zero. |
+
+`clm_id_get` uses `CLM_ID_NOT_FOUND` (`UINT64_MAX`) as its missing-name
+sentinel; use `clm_id_try_get` if that value itself must be returned without
+ambiguity. The C binding accepts nonempty, NUL-terminated UTF-8 strings and
+rejects malformed UTF-8. It does not perform Unicode normalization.
+Case-insensitive mode folds ASCII letters only; non-ASCII bytes remain
+case-sensitive. It therefore does not provide the Unicode case-folding
+semantics described by the language-neutral contract.
+
+The internal IDs `ID_STORAGE_ID`, `CLM_ID_INDEX_STORAGE_ID`,
+`CLM_ID_NAMES_STORAGE_ID`, `CLM_ID_VALUES_STORAGE_ID`, and
+`CLM_ID_NAME_BUFFER_ID` are reserved and must not be used by applications.
+Generated IDs are independent of explicitly registered IDs; callers should
+coordinate the two namespaces.
+
 ## Project and licensing
 
 **CLM — Cross Language Modules** is an initiative by **Deeperlevel**, developed through community contributions.

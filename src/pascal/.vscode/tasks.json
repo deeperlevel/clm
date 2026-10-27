@@ -1,0 +1,47 @@
+
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Clean Free Pascal",
+      "type": "shell",
+      "command": "if (Test-Path 'build') { Remove-Item 'build' -Recurse -Force }; New-Item -ItemType Directory -Path 'build' -Force | Out-Null",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "powershell.exe",
+          "args": ["-NoProfile", "-Command"]
+        }
+      },
+      "problemMatcher": [],
+      "hide": true
+    },
+    {
+      "label": "Build Free Pascal (debug)",
+      "type": "shell",
+      "command": "fpc",
+      "args": [
+        "-Twin64",
+        "-Px86_64",
+        "-gw3",
+        "-gl",
+        "-O-",
+        "-Fuclm",
+        "-Futests",
+        "-FEbuild",
+        "-FUbuild",
+        "main.pas"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": ["Clean Free Pascal"],
+      "dependsOrder": "sequence",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}

@@ -1,259 +1,129 @@
-# CLM Storage
+# CLM — Storage
 
-## 1. Purpose and boundaries
+## 1. Purpose
 
-`clm_storage` is an unkeyed, position-addressed resource registry. A **storage ID** identifies an entire resource, while individual values are accessed by zero-based indices or coordinates. `clm_container` is the complementary **keyed** store; neither module requires the other. `clm_block` (`Block {x,y,width,height}`) and `clm_block3d` (`Block3D {x,y,z,width,height,depth}`) provide standalone plain-data structures. They do not allocate memory and do not impose dimension validation.
+`clm_storage` is an ID-addressed **fixed-dimension**, **row-major** data grid backed by one BPAA allocation with a BPA metadata block. It supports 2D grids, layered 3D grids, and an atlas interpretation of a grid divided into equal-sized rectangular frames. It stores fixed-width elements; it is not an image decoder, serializer, multidimensional object model, or table/query engine.
 
-The implementation may use native arrays, lists, vectors, byte buffers, or other facilities. The observable API and its behavioral contracts are shared, *not the implementation strategy*. Python's implementation uses lists internally; `reserved` is **logical capacity**, not proof of preallocated bytes. Compiled implementations should reserve actual capacity where feasible.
+This C implementation is header-only: include `clm/storage.h`. As with BPA itself, compile `#define CLM_BPA_IMPLEMENTATION` in **exactly one C translation unit**, before the first inclusion of `storage.h` or `bpa.h`. Other files include normally. No `CLM_STORAGE_IMPLEMENTATION` macro is required.
 
-This specification covers the initial Python implementation delivered alongside this document. Some discussed capabilities are identified as future extensions at the end rather than falsely claimed as implemented.
+## 2. Data and coordinate model
 
-## 2. Type IDs and value semantics
+- **Column (`x`)**, **row (`y`)**, and **layer (`z`)** indexes are zero-based and supplied in the function signatures as `(layer, row, column)`.
+- A 2D storage has exactly one layer (`layer=0`). Dimensions are positive and fixed for the lifetime of a storage.
+- A regular grid is **rectangular**: every row has the same column count; every layer has the same row and column dimensions.
+- Flat array index is `((layer * rows) + row) * columns + column`.
+- All cells are initialized to zero bytes at creation; all cells are immediately committed (`count == capacity`).
+- Values are byte-copied, fixed-width BPA element types (`BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`, `DOUBLE`, `UUID`, `DATETIME`, and `STRUCT` where supported by BPA). `STRUCT` requires a positive explicit element width. `STRING` is **not supported** in this revision; use separately managed strings or indices/IDs in grid records instead. For `STRUCT`, only trivially byte-copyable C-compatible record layouts are safe; pointers within copied records are not deep-copied.
+- Dimensions are limited by `clm_int` maximum element count and available memory. Multiplication and allocation size overflow are rejected.
 
-| ID | Type | Value contract |
-|---|---|---|
-| `0x01` | STRING | Unicode text; UTF-8 encoded length <= `size` bytes |
-| `0x02` | BYTE | Signed 8-bit integer |
-| `0x03` | SHORT | Signed 16-bit integer |
-| `0x04` | INTEGER | Signed 32-bit integer |
-| `0x05` | LONG_INTEGER | Signed 64-bit integer |
-| `0x06` | FLOAT | IEEE-754 binary32 representative value |
-| `0x07` | DOUBLE | Host double, normally IEEE-754 binary64 |
-| `0xFE` | DYNAMIC | Exactly `size` bytes; stored as an owned immutable copy |
-| `0xFF` | OBJECT | Opaque host-language reference; shallow-copy semantics |
+## 3. Construction and lifecycle
 
-For numeric fixed-width types, `size` equals their native byte width. For STRING it is the maximum UTF-8 byte count; for DYNAMIC it is the exact record length. OBJECT's `size` is metadata, not a promise of deep cloning. In the Python implementation, OBJECT accepts any object including `None`. Strings exceeding `size` are rejected **without truncation**. FLOAT rounds to binary32 on insertion. NaN/Infinity are accepted if representable; the standard numeric sort does not guarantee a total order involving NaN. Use an explicit comparator when required.
-
-## 3. Status codes and calling convention
-
-Mutators return one status. Queries returning data use `(status, value)`; counts such as `dispose`, `delete`, and `replace_all` use `(status, number)`. Other languages should express the same contract through result structs or out-parameters.
-
-| Status | Hex | Meaning |
-|---|---|---|
-| `STORAGE_SUCCESS` | `0x00` | Completed |
-| `STORAGE_ERROR_DUPLICATE_ID` | `0x01` | Storage ID exists |
-| `STORAGE_ERROR_NOT_FOUND` | `0x02` | Storage ID not registered |
-| `STORAGE_ERROR_TYPE_NOT_SUPPORTED` | `0x03` | Unsupported type |
-| `STORAGE_ERROR_TYPE_NOT_MATCHED` | `0x04` | Source/destination type or size mismatch |
-| `STORAGE_ERROR_INVALID_VALUE` | `0x05` | Value or configuration invalid |
-| `STORAGE_ERROR_INVALID_INDEX` | `0x06` | Invalid index/coordinate |
-| `STORAGE_ERROR_LOCKED` | `0x07` | Mutation forbidden |
-| `STORAGE_ERROR_DIMENSION` | `0x08` | Invalid grid dimensions |
-| `STORAGE_ERROR_EMPTY` | `0x09` | No elements available |
-| `STORAGE_ERROR_REFERENCES` | `0x0A` | Reference count cannot decrement |
-| `STORAGE_ERROR_OVERFLOW` | `0x0B` | Size mismatch rejected by overflow policy |
-| `STORAGE_ERROR_INCOMPATIBLE` | `0x0C` | Operation does not apply to resource kind |
-
-## 4. Lifecycle, metadata, and ownership
-
-- `clm_storage_create(id, type=DYNAMIC, size=default, reserved=0)` creates an empty **linear** storage. `size` is mandatory for non-default custom record widths. For default DYNAMIC, `size=1`.
-- `clm_storage_get_info(id) -> (status, StorageInfo)` yields a read-only metadata snapshot.
-- `clm_storage_count(id) -> (status, integer)` reports committed entries.
-- `clm_storage_reserve(id, count)` increases reported reserved capacity without committing elements; never shrinks.
-- `clm_storage_resize(id, count)` changes committed length; new values are initialized to zero/empty/`None`/zero bytes. Shrinking discards trailing elements.
-- `clm_storage_clear(id)` removes committed entries; capacity remains available.
-- `clm_storage_destroy(id)` **immediately** removes a resource, overriding positive references (explicit force destroy, consistent with current Container behavior).
-- `clm_storage_reference(id)` increments the manual count.
-- `clm_storage_unreference(id)` decrements the manual count, returning an error if already zero; **never** frees the resource directly.
-- `clm_storage_dispose() -> (status, disposed_count)` removes **all and only** resources with zero references, including grid resources, irrespective of lock state.
-- `clm_storage_lock(id)` and `clm_storage_unlock(id)` toggle API mutation prevention. This is **not** a concurrency mutex.
-
-`StorageInfo` fields: `id`, `type`, `committed`, `reserved`, `references`, `index`, `size`, `locked`, `spent`, `kind`, `width`, `height`, `depth`, `rows`, `columns`, `layers`. Resources start with `references=1`, `index=-1`, `spent=0`, `locked=false`. A storage ID may be reused after destruction. Old IDs must not be assumed valid after destruction and re-creation; generation handles are not part of this version.
-
-OBJECT entries hold shallow references. `destroy`, `clear`, or `dispose` release the storage's references, **not necessarily the resources owned by those objects**. Native ports need their own explicit destructor/ownership policy; this module does not invoke arbitrary user destructors.
-
-## 5. Linear access, cursor, and mutations
-
-Linear storage is sequential and does not support caller-defined entry keys. Valid indices are `0 .. committed-1`. The per-storage cursor is a separate numeric index. Reading/manipulating an explicit index **never navigates the cursor**; insert/remove preserve its numeric position if valid, otherwise clamp to the last index; clearing resets it to `-1`.
-
-- Navigation: `clm_storage_move_first`, `move_last`, `move_next`, `move_previous`, `iterate` (= first), `iterate_backward` (= last), `set_index(id,index)`, `get_index`, `get(id,index=None)`, `is_first`, `is_last`.
-- `clm_storage_append(id,value)` adds to the end.
-- `clm_storage_insert(id,index,value)` inserts before index; `index==count` is allowed.
-- `clm_storage_replace(id,index,value)` overwrites one element.
-- `clm_storage_remove(id,index)` removes one element and shifts the suffix left.
-- `clm_storage_swap(id,a,b)` swaps two positions.
-- `clm_storage_copy(id,source_index,destination_index,length)` overwrites **within** the same storage. Source and destination ranges must be fully in bounds. Overlaps have snapshot / `memmove` behavior; no automatic extension.
-- `clm_storage_replace_all(id,old,new) -> (status,count)` replaces all matching values.
-- `clm_storage_delete(id,value) -> (status,count)` removes all matching values.
-- `clm_storage_add_sampling(id,value,count,index=None)` inserts `count` repeats, appending by default. Mutable OBJECTs repeat the **same object reference**, not clones.
-
-## 6. Transfers and transformations
-
-`clm_storage_clone(source,destination)` replaces destination values with the entire source; `clm_storage_append_clone(source,destination)` appends; `clm_storage_slice(source,destination,start,count)` replaces destination with a selected positional slice. `clm_storage_filter(source,predicate,destination)` replaces destination with values matching a predicate, preserving order. The destination **must already exist, be unlocked, and have the same type, size and linear kind**. Operations preserve destination resource ID, reference count, and lock state. Source/destination may be the same for these linear operations (read snapshot first). They do not automatically clone mutable OBJECT data.
-
-- `clm_storage_shuffle(id,rng=None)`: Fisher–Yates through host's shuffle (optional injected RNG in Python).
-- `clm_storage_reverse(id)`.
-- `clm_storage_sort(id,comparator=None,descending=False)`; `clm_storage_sort_desc(id,comparator=None)`. Sorting OBJECT requires an explicit comparator.
-- `clm_storage_spend(id,index) -> (status,value)`: swaps the chosen **available** entry with the last available entry and increments `spent`; O(1) swap for fixed-size records.
-- `clm_storage_draw(id,rng=None) -> (status,value)`: picks a random available entry uniformly and spends it.
-- `clm_storage_reset_spent(id)`: marks all entries as available again.
-
-The spent partition is `[available | spent]`, with `available=count-spent`. A draw never repeats a spent position before reset. Mutations, sorting, reverse, and shuffle reset `spent=0`. Spending modifies ordering but keeps committed count unchanged. Repeated draw on exhausted storage yields `STORAGE_ERROR_EMPTY`.
-
-**Failure atomicity:** Validate IDs, bounds, values, types and locks before altering ordinary operations. Python comparator or predicate exceptions are propagated; filter/sort construct results before mutating destination. Native allocation failures need explicit error handling.
-
-## 7. Multidimensional layout
-
-A **Block** stores a two-dimensional fixed-size grid. A **Block3D** stores a three-dimensional grid. An **Atlas** stores a grid of Blocks. An **Atlas3D** stores a 3D grid of Block3Ds. All grid resources contain default-valued committed cells at creation; they are not manually extended through linear append.
-
-### Constructors
-
-```text
-clm_storage_block_create(id, width, height, size=default, storage_type=BYTE)
-clm_storage_block3d_create(id, width, height, depth, size=default, storage_type=BYTE)
-clm_storage_atlas_create(id, width, height, rows, columns, size=default, storage_type=BYTE)
-clm_storage_atlas3d_create(id, width, height, depth, rows, columns, layers,
-                          size=default, storage_type=BYTE)
+```c
+clm_storage_new(id, type, struct_size, columns, rows, layers);
+clm_storage_new_2d(id, type, struct_size, columns, rows);
+clm_storage_delete(id);
+clm_storage_get_info(id, &info);
 ```
 
-`width,height,depth` describe **cells within a block**. `columns,rows,layers` describe **the number of blocks in the atlas**. All must be strictly positive. For a 2D Atlas, `depth=layers=1`. Example: `width=20,height=20,rows=20,columns=20` means 400 blocks and 160,000 total cells.
+Pass `struct_size=0` for built-in types; for `STRUCT`, pass `sizeof(MyRecord)`. Duplicate IDs and unsupported dimensions/types fail. The numeric storage ID is a BPA block ID; the internal BPAA allocation receives a separate automatically chosen ID. All internal storage IDs, metadata and backing arrays are **private implementation resources**: never alter or delete them through raw BPA/BPAA APIs. `clm_storage_delete()` releases the backing array and metadata. Like BPA, forced `clm_bpa_shutdown()` invalidates every storage.
 
-Each Block uses row-major layout: `cell_index=(z*height+y)*width+x`. Each Atlas stores its blocks contiguously in row-major block order: `block_index=(layer*rows+row)*columns+column`, multiplied by `width*height*depth`, plus cell index. Python uses one logical list for the full grid (not one Python list per block).
+### Information snapshot
 
-### Cell access
+`clm_storage_info` contains `columns`, `rows`, `layers`, `frame_columns`, `frame_rows`, `element_size`, `type`, `atlas`, and `data_id`. `data_id` is exposed as diagnostic metadata **only**; it is not a supported mutation/ownership API. For ordinary grids `atlas=0` and frame dimensions are zero.
 
-- `clm_storage_block_get(id,x,y)` / `clm_storage_block_set(id,x,y,value)`.
-- `clm_storage_block3d_get(id,x,y,z)` / `clm_storage_block3d_set(id,x,y,z,value)`.
-- `clm_storage_grid_get(id,x,y,z=0,column=0,row=0,layer=0)` and `clm_storage_grid_set(id,x,y,value,z=0,column=0,row=0,layer=0)` for all grid kinds. `column,row,layer` select an Atlas's **block**, while `x,y,z` select a cell within that block.
+## 4. Cell operations
 
-Grid accesses do not navigate the linear cursor. Values are validated against their declared type and size. Grid mutations obey lock state. The `Block` and `Block3D` dataclasses themselves remain simple geometry records and are **not** storage handles.
+```c
+clm_storage_set_from(storage_id, layer, row, column, &value, sizeof(value));
+clm_storage_get_to(storage_id, layer, row, column, &value, sizeof(value));
 
-### Block transfers
+clm_storage_set(storage_id, layer, row, column, precreated_source_bpa_block_id);
+clm_storage_get(storage_id, layer, row, column, precreated_destination_bpa_block_id);
 
-```text
-clm_storage_atlas_get(atlas_id, column, row, destination_block_id, overflow=CANCEL)
-clm_storage_atlas_set(atlas_id, column, row, source_block_id, overflow=CANCEL)
-clm_storage_atlas3d_get(atlas3d_id, column, row, layer, destination_block3d_id, overflow=CANCEL)
-clm_storage_atlas3d_set(atlas3d_id, column, row, layer, source_block3d_id, overflow=CANCEL)
+clm_storage_fill_from(storage_id, &value, sizeof(value));
 ```
 
-These **copy** the selected block, not return views. The source and target must share element type and size. When the source is larger along any dimension than the destination:
+- `_from` reads from a caller-owned C buffer, `_to` writes to one. `set_from` requires the exact element width; `get_to` accepts a destination of at least that width.
+- Unsuffixed `get` and `set` copy to/from **already-existing** BPA blocks with matching type and width. No block is created implicitly.
+- `fill_from` copies one record to **every** cell. It snapshots the value before filling, so even values borrowed from inside the grid can be used safely.
+- Out-of-range coordinates, incorrect widths, missing IDs, incompatible BPA blocks and failed allocations return failure. A failed cell read/write does not change storage.
 
-| Overflow policy | Value | Contract |
-|---|---|---|
-| `STORAGE_ATLAS_OVERFLOW_IGNORE` | `0x01` | Copy only overlapping cells; preserve destination dimensions and untouched cells |
-| `STORAGE_ATLAS_OVERFLOW_EXTEND` | `0x02` | Grow destination's per-block dimensions to at least source dimensions; retain previously addressable cells |
-| `STORAGE_ATLAS_OVERFLOW_CANCEL` | `0x03` | Reject without mutation (default) |
+### Region slicing
 
-A destination larger than its source retains cells outside the copied region. Invalid source coordinates always fail independently of overflow policy. For `atlas_set`, `EXTEND` may grow **all** blocks' dimensions because blocks in one atlas have uniform shape.
-
-### Resizing, redefining, cloning
-
-```text
-clm_storage_atlas_resize(id,width,height)                 # each block's dimensions
-clm_storage_atlas_redefine(id,rows,columns)               # block-grid dimensions
-clm_storage_atlas3d_resize(id,width,height,depth)
-clm_storage_atlas3d_redefine(id,rows,columns,layers)
-clm_storage_atlas_clone(source,destination)
-clm_storage_atlas3d_clone(source,destination)
+```c
+clm_storage_slice(source_id,
+                  start_layer, start_row, start_column,
+                  layer_count, row_count, column_count,
+                  new_destination_id);
 ```
 
-Resize and redefine preserve cells whose **exact block coordinate and local cell coordinate** still exist. They discard out-of-range cells and default-initialize newly addressable cells. Cloning copies dimensions and values into an existing same-kind destination, preserving the destination's resource ID and references. No automatic deep cloning of OBJECT values.
+Creates an independently managed storage with the selected rectangular/volumetric region copied into its own contiguous BPAA backing allocation. Counts must be positive, the entire requested region must fit, and the destination ID must be unused. Slice output is ordinary (non-atlas) storage even when the input is an atlas. Neither source nor destination is a borrowed view. Invalid arguments fail without modifying the source.
 
-### Atlas3D slicing
+## 5. Atlas storage
 
-`clm_storage_atlas3d_slice(source_atlas3d, destination_atlas, layer, depth=0, overflow=CANCEL)` copies one **block-grid layer** and one **local z-depth plane within every selected 3D block**, producing a 2D Atlas. Source and destination element types and sizes must match. Overflow policy applies to *both* per-block width/height and block-grid rows/columns.
+Atlas is a **coordinate interpretation of a single full grid**: the entire atlas is stored once in one BPAA allocation; frames are rectangles within each layer. It does not separately allocate each frame.
 
-### Destruction
-
-`clm_storage_block_destroy`, `clm_storage_block3d_destroy`, `clm_storage_atlas_destroy`, and `clm_storage_atlas3d_destroy` check the resource kind and then destroy the resource. The generic `clm_storage_destroy` can destroy any kind.
-
-## 8. Examples
-
-```python
-from clm_storage import *
-
-DECK, DRAWN = 1001, 1002
-clm_storage_create(DECK, STORAGE_TYPE_INTEGER, reserved=52)
-clm_storage_create(DRAWN, STORAGE_TYPE_INTEGER)
-for card in range(52):
-    clm_storage_append(DECK, card)
-clm_storage_shuffle(DECK)
-status, card = clm_storage_draw(DECK)
-
-WORLD, REGION = 2001, 2002
-clm_storage_atlas_create(WORLD, width=16, height=16, rows=8, columns=8)
-clm_storage_block_create(REGION, width=16, height=16)
-clm_storage_block_set(REGION, 3, 4, 7)
-clm_storage_atlas_set(WORLD, 2, 1, REGION)
-
-clm_storage_unreference(DECK)
-clm_storage_unreference(DRAWN)
-clm_storage_unreference(WORLD)
-clm_storage_unreference(REGION)
-clm_storage_dispose()
+```c
+clm_storage_atlas_new(id, type, struct_size,
+                      atlas_columns, atlas_rows, frame_columns, frame_rows);
+clm_storage_atlas_new_3d(id, type, struct_size,
+                         atlas_columns, atlas_rows, layers,
+                         frame_columns, frame_rows);
 ```
 
-## 9. Constraints, future work, and open contracts
+Atlas and frame sizes must be positive, and frame dimensions must divide atlas dimensions exactly. `atlas_columns/frame_columns` is the number of frame columns; `atlas_rows/frame_rows` is the number of frame rows. For an image atlas, one element is one already-decoded pixel or packed pixel record; e.g., RGBA8 might be a `STRUCT` with `struct_size=4`. For a tile atlas, one element may be a tile. This library does not decode PNG/JPEG or process color spaces.
 
-- **No automatic memory tracing**: reference counts are manual; external raw pointers and ownership cycles cannot be discovered.
-- **Not thread-safe**: the Python implementation and resource registry require caller-side synchronization, particularly with future `clm_managed` worker collection.
-- **No guaranteed physical preallocation in Python**: logical `reserved` is a portability-contract hint; C/C++ ports should implement actual reservation.
-- **No implicit deep object ownership**: copied objects share references, and disposal does not invoke custom destructors.
-- **No automatic arbitrary struct packing**: DYNAMIC accepts fixed-size bytes, with field layout defined by the caller.
-- **Not yet implemented**: layer insertion, view/non-copy block access, allocator controls, generation-tagged handles, and total-order floating-point comparator semantics. Grid-specific coordinate cursors, atlas navigation, and 2D-to-3D layer assignment are implemented.
-- **Future specification questions**: should `destroy` reject positive references in a stricter version; how to expose allocation failures and deep-object policies consistently in C, Go, and Python.
+### Frame operations
 
-The provided Python tests exercise linear storage, types, cursor behavior, copying, references, spending, 2D/3D cells, transfers, resizing, cloning and 3D layer slicing. Run them with `python -m unittest -v test_clm_storage test_clm_block test_clm_block3d`.
+```c
+clm_storage_atlas_get_frame_to(id, layer, frame_row, frame_column,
+                               destination_buffer, buffer_byte_capacity);
+clm_storage_atlas_set_frame_from(id, layer, frame_row, frame_column,
+                                 source_buffer, exact_buffer_byte_size);
+clm_storage_atlas_slice_frame(id, layer, frame_row, frame_column,
+                              new_storage_id);
+```
 
+Frame copy buffers are tightly packed in **row-major** order without padding. Their required byte count is `frame_columns * frame_rows * element_size`. `get_frame_to` accepts at least the required byte capacity; `set_frame_from` requires exactly that byte count. Both copy the frame **row by row** using the full atlas row stride, and they snapshot their input/output so overlap with atlas backing memory is safe. `slice_frame` creates an ordinary independently owned one-layer 2D storage object holding the requested frame. Normal cell get/set functions work on atlas coordinates too.
 
-## Multidimensional cursor navigation (extension)
+Atlas operations do not promise zero-copy access to an individual frame, because rows of a frame typically are **not contiguous** inside the larger atlas. For whole-atlas transfer, use ordinary cell operations or external application-managed data-loading loops; a bulk import/export API can be added later.
 
-All Block, Block3D, Atlas, and Atlas3D resources use the existing `index` cursor.
-The cursor is a flattened row-major index and is initialized to `-1`.
-New operations include:
+## 6. Results
 
-- `clm_storage_grid_set_position(id,x,y,z=0,column=0,row=0,layer=0)`
-- `clm_storage_grid_get_position(id)` → `(status,(x,y,z,column,row,layer))`
-- `clm_storage_grid_get_current(id)` → `(status,value)`
-- `clm_storage_{block|block3d|atlas|atlas3d}_move_{first|last|next|previous}(id)`
-- `clm_storage_{block|block3d|atlas|atlas3d}_set_position(...)` and `_get_position(id)`
+| Return | Meaning |
+|---|---|
+| `CLM_BPA_SUCCESS` (0) | Create, delete, fill or slice successful |
+| `CLM_BPA_GET_SUCCESS` (1) | Cell, info or frame read successful |
+| `CLM_BPA_SET_SUCCESS` (2) | Cell or frame write successful |
+| `CLM_BPA_FAILURE` (-1) | Invalid resource, unsupported type/dimensions, bad bounds/size or allocation failure |
 
-`x,y,z` address cells **inside** one block, while `column,row,layer`
-select a block within an atlas. For a 2D resource, `z=0` and `layer=0`.
-The traversal order is x, y, local depth, atlas column, atlas row, atlas layer.
-Explicitly indexed grid reads/writes do not move the cursor; invalid positions
-return the existing invalid-index status. The cursor is not an iterator snapshot.
+## 7. Example
 
-### Reverse Atlas3D slicing
+```c
+#define CLM_BPA_IMPLEMENTATION
+#include "clm/storage.h"
 
-`clm_storage_atlas3d_set_slice(source_atlas2d, destination_atlas3d, layer, depth=0, overflow=CANCEL)`
-copies a 2D atlas into the selected atlas-grid layer and local block depth plane.
-It preserves all other 3D layers/planes. Type and record-size compatibility are
-mandatory; CANCEL rejects oversized sources, IGNORE clips, and EXTEND grows the
-destination block/grid dimensions before copying. This is the counterpart of
-`clm_storage_atlas3d_slice(...)` and does not swap `layer` with `depth`.
+int main(void) {
+    enum { GRID = 10, ATLAS = 11, FRAME = 12 };
+    clm_int number = 42, result = 0;
+    if (clm_storage_new(GRID, CLM_BPA_TYPE_INT, 0, 8, 6, 3) != CLM_BPA_SUCCESS) return 1;
+    clm_storage_set_from(GRID, 2, 1, 4, &number, sizeof(number));
+    clm_storage_get_to(GRID, 2, 1, 4, &result, sizeof(result));
+    clm_storage_delete(GRID);
 
-### Eligible-resource count
+    if (clm_storage_atlas_new(ATLAS, CLM_BPA_TYPE_BYTE, 0, 256, 128, 64, 64) != CLM_BPA_SUCCESS) return 1;
+    clm_storage_atlas_slice_frame(ATLAS, 1, 2, FRAME);
+    clm_storage_delete(FRAME);
+    clm_storage_delete(ATLAS);
+    clm_bpa_shutdown();
+    return result == 42 ? 0 : 1;
+}
+```
 
-`clm_storage_pending_count()` returns the number of zero-reference storage
-resources, useful for CLM Managed's optional threshold scheduler. It does not
-free any resource. Python's `reserved` represents logical rather than guaranteed
-physical allocation, and OBJECT copying remains shallow.
+## 8. Conformance tests and limitations
 
+The accompanying `tests/test_storage.c` exercises 2D and 3D coordinate mapping, zero initialization, read/write, bounds, widths, duplicate IDs, region copies and ownership independence, atlas frame extraction and replacement, frame slicing, bulk fill, managed block transfer, invalid dimensions, and cleanup. Compile with GCC or Clang; sanitizers are recommended. Tests are not a proof of correctness under allocation failure or concurrent access.
 
-### Python return contract
+Current limitations: no resizing, no string cells, no strided/padded external frame buffers, no lazy/file-backed storage, no external buffer adoption/borrowing, no multidimensional region assignment, and no threadsafe access. `clm_storage` is not a database; future table semantics, indexes, transactions and schema handling should be built separately.
 
-`clm_storage_pending_count() -> integer` returns a plain nonnegative integer (not a `(status, count)` tuple). It counts registered resources with `references == 0`, including empty resources; it does not collect, mutate or change their reference counts. New resources start with one reference and are not pending until unreferenced. Explicit destruction removes a resource from the registry immediately. The count is a point-in-time snapshot and requires external synchronization if registries are shared across threads.
-
-### Implemented multidimensional API details
-
-`grid_set_position(id,x,y,z=0,column=0,row=0,layer=0)` sets a **cell** cursor.
-`grid_get_position(id)` returns `(status,(x,y,z,column,row,layer))`;
-`grid_get_current(id)` returns `(status,value)`. Unpositioned cursors return
-`STORAGE_ERROR_INVALID_INDEX` without changing the underlying data.
-Kind-specific position getters return only applicable coordinates:
-Block `(x,y)`, Block3D `(x,y,z)`, Atlas `(x,y,column,row)`, and
-Atlas3D `(x,y,z,column,row,layer)`. Wrong-kind operations return
-`STORAGE_ERROR_INCOMPATIBLE`. Kind-specific first/last/next/previous
-operations use row-major cell order and preserve their current position on
-out-of-range movement. Explicit coordinate read/write does not move cursors.
-
-`atlas3d_set_slice(source_atlas2d,destination_atlas3d,layer,depth=0,overflow=CANCEL)`
-copies one complete 2D atlas into the selected grid layer and per-block z plane.
-The destination atlas3d must exist, match type and element size, and be unlocked.
-Only the target layer/plane is overwritten; other planes are preserved, except
-that `EXTEND` can increase block width/height and atlas rows/columns.
-`CANCEL` makes no modification if the source exceeds destination size; `IGNORE`
-clips; `EXTEND` grows the destination to fit. The selected layer/depth must
-already exist; overflow policy does not implicitly create target planes.
+**Cross-language promise:** consistent coordinate, layout, copy, and lifetime behavior; C's BPA-backed physical layout is an implementation choice rather than a requirement for ports in other languages.

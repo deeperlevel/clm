@@ -55,10 +55,14 @@ CLM is developed incrementally, based on actual use in frameworks and libraries.
 
 | Module | Purpose |
 | --- | --- |
-| [`clm_console`](./docs/clm_console.md) | Provides a small, procedural interface for interactive terminal input, output, screen control, and console lifecycle management. |
+| [`clm_base`](./docs/clm_base.md) | Base types and structures. |
+| [`clm_bpa`](./docs/clm_bpa.md) | ID-addressed block allocation and reusable memory pooling, plus structure-agnostic managed arrays, with explicit resource lifetimes and validated data transfers. matching. |
+| [`clm_console`](./docs/clm_console.md) | Standard-stream text input/output and ANSI-compatible terminal controls. |
+| [`clm_dictionary`](./docs/clm_dictionary.md) | ID-based integer-key dictionaries with BPA/BPAA-managed typed values and key iteration. |
+| [`clm_string`](./docs/clm_string.md) | BPA-backed Unicode strings and BPAA-backed string arrays, stored as UTF-8 with selectable UTF-8, Latin-1, or UTF-16LE byte export. |
 | [`clm_container`](./docs/clm_container.md) | A procedural, **typed key/value collection registry**. A numeric **container ID** identifies each collection. Within it, caller-defined numeric **entry keys** identify values. Container keys are **not** positional array indices; gaps in the numeric key space are permitted. |
 | [`clm_storage`](./docs/clm_storage.md) | ID-addressed, typed sequential and multidimensional storage with explicit allocation, navigation, transformations, and manually managed lifetimes. |
-| [`clm_id`](./docs/clm_id.md) | Map readable names to integer IDs; optionally use case-insensitive matching. |
+| [`clm_id`](./docs/clm_id.md) | Map names to numeric IDs, optionally use ASCII case-insensitive matching, and generate sequential IDs. |
 | [`clm_depend`](./docs/clm_depend.md) | Procedural, ID-based dependency injection and factories with tracked instance identities, explicit references, and deferred transient disposal. |
 | [`clm_ecs`](./docs/clm_ecs.md) | ID-based entity and component composition with system queries built on CLM Depend's tracked transient factories. |
 | [`clm_dispatch`](./docs/clm_dispatch.md) | A procedural, ID-based, asynchronous message dispatcher |
@@ -75,8 +79,6 @@ CLM is developed incrementally, based on actual use in frameworks and libraries.
 | [`clm_file`](./docs/clm_file.md) | Provides whole-file, text/line, and block-streaming file operations through mapped **CLM Path IDs** and caller-created **CLM Storage IDs**. |
 | [`clm_managed`](./docs/clm_managed.md) | Optional manual or interval-based coordinator for deferred disposal of CLM Depend, Container and Storage resources. |
 | [`clm_ua`](./docs/clm_ua.md) | Lightweight User-Agent parsing. |
-| [`clm_size`](./docs/clm_size.md) | A simple size object. |
-| [`clm_position`](./docs/clm_position.md) | A simple position object. |
 
 **Status note:** This is a project scope and direction, **not a claim that every module or language port is finished**. JSON, YAML, CSV, mapping, and other modules can be developed as consumers require them. Earlier modules or filenames prefixed `cla_` are part of the project's history and should be renamed to `clm_` as they are migrated.
 

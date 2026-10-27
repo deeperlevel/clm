@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Odin (debug)",
+      "type": "shell",
+      "command": "odin",
+      "args": ["build", ".", "-debug", "-out:main.exe"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

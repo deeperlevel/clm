@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug D",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\bin\\main.exe",
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Build D (debug)",
+      "console": "integratedTerminal"
+    }
+  ]
+}
