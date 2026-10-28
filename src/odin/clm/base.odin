@@ -24,6 +24,7 @@ import "core:os"
  */
 
 idkey :: u64
+clm_id :: idkey
 
 clm_byte :: u8
 clm_sbyte :: i8

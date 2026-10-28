@@ -1,176 +1,152 @@
-import random
-import unittest
-from clm_storage import *
+"""Grid and atlas storage checks using the CLM test reporting style."""
+
+import struct
+
+from clm import bpa, storage
+from tests.test import TestResult, clm_test_assert, clm_test_begin, clm_test_summary
 
 
-class StorageTests(unittest.TestCase):
-    def setUp(self):
-        for sid in list(range(100, 300)):
-            clm_storage_destroy(sid)
+def run_tests() -> int:
+    """Run storage checks and return the number of failed assertions."""
+    result = TestResult()
+    clm_test_begin("CLM - Storage")
 
-    def tearDown(self):
-        for sid in list(range(100, 300)):
-            clm_storage_destroy(sid)
+    grid_id = 100
+    slice_id = 101
+    bad_slice_id = 102
+    status = storage.clm_storage_new_2d(grid_id, bpa.CLM_BPA_TYPE_INT, 0, 4, 3)
+    duplicate = storage.clm_storage_new_2d(grid_id, bpa.CLM_BPA_TYPE_INT, 0, 4, 3)
+    zero = storage.clm_storage_get_to(grid_id, 0, 2, 3, 4)
+    set_value = storage.clm_storage_set_from(grid_id, 0, 1, 2, struct.pack("=i", 72))
+    get_value = storage.clm_storage_get_to(grid_id, 0, 1, 2, 4)
+    invalid_layer = storage.clm_storage_get_to(grid_id, 1, 1, 2, 4)
+    invalid_row = storage.clm_storage_get_to(grid_id, 0, 3, 2, 4)
+    invalid_width = storage.clm_storage_set_from(grid_id, 0, 1, 2, b"\x00\x00")
+    info_status, info = storage.clm_storage_get_info(grid_id)
+    clm_test_assert(
+        result,
+        status == bpa.CLM_BPA_SUCCESS
+        and duplicate == bpa.CLM_BPA_FAILURE
+        and zero == (bpa.CLM_BPA_GET_SUCCESS, b"\0" * 4)
+        and set_value == bpa.CLM_BPA_SET_SUCCESS
+        and get_value == (bpa.CLM_BPA_GET_SUCCESS, struct.pack("=i", 72))
+        and invalid_layer == (bpa.CLM_BPA_FAILURE, None)
+        and invalid_row == (bpa.CLM_BPA_FAILURE, None)
+        and invalid_width == bpa.CLM_BPA_FAILURE
+        and info_status == bpa.CLM_BPA_GET_SUCCESS
+        and info is not None
+        and (info.columns, info.rows, info.layers, info.element_size) == (4, 3, 1, 4),
+        "create 2D storage, validate coordinates, and read/write BPA values",
+    )
 
-    def test_create_and_capacity(self):
-        self.assertEqual(clm_storage_create(100, STORAGE_TYPE_INTEGER, reserved=2), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_get_info(100)[1].reserved, 2)
-        for x in range(5): self.assertEqual(clm_storage_append(100, x), STORAGE_SUCCESS)
-        info = clm_storage_get_info(100)[1]
-        self.assertEqual((info.committed, info.references, info.index), (5, 1, -1))
-        self.assertGreaterEqual(info.reserved, 5)
-        self.assertEqual(clm_storage_create(100, STORAGE_TYPE_INTEGER), STORAGE_ERROR_DUPLICATE_ID)
-        self.assertEqual(clm_storage_create(101, 0xEF), STORAGE_ERROR_TYPE_NOT_SUPPORTED)
+    slice_status = storage.clm_storage_slice(grid_id, 0, 1, 1, 1, 2, 2, slice_id)
+    slice_value = storage.clm_storage_get_to(slice_id, 0, 0, 1, 4)
+    independent = storage.clm_storage_set_from(slice_id, 0, 0, 1, struct.pack("=i", 21))
+    source_unchanged = storage.clm_storage_get_to(grid_id, 0, 1, 2, 4)
+    invalid_slice = storage.clm_storage_slice(grid_id, 0, 2, 2, 1, 2, 2, bad_slice_id)
+    clm_test_assert(
+        result,
+        slice_status == bpa.CLM_BPA_SUCCESS
+        and slice_value == (bpa.CLM_BPA_GET_SUCCESS, struct.pack("=i", 72))
+        and independent == bpa.CLM_BPA_SET_SUCCESS
+        and source_unchanged == (bpa.CLM_BPA_GET_SUCCESS, struct.pack("=i", 72))
+        and invalid_slice == bpa.CLM_BPA_FAILURE
+        and storage.clm_storage_delete(slice_id) == bpa.CLM_BPA_SUCCESS
+        and storage.clm_storage_delete(grid_id) == bpa.CLM_BPA_SUCCESS
+        and storage.clm_storage_get_info(grid_id) == (bpa.CLM_BPA_FAILURE, None),
+        "slice copies a bounded region into independent storage",
+    )
 
-    def test_types(self):
-        for sid, t, good, bad in [(100, STORAGE_TYPE_BYTE, 127, 128),
-                                  (101, STORAGE_TYPE_SHORT, -32768, 32768),
-                                  (102, STORAGE_TYPE_INTEGER, 12, True),
-                                  (103, STORAGE_TYPE_LONG_INTEGER, 2**50, 2**63),
-                                  (104, STORAGE_TYPE_FLOAT, 1.25, 1e100),
-                                  (105, STORAGE_TYPE_DOUBLE, 1.25, 3),
-                                  (106, STORAGE_TYPE_STRING, 'abc', 'abcd'),
-                                  (107, STORAGE_TYPE_DYNAMIC, b'abcd', b'ab'),
-                                  (108, STORAGE_TYPE_OBJECT, {'a': 1}, None)]:
-            size = 3 if t == STORAGE_TYPE_STRING else (4 if t == STORAGE_TYPE_DYNAMIC else None)
-            self.assertEqual(clm_storage_create(sid, t, size=size), STORAGE_SUCCESS)
-            self.assertEqual(clm_storage_append(sid, good), STORAGE_SUCCESS)
-            if t != STORAGE_TYPE_OBJECT:
-                self.assertEqual(clm_storage_append(sid, bad), STORAGE_ERROR_INVALID_VALUE)
-        self.assertEqual(clm_storage_create(109, STORAGE_TYPE_STRING, size=1), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_append(109, 'é'), STORAGE_ERROR_INVALID_VALUE)
+    layered_id = 110
+    layered_slice_id = 111
+    layered_create = storage.clm_storage_new(layered_id, bpa.CLM_BPA_TYPE_BYTE, 0, 2, 3, 2)
+    set_layer = storage.clm_storage_set_from(layered_id, 1, 2, 1, b"\x09")
+    other_layer = storage.clm_storage_get_to(layered_id, 0, 2, 1, 1)
+    layered_slice = storage.clm_storage_slice(layered_id, 1, 1, 0, 1, 2, 2, layered_slice_id)
+    slice_cell = storage.clm_storage_get_to(layered_slice_id, 0, 1, 1, 1)
+    clm_test_assert(
+        result,
+        layered_create == bpa.CLM_BPA_SUCCESS
+        and set_layer == bpa.CLM_BPA_SET_SUCCESS
+        and other_layer == (bpa.CLM_BPA_GET_SUCCESS, b"\0")
+        and layered_slice == bpa.CLM_BPA_SUCCESS
+        and slice_cell == (bpa.CLM_BPA_GET_SUCCESS, b"\x09")
+        and storage.clm_storage_delete(layered_slice_id) == bpa.CLM_BPA_SUCCESS
+        and storage.clm_storage_delete(layered_id) == bpa.CLM_BPA_SUCCESS,
+        "3D grids use layer-row-column row-major addressing",
+    )
 
-    def test_navigation(self):
-        clm_storage_create(100, STORAGE_TYPE_INTEGER)
-        for x in [10, 20, 30]: clm_storage_append(100, x)
-        self.assertEqual(clm_storage_get(100)[0], STORAGE_ERROR_INVALID_INDEX)
-        self.assertEqual(clm_storage_move_first(100), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_get(100), (STORAGE_SUCCESS, 10))
-        self.assertEqual(clm_storage_move_next(100), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_get_index(100), (STORAGE_SUCCESS, 1))
-        clm_storage_insert(100, 0, 5)
-        self.assertEqual(clm_storage_get_index(100)[1], 1) # numeric cursor unchanged
-        self.assertEqual(clm_storage_get(100)[1], 10)
-        self.assertEqual(clm_storage_move_last(100), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_move_next(100), STORAGE_ERROR_INVALID_INDEX)
-        self.assertEqual(clm_storage_get(100)[1], 30)
-        clm_storage_remove(100, 3)
-        self.assertEqual(clm_storage_get_index(100)[1], 2)
-        self.assertEqual(clm_storage_set_index(100, 99), STORAGE_ERROR_INVALID_INDEX)
-        self.assertEqual(clm_storage_is_last(100), (STORAGE_SUCCESS, True))
+    atlas_id = 120
+    frame_storage_id = 121
+    atlas_create = storage.clm_storage_atlas_new(atlas_id, bpa.CLM_BPA_TYPE_BYTE, 0, 4, 4, 2, 2)
+    frame = bytes((1, 2, 3, 4))
+    frame_set = storage.clm_storage_atlas_set_frame_from(atlas_id, 0, 1, 1, frame)
+    frame_get = storage.clm_storage_atlas_get_frame_to(atlas_id, 0, 1, 1, 4)
+    zero_frame = storage.clm_storage_atlas_get_frame_to(atlas_id, 0, 0, 0, 4)
+    bad_frame = storage.clm_storage_atlas_get_frame_to(atlas_id, 0, 2, 0, 4)
+    undersized_frame = storage.clm_storage_atlas_get_frame_to(atlas_id, 0, 1, 1, 3)
+    frame_slice = storage.clm_storage_atlas_slice_frame(atlas_id, 0, 1, 1, frame_storage_id)
+    last_frame_value = storage.clm_storage_get_to(frame_storage_id, 0, 1, 1, 1)
+    clm_test_assert(
+        result,
+        atlas_create == bpa.CLM_BPA_SUCCESS
+        and frame_set == bpa.CLM_BPA_SET_SUCCESS
+        and frame_get == (bpa.CLM_BPA_GET_SUCCESS, frame)
+        and zero_frame == (bpa.CLM_BPA_GET_SUCCESS, b"\0" * 4)
+        and bad_frame == (bpa.CLM_BPA_FAILURE, None)
+        and undersized_frame == (bpa.CLM_BPA_FAILURE, None)
+        and frame_slice == bpa.CLM_BPA_SUCCESS
+        and last_frame_value == (bpa.CLM_BPA_GET_SUCCESS, b"\x04")
+        and storage.clm_storage_delete(frame_storage_id) == bpa.CLM_BPA_SUCCESS
+        and storage.clm_storage_delete(atlas_id) == bpa.CLM_BPA_SUCCESS,
+        "atlas frames read, write, and copy into regular 2D storage",
+    )
 
-    def test_mutation_copy_bulk(self):
-        clm_storage_create(100, STORAGE_TYPE_INTEGER)
-        clm_storage_add_sampling(100, 4, 3)
-        clm_storage_insert(100, 1, 8)
-        self.assertEqual([clm_storage_get(100, i)[1] for i in range(4)], [4,8,4,4])
-        self.assertEqual(clm_storage_replace_all(100, 4, 9), (STORAGE_SUCCESS,3))
-        self.assertEqual(clm_storage_copy(100, 0, 1, 3), STORAGE_SUCCESS)
-        self.assertEqual([clm_storage_get(100, i)[1] for i in range(4)], [9,9,8,9])
-        self.assertEqual(clm_storage_delete(100, 9), (STORAGE_SUCCESS, 3))
-        self.assertEqual(clm_storage_get(100, 0), (STORAGE_SUCCESS, 8))
-        self.assertEqual(clm_storage_resize(100, 3), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_get(100, 2), (STORAGE_SUCCESS, 0))
-        self.assertEqual(clm_storage_swap(100, 0, 2), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_reverse(100), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_sort_desc(100), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_get(100, 0)[1], 8)
+    atlas3d_id = 130
+    atlas3d_create = storage.clm_storage_atlas_new_3d(atlas3d_id, bpa.CLM_BPA_TYPE_BYTE, 0, 4, 4, 2, 2, 2)
+    set_3d_frame = storage.clm_storage_atlas_set_frame_from(atlas3d_id, 1, 0, 1, frame)
+    get_3d_frame = storage.clm_storage_atlas_get_frame_to(atlas3d_id, 1, 0, 1, 4)
+    untouched_layer = storage.clm_storage_get_to(atlas3d_id, 0, 0, 2, 1)
+    clm_test_assert(
+        result,
+        atlas3d_create == bpa.CLM_BPA_SUCCESS
+        and set_3d_frame == bpa.CLM_BPA_SET_SUCCESS
+        and get_3d_frame == (bpa.CLM_BPA_GET_SUCCESS, frame)
+        and untouched_layer == (bpa.CLM_BPA_GET_SUCCESS, b"\0")
+        and storage.clm_storage_delete(atlas3d_id) == bpa.CLM_BPA_SUCCESS,
+        "layered atlases isolate frame updates by layer",
+    )
 
-    def test_transfer_filter_and_shallow_object(self):
-        for i in (100,101,102): clm_storage_create(i, STORAGE_TYPE_OBJECT)
-        obj = {'data':[1]}
-        clm_storage_append(100, obj)
-        clm_storage_append(100, {'data':[2]})
-        self.assertEqual(clm_storage_clone(100, 101), STORAGE_SUCCESS)
-        self.assertIs(clm_storage_get(101,0)[1], obj)
-        self.assertEqual(clm_storage_slice(100, 102, 1, 1), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_count(102), (STORAGE_SUCCESS,1))
-        self.assertEqual(clm_storage_append_clone(100,102), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_count(102), (STORAGE_SUCCESS,3))
-        self.assertEqual(clm_storage_filter(100, lambda x: x['data'][0] > 1, 101), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_count(101), (STORAGE_SUCCESS,1))
-        self.assertEqual(clm_storage_sort(100), STORAGE_ERROR_INVALID_VALUE)
-        self.assertEqual(clm_storage_sort(100, lambda a,b: a['data'][0]-b['data'][0]), STORAGE_SUCCESS)
+    fill_id = 140
+    block_id = 141
+    fill_create = storage.clm_storage_new_2d(fill_id, bpa.CLM_BPA_TYPE_INT, 0, 2, 2)
+    fill_status = storage.clm_storage_fill_from(fill_id, struct.pack("=i", 5))
+    filled = storage.clm_storage_get_to(fill_id, 0, 1, 1, 4)
+    bpa.clm_bpa_create(block_id, bpa.CLM_BPA_TYPE_INT)
+    bpa.clm_bpa_set(block_id, struct.pack("=i", 83))
+    set_from_block = storage.clm_storage_set(fill_id, 0, 0, 0, block_id)
+    get_to_block = storage.clm_storage_get(fill_id, 0, 0, 0, block_id)
+    block_value = bpa.clm_bpa_get(block_id, 4)
+    clm_test_assert(
+        result,
+        fill_create == bpa.CLM_BPA_SUCCESS
+        and fill_status == bpa.CLM_BPA_SUCCESS
+        and filled == (bpa.CLM_BPA_GET_SUCCESS, struct.pack("=i", 5))
+        and set_from_block == bpa.CLM_BPA_SET_SUCCESS
+        and get_to_block == bpa.CLM_BPA_GET_SUCCESS
+        and block_value == (bpa.CLM_BPA_GET_SUCCESS, struct.pack("=i", 83))
+        and storage.clm_storage_delete(fill_id) == bpa.CLM_BPA_SUCCESS
+        and bpa.clm_bpa_delete(block_id) == bpa.CLM_BPA_SUCCESS,
+        "fill grids and transfer elements through compatible BPA blocks",
+    )
 
-    def test_lock_refs_disposal(self):
-        clm_storage_create(100, STORAGE_TYPE_BYTE)
-        self.assertEqual(clm_storage_lock(100), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_append(100,3), STORAGE_ERROR_LOCKED)
-        self.assertEqual(clm_storage_unlock(100), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_append(100,3), STORAGE_SUCCESS)
-        clm_storage_reference(100)
-        clm_storage_unreference(100)
-        self.assertEqual(clm_storage_dispose(), (STORAGE_SUCCESS,0))
-        clm_storage_unreference(100)
-        self.assertEqual(clm_storage_unreference(100), STORAGE_ERROR_REFERENCES)
-        self.assertEqual(clm_storage_get(100,0), (STORAGE_SUCCESS,3))
-        self.assertEqual(clm_storage_dispose(), (STORAGE_SUCCESS,1))
-        self.assertEqual(clm_storage_get(100,0)[0], STORAGE_ERROR_NOT_FOUND)
+    clm_test_assert(
+        result,
+        storage.clm_storage_atlas_new(122, bpa.CLM_BPA_TYPE_BYTE, 0, 5, 4, 2, 2) == bpa.CLM_BPA_FAILURE
+        and storage.clm_storage_new_2d(123, bpa.CLM_BPA_TYPE_STRING, 0, 2, 2) == bpa.CLM_BPA_FAILURE
+        and storage.clm_storage_new_2d(124, bpa.CLM_BPA_TYPE_INT, 0, 0, 2) == bpa.CLM_BPA_FAILURE
+        and storage.clm_storage_new(125, bpa.CLM_BPA_TYPE_INT, 0, 0xFFFFFFFF, 0xFFFFFFFF, 2) == bpa.CLM_BPA_FAILURE,
+        "reject invalid atlas divisibility, unsupported string grids, and unsafe dimensions",
+    )
 
-    def test_draw_spend(self):
-        clm_storage_create(100, STORAGE_TYPE_INTEGER)
-        for i in range(52): clm_storage_append(100, i)
-        drawn = [clm_storage_draw(100, random.Random(i))[1] for i in range(52)]
-        self.assertEqual(set(drawn), set(range(52)))
-        self.assertEqual(clm_storage_draw(100)[0], STORAGE_ERROR_EMPTY)
-        self.assertEqual(clm_storage_get_info(100)[1].spent, 52)
-        clm_storage_reset_spent(100)
-        self.assertEqual(clm_storage_get_info(100)[1].spent, 0)
-        clm_storage_shuffle(100, random.Random(1))
-        self.assertEqual(clm_storage_spend(100, 0)[0], STORAGE_SUCCESS)
-
-    def test_blocks_and_grids(self):
-        self.assertEqual(clm_storage_block_create(100, 3, 2), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_block_set(100, 2, 1, 12), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_block_get(100, 2, 1), (STORAGE_SUCCESS,12))
-        self.assertEqual(clm_storage_block_get(100, 3, 1)[0], STORAGE_ERROR_INVALID_INDEX)
-        self.assertEqual(clm_storage_block3d_create(101, 2, 2, 3), STORAGE_SUCCESS)
-        clm_storage_block3d_set(101, 1, 1, 2, 99)
-        self.assertEqual(clm_storage_block3d_get(101,1,1,2)[1],99)
-        self.assertEqual(clm_storage_block_create(102, 0, 2), STORAGE_ERROR_DIMENSION)
-        self.assertEqual(clm_storage_append(100,3), STORAGE_ERROR_INCOMPATIBLE)
-
-    def test_atlas_transfer_and_overflow(self):
-        clm_storage_atlas_create(100, 2, 2, 2, 3)
-        clm_storage_block_create(101, 2, 2)
-        clm_storage_block_set(101,1,1,77)
-        self.assertEqual(clm_storage_atlas_set(100,2,1,101), STORAGE_SUCCESS)
-        clm_storage_block_create(102,2,2)
-        self.assertEqual(clm_storage_atlas_get(100,2,1,102), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_block_get(102,1,1)[1],77)
-        clm_storage_block_create(103,1,1)
-        self.assertEqual(clm_storage_atlas_get(100,2,1,103), STORAGE_ERROR_OVERFLOW)
-        self.assertEqual(clm_storage_atlas_get(100,2,1,103,STORAGE_ATLAS_OVERFLOW_IGNORE), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_atlas_get(100,2,1,103,STORAGE_ATLAS_OVERFLOW_EXTEND), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_get_info(103)[1].width,2)
-        self.assertEqual(clm_storage_atlas_resize(100,3,3), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_atlas_get(100,2,1,102), STORAGE_ERROR_OVERFLOW)
-        self.assertEqual(clm_storage_atlas_get(100,2,1,102,STORAGE_ATLAS_OVERFLOW_EXTEND), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_block_get(102,1,1)[1],77)
-        self.assertEqual(clm_storage_atlas_redefine(100,1,3),STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_atlas_get(100,2,1,102),STORAGE_ERROR_INVALID_INDEX)
-
-    def test_atlas3d_and_slice(self):
-        self.assertEqual(clm_storage_atlas3d_create(100,2,2,3,2,2,2), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_grid_set(100,1,0,91,z=2,column=1,row=0,layer=1), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_atlas_create(101,2,2,2,2), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_atlas3d_slice(100,101,layer=1,depth=2), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_grid_get(101,1,0,column=1,row=0), (STORAGE_SUCCESS,91))
-        clm_storage_block3d_create(102,2,2,3)
-        self.assertEqual(clm_storage_atlas3d_get(100,1,0,1,102), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_block3d_get(102,1,0,2)[1],91)
-        self.assertEqual(clm_storage_atlas3d_redefine(100,2,2,1), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_atlas3d_slice(100,101,layer=1), STORAGE_ERROR_INVALID_INDEX)
-
-    def test_clone_and_invalid_operations(self):
-        clm_storage_atlas_create(100,2,2,1,1)
-        clm_storage_atlas_create(101,1,1,2,2)
-        clm_storage_grid_set(100,1,1,42)
-        self.assertEqual(clm_storage_atlas_clone(100,101), STORAGE_SUCCESS)
-        self.assertEqual(clm_storage_grid_get(101,1,1)[1],42)
-        self.assertEqual(clm_storage_atlas_get(100,0,0,101), STORAGE_ERROR_INCOMPATIBLE)
-        self.assertEqual(clm_storage_set_index(100,999), STORAGE_ERROR_INVALID_INDEX)
-
-
-if __name__ == '__main__':
-    unittest.main()
+    return clm_test_summary(result)

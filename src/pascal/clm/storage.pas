@@ -13,7 +13,7 @@ type
     frame_columns, frame_rows: clm_uint;
     element_size: clm_uint;
     kind, atlas: clm_byte;
-    data_id: clm_id;
+    data_id: clm_id; { Storage-owned ID, not a BPA/BPAA block or array ID. }
   end;
 
 function clm_storage_new(Id: clm_id; Kind: clm_byte; StructSize: SizeUInt; Columns, Rows, Layers: clm_uint): LongInt;
@@ -75,7 +75,8 @@ begin
   ItemSize := ElementSize(Kind, StructSize);
   if ItemSize = 0 then Exit(CLM_BPA_FAILURE);
   Total := QWord(Columns) * Rows * Layers;
-  if (Total = 0) or (Total > High(LongInt)) or (Total * ItemSize > High(SizeInt)) then Exit(CLM_BPA_FAILURE);
+  if (Total = 0) or (Total > High(LongInt)) or
+     (Total > QWord(High(SizeInt)) div ItemSize) then Exit(CLM_BPA_FAILURE);
   I := Length(Storages);
   SetLength(Storages, I + 1);
   Storages[I].Info.columns := Columns;
@@ -116,34 +117,99 @@ end;
 
 function clm_storage_get_to(Id: clm_id; Layer, Row, Column: clm_uint; Buffer: Pointer; BufferSize: SizeUInt): LongInt;
 var I: SizeInt; Element: SizeUInt;
-begin I := FindStorage(Id); if (I < 0) or (Buffer = nil) or (BufferSize < Storages[I].Info.element_size) or not ElementIndex(Storages[I].Info, Layer, Row, Column, Element) then Exit(CLM_BPA_FAILURE); Move(Storages[I].Data[Element * Storages[I].Info.element_size], Buffer^, Storages[I].Info.element_size); Result := CLM_BPA_GET_SUCCESS; end;
+begin
+  I := FindStorage(Id);
+  if I < 0 then Exit(CLM_BPA_FAILURE);
+  if (Buffer = nil) or (BufferSize < Storages[I].Info.element_size) then Exit(CLM_BPA_FAILURE);
+  if not ElementIndex(Storages[I].Info, Layer, Row, Column, Element) then Exit(CLM_BPA_FAILURE);
+  Move(Storages[I].Data[Element * Storages[I].Info.element_size], Buffer^, Storages[I].Info.element_size);
+  Result := CLM_BPA_GET_SUCCESS;
+end;
+
 function clm_storage_set_from(Id: clm_id; Layer, Row, Column: clm_uint; Value: Pointer; ValueSize: SizeUInt): LongInt;
 var I: SizeInt; Element: SizeUInt;
-begin I := FindStorage(Id); if (I < 0) or (Value = nil) or (ValueSize <> Storages[I].Info.element_size) or not ElementIndex(Storages[I].Info, Layer, Row, Column, Element) then Exit(CLM_BPA_FAILURE); Move(Value^, Storages[I].Data[Element * Storages[I].Info.element_size], ValueSize); Result := CLM_BPA_SET_SUCCESS; end;
+begin
+  I := FindStorage(Id);
+  if I < 0 then Exit(CLM_BPA_FAILURE);
+  if (Value = nil) or (ValueSize <> Storages[I].Info.element_size) then Exit(CLM_BPA_FAILURE);
+  if not ElementIndex(Storages[I].Info, Layer, Row, Column, Element) then Exit(CLM_BPA_FAILURE);
+  Move(Value^, Storages[I].Data[Element * Storages[I].Info.element_size], ValueSize);
+  Result := CLM_BPA_SET_SUCCESS;
+end;
 
 function clm_storage_get(Id: clm_id; Layer, Row, Column: clm_uint; DestinationBlockId: clm_id): LongInt;
 var I: SizeInt; Block: pclm_bpa_block_node; Element: SizeUInt;
-begin I := FindStorage(Id); Block := clm_bpa_find_block(DestinationBlockId); if (I < 0) or (Block = nil) or (Block^.block_size <> Storages[I].Info.element_size) or not ElementIndex(Storages[I].Info, Layer, Row, Column, Element) then Exit(CLM_BPA_FAILURE); Move(Storages[I].Data[Element * Storages[I].Info.element_size], Block^.data^, Block^.block_size); Result := CLM_BPA_GET_SUCCESS; end;
+begin
+  I := FindStorage(Id);
+  if I < 0 then Exit(CLM_BPA_FAILURE);
+  Block := clm_bpa_find_block(DestinationBlockId);
+  if Block = nil then Exit(CLM_BPA_FAILURE);
+  if (Block^.data = nil) or (Block^.block_size <> Storages[I].Info.element_size) then Exit(CLM_BPA_FAILURE);
+  if not ElementIndex(Storages[I].Info, Layer, Row, Column, Element) then Exit(CLM_BPA_FAILURE);
+  Move(Storages[I].Data[Element * Storages[I].Info.element_size], Block^.data^, Block^.block_size);
+  Result := CLM_BPA_GET_SUCCESS;
+end;
+
 function clm_storage_set(Id: clm_id; Layer, Row, Column: clm_uint; SourceBlockId: clm_id): LongInt;
 var Block: pclm_bpa_block_node;
-begin Block := clm_bpa_find_block(SourceBlockId); if Block = nil then Exit(CLM_BPA_FAILURE); Result := clm_storage_set_from(Id, Layer, Row, Column, Block^.data, Block^.block_size); end;
+begin
+  Block := clm_bpa_find_block(SourceBlockId);
+  if Block = nil then Exit(CLM_BPA_FAILURE);
+  Result := clm_storage_set_from(Id, Layer, Row, Column, Block^.data, Block^.block_size);
+end;
 
 function clm_storage_fill_from(Id: clm_id; Value: Pointer; ValueSize: SizeUInt): LongInt;
-var I: SizeInt; ItemSize: SizeUInt;
-begin I := FindStorage(Id); if (I < 0) or (Value = nil) or (ValueSize <> Storages[I].Info.element_size) then Exit(CLM_BPA_FAILURE); ItemSize := Storages[I].Info.element_size; for I := 0 to Length(Storages[FindStorage(Id)].Data) div ItemSize - 1 do Move(Value^, Storages[FindStorage(Id)].Data[I * ItemSize], ItemSize); Result := CLM_BPA_SUCCESS; end;
+var
+  I: SizeInt;
+  Offset, ItemSize: SizeUInt;
+  Snapshot: array of Byte;
+begin
+  I := FindStorage(Id);
+  if I < 0 then Exit(CLM_BPA_FAILURE);
+  ItemSize := Storages[I].Info.element_size;
+  if (Value = nil) or (ValueSize <> ItemSize) then Exit(CLM_BPA_FAILURE);
+  SetLength(Snapshot, ItemSize);
+  Move(Value^, Snapshot[0], ItemSize);
+  Offset := 0;
+  while Offset < SizeUInt(Length(Storages[I].Data)) do
+  begin
+    Move(Snapshot[0], Storages[I].Data[Offset], ItemSize);
+    Inc(Offset, ItemSize);
+  end;
+  Result := CLM_BPA_SUCCESS;
+end;
 
 function clm_storage_slice(SourceId: clm_id; Layer, Row, Column, Layers, Rows, Columns: clm_uint; DestinationId: clm_id): LongInt;
-var S, D: SizeInt; Z, Y: clm_uint; SrcOffset, DstOffset, Bytes: SizeUInt;
+var
+  S, D: SizeInt;
+  Z, Y: clm_uint;
+  SrcOffset, DstOffset, Bytes: SizeUInt;
+  SourceInfo: clm_storage_info;
+  SourceData: TStorageBytes;
 begin
   S := FindStorage(SourceId);
-  if (S < 0) or (Layers = 0) or (Rows = 0) or (Columns = 0) or (Layer > Storages[S].Info.layers) or (Row > Storages[S].Info.rows) or (Column > Storages[S].Info.columns) or (Layers > Storages[S].Info.layers - Layer) or (Rows > Storages[S].Info.rows - Row) or (Columns > Storages[S].Info.columns - Column) then Exit(CLM_BPA_FAILURE);
-  if clm_storage_new(DestinationId, Storages[S].Info.kind, Storages[S].Info.element_size, Columns, Rows, Layers) <> CLM_BPA_SUCCESS then Exit(CLM_BPA_FAILURE);
-  D := FindStorage(DestinationId); Bytes := SizeUInt(Columns) * Storages[S].Info.element_size;
-  for Z := 0 to Layers - 1 do for Y := 0 to Rows - 1 do begin
-    SrcOffset := ((SizeUInt(Layer + Z) * Storages[S].Info.rows + Row + Y) * Storages[S].Info.columns + Column) * Storages[S].Info.element_size;
-    DstOffset := (SizeUInt(Z) * Rows + Y) * Columns * Storages[S].Info.element_size;
-    Move(Storages[S].Data[SrcOffset], Storages[D].Data[DstOffset], Bytes);
-  end;
+  if S < 0 then Exit(CLM_BPA_FAILURE);
+  SourceInfo := Storages[S].Info;
+  if (Layers = 0) or (Rows = 0) or (Columns = 0) or
+     (Layer >= SourceInfo.layers) or (Row >= SourceInfo.rows) or
+     (Column >= SourceInfo.columns) or
+     (Layers > SourceInfo.layers - Layer) or
+     (Rows > SourceInfo.rows - Row) or
+     (Columns > SourceInfo.columns - Column) then Exit(CLM_BPA_FAILURE);
+  { Preserve source backing through possible Storages dynamic-array relocation. }
+  SourceData := Storages[S].Data;
+  if clm_storage_new(DestinationId, SourceInfo.kind, SourceInfo.element_size,
+                     Columns, Rows, Layers) <> CLM_BPA_SUCCESS then Exit(CLM_BPA_FAILURE);
+  D := FindStorage(DestinationId);
+  Bytes := SizeUInt(Columns) * SourceInfo.element_size;
+  for Z := 0 to Layers - 1 do
+    for Y := 0 to Rows - 1 do
+    begin
+      SrcOffset := ((SizeUInt(Layer + Z) * SourceInfo.rows + Row + Y) *
+                    SourceInfo.columns + Column) * SourceInfo.element_size;
+      DstOffset := (SizeUInt(Z) * Rows + Y) * Columns * SourceInfo.element_size;
+      Move(SourceData[SrcOffset], Storages[D].Data[DstOffset], Bytes);
+    end;
   Result := CLM_BPA_SUCCESS;
 end;
 

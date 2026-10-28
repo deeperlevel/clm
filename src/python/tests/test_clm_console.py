@@ -1,119 +1,91 @@
-# =============================================================================
-# CLM — Cross Language Modules
-#
-# An initiative by Deeperlevel, developed with community contributions.
-# https://github.com/deeperlevel/clm
-# Contact: deeparchive@outlook.com
-#
-# Public Domain — CC0 1.0 Universal
-# https://creativecommons.org/publicdomain/zero/1.0/
-#
-# Free to use, modify, redistribute, and bundle for any purpose.
-# Attribution and retention of this notice are appreciated, not required.
-#
-# Provided AS IS, without warranty or liability.
-#
-# Don't start from scratch, bro.
-# =============================================================================
+"""Console API checks using the CLM test reporting style."""
 
-"""Tests for the standalone, procedural CLA Console API.
-
-Run this against the refactored cla_console.py that exports cla_console_* functions.
-"""
-import contextlib
 import io
-import unittest
-from unittest.mock import patch
 
-import clm_console
-from clm_console import (
-    Position,
-    cla_console_clear,
-    cla_console_get_cursor_position,
-    cla_console_get_window_size,
-    cla_console_session,
-    cla_console_set_cursor_position,
-    cla_console_set_title,
-    cla_console_write,
-    cla_console_write_character,
-    cla_console_write_color,
-    cla_console_write_effect,
-    cla_console_write_line, UnsupportedConsoleCapability,
+from clm.base import Position
+from clm.console import (
+    CLM_CONSOLE_FAILURE,
+    CLM_CONSOLE_INVALID_ARGUMENT,
+    CLM_CONSOLE_SUCCESS,
+    clm_console_confirm_from,
+    clm_console_read_line_from,
+    clm_console_set_cursor_position_to,
+    clm_console_wait,
+    clm_console_write_character_to,
+    clm_console_write_effect_to,
+    clm_console_write_format_to,
 )
+from tests.test import TestResult, clm_test_assert, clm_test_begin, clm_test_summary
 
 
-class ConsoleTests(unittest.TestCase):
-    def test_output(self):
-        stream = io.StringIO()
-        with contextlib.redirect_stdout(stream):
-            cla_console_write('A')
-            cla_console_write_line('B')
-            cla_console_write('C')
-            cla_console_write_line('D')
-            cla_console_write_character('é')
-        self.assertEqual(stream.getvalue(), 'AB\nCD\né')
+def run_tests() -> int:
+    """Run console checks and return the number of failed assertions."""
+    result = TestResult()
+    clm_test_begin("CLM - Console")
 
-    def test_invalid_character(self):
-        with self.assertRaises(ValueError):
-            cla_console_write_character('abc')
+    stream = io.StringIO()
+    status = clm_console_write_format_to(stream, "%s:%d", "item", 4)
+    clm_test_assert(
+        result,
+        status == CLM_CONSOLE_SUCCESS and stream.getvalue() == "item:4",
+        "formatted stream output writes the expected text",
+    )
 
-    def test_redirected_color_is_plain_text(self):
-        stream = io.StringIO()
-        with contextlib.redirect_stdout(stream):
-            cla_console_write_color('hello', 'green')
-        self.assertEqual(stream.getvalue(), 'hello')
+    stream = io.StringIO()
+    status = clm_console_set_cursor_position_to(stream, Position[int](2, 4))
+    clm_test_assert(
+        result,
+        status == CLM_CONSOLE_SUCCESS and stream.getvalue() == "\x1b[5;3H",
+        "cursor positioning converts zero-based coordinates to ANSI",
+    )
 
-    def test_unsupported_color(self):
-        with self.assertRaises(ValueError):
-            cla_console_write_color('x', 'ultraviolet')
+    stream = io.StringIO()
+    valid_status = clm_console_write_character_to(stream, "🙂")
+    invalid_status = clm_console_write_character_to(stream, "ab")
+    clm_test_assert(
+        result,
+        valid_status == CLM_CONSOLE_SUCCESS
+        and invalid_status == CLM_CONSOLE_INVALID_ARGUMENT
+        and stream.getvalue() == "🙂",
+        "character output accepts one Unicode scalar value",
+    )
 
-    def test_reject_control_title(self):
-        with self.assertRaises(ValueError):
-            cla_console_set_title('bad\x1btitle')
+    line_status = clm_console_read_line_from(io.StringIO("hello\r\n"), 16)
+    long_stream = io.StringIO("abcd\nnext\n")
+    overlong_status = clm_console_read_line_from(long_stream, 4)
+    next_line_status = clm_console_read_line_from(long_stream, 8)
+    clm_test_assert(
+        result,
+        line_status == (CLM_CONSOLE_SUCCESS, "hello")
+        and overlong_status == (CLM_CONSOLE_FAILURE, "")
+        and next_line_status == (CLM_CONSOLE_SUCCESS, "next"),
+        "line input strips CRLF and drains overlong lines",
+    )
 
-    def test_clear_with_redirected_output(self):
-        # Clear has a Windows fallback now; redirected output should not crash
-        # or be polluted with ANSI sequences. Don't actually invoke cls/clear.
-        stream = io.StringIO()
-        with contextlib.redirect_stdout(stream), patch.object(clm_console.os, 'system', return_value=0):
-            try:
-                cla_console_clear()
-            except UnsupportedConsoleCapability:
-                # Acceptable when there is no usable console backend.
-                pass
-        self.assertNotIn('\x1b', stream.getvalue())
+    output = io.StringIO()
+    confirmation = clm_console_confirm_from(io.StringIO(" YES \n"), output, "Proceed?")
+    clm_test_assert(
+        result,
+        confirmation == (CLM_CONSOLE_SUCCESS, True)
+        and output.getvalue() == "Proceed? [y/n]: ",
+        "confirmation parses yes and writes its prompt",
+    )
 
-    def test_size(self):
-        size = cla_console_get_window_size()
-        self.assertGreater(size.width, 0)
-        self.assertGreater(size.height, 0)
+    output = io.StringIO()
+    status = clm_console_write_effect_to(output, "abc", 0)
+    clm_test_assert(
+        result,
+        status == CLM_CONSOLE_SUCCESS and output.getvalue() == "abc",
+        "write effect emits text without adding a newline",
+    )
 
-    def test_negative_cursor(self):
-        with self.assertRaises(ValueError):
-            cla_console_set_cursor_position(Position(-1, 0))
+    invalid_capacity = clm_console_read_line_from(io.StringIO(""), 2**31)
+    invalid_delay = clm_console_wait(10**1000)
+    clm_test_assert(
+        result,
+        invalid_capacity == (CLM_CONSOLE_INVALID_ARGUMENT, "")
+        and invalid_delay == CLM_CONSOLE_INVALID_ARGUMENT,
+        "out-of-range capacity and delay values are rejected",
+    )
 
-    def test_cursor_unavailable_in_redirected_environment(self):
-        with contextlib.redirect_stdout(io.StringIO()):
-            self.assertIsNone(cla_console_get_cursor_position())
-
-    def test_session_restores(self):
-        with self.assertRaises(ZeroDivisionError):
-            with cla_console_session():
-                # noinspection statement-effect
-                1 / 0
-        self.assertFalse(clm_console.ClaConsoleState.initialized)
-
-    def test_typewriter_effect(self):
-        stream = io.StringIO()
-        with contextlib.redirect_stdout(stream):
-            cla_console_write_effect('hey', 0)
-        self.assertEqual(stream.getvalue(), 'hey\n')
-
-    def test_windows_dll_not_used(self):
-        self.assertNotIn('ctypes', vars(clm_console))
-        self.assertNotIn('kernel32', vars(clm_console))
-        self.assertNotIn('user32', vars(clm_console))
-
-
-if __name__ == '__main__':
-    unittest.main()
+    return clm_test_summary(result)

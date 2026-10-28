@@ -48,29 +48,34 @@ var
   GeneratorExhausted: Boolean = False;
 
 function ValidUtf8(const Value: UTF8String): Boolean;
-var I, Need: SizeInt; First, Second: Byte;
+var
+  I, J, Need: SizeInt;
+  First, Second: Byte;
 begin
   I := 1;
   while I <= Length(Value) do
   begin
     First := Ord(Value[I]);
-    if First <= $7F then begin Inc(I); Continue; end
+    if First <= $7F then
+    begin
+      Inc(I);
+      Continue;
+    end
     else if (First >= $C2) and (First <= $DF) then Need := 2
     else if (First >= $E0) and (First <= $EF) then Need := 3
     else if (First >= $F0) and (First <= $F4) then Need := 4
     else Exit(False);
-    if I + Need - 1 > Length(Value) then Exit(False);
+
+    if Need > Length(Value) - I + 1 then Exit(False);
     Second := Ord(Value[I + 1]);
     if (Second and $C0) <> $80 then Exit(False);
-    if ((First = $E0) and (Second < $A0)) or ((First = $ED) and (Second >= $A0)) or
-       ((First = $F0) and (Second < $90)) or ((First = $F4) and (Second >= $90)) then Exit(False);
-    while Need > 1 do
-    begin
-      if (Ord(Value[I + Need - 1]) and $C0) <> $80 then Exit(False);
-      Dec(Need);
-    end;
-    Inc(I, 3);
-    if First >= $F0 then Inc(I);
+    if ((First = $E0) and (Second < $A0)) or
+       ((First = $ED) and (Second >= $A0)) or
+       ((First = $F0) and (Second < $90)) or
+       ((First = $F4) and (Second >= $90)) then Exit(False);
+    for J := 2 to Need - 1 do
+      if (Ord(Value[I + J]) and $C0) <> $80 then Exit(False);
+    Inc(I, Need);
   end;
   Result := True;
 end;

@@ -21,6 +21,16 @@ begin
   TestResult.passed := 0;
   TestResult.failed := 0;
   clm_test_begin('CLM - Storage');
+  clm_test_assert(TestResult, clm_storage_get_to(99999, 0, 0, 0, @ReadValue,
+    SizeOf(ReadValue)) = CLM_BPA_FAILURE, 'unknown storage get fails cleanly');
+  clm_test_assert(TestResult, clm_storage_set_from(99999, 0, 0, 0, @Value,
+    SizeOf(Value)) = CLM_BPA_FAILURE, 'unknown storage set fails cleanly');
+  clm_test_assert(TestResult, clm_storage_get(99999, 0, 0, 0, 99998) = CLM_BPA_FAILURE,
+    'unknown storage block get fails cleanly');
+  clm_test_assert(TestResult, clm_storage_fill_from(99999, @Value,
+    SizeOf(Value)) = CLM_BPA_FAILURE, 'unknown storage fill fails cleanly');
+  clm_test_assert(TestResult, clm_storage_slice(99999, 0, 0, 0, 1, 1, 1,
+    99997) = CLM_BPA_FAILURE, 'unknown storage slice fails cleanly');
   clm_test_assert(TestResult, clm_storage_new_2d(100, CLM_BPA_TYPE_INT, 0, 4, 3) = CLM_BPA_SUCCESS, 'create two-dimensional grid');
   clm_test_assert(TestResult, clm_storage_get_to(100, 0, 2, 3, @ReadValue, SizeOf(ReadValue)) = CLM_BPA_GET_SUCCESS, 'read zero-initialized cell');
   clm_test_assert(TestResult, ReadValue = 0, 'new storage is zero-initialized');
@@ -34,6 +44,12 @@ begin
   clm_test_assert(TestResult, clm_storage_slice(100, 0, 1, 1, 1, 2, 2, 101) = CLM_BPA_SUCCESS, 'copy grid slice');
   clm_test_assert(TestResult, clm_storage_get_to(101, 0, 0, 1, @ReadValue, SizeOf(ReadValue)) = CLM_BPA_GET_SUCCESS, 'read copied slice');
   clm_test_assert(TestResult, ReadValue = 72, 'slice preserves selected value');
+  clm_test_assert(TestResult, clm_storage_slice(100, 0, 0, 0, 1, 1, 1,
+    102) = CLM_BPA_SUCCESS, 'copy a second slice after registry growth');
+  clm_test_assert(TestResult, clm_storage_get_to(102, 0, 0, 0, @ReadValue,
+    SizeOf(ReadValue)) = CLM_BPA_GET_SUCCESS, 'second slice remains readable');
+  clm_test_assert(TestResult, clm_storage_delete(102) = CLM_BPA_SUCCESS,
+    'delete second slice');
   clm_test_assert(TestResult, clm_storage_delete(101) = CLM_BPA_SUCCESS, 'delete slice');
   clm_test_assert(TestResult, clm_storage_delete(100) = CLM_BPA_SUCCESS, 'delete grid');
 

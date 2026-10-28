@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Ruby: Build (syntax check)",
+      "type": "process",
+      "command": "ruby",
+      "args": ["-c", "main.rb"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Ruby: Run",
+      "type": "process",
+      "command": "ruby",
+      "args": ["main.rb"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "Ruby: Test",
+      "type": "process",
+      "command": "ruby",
+      "args": ["main.rb"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test"
+    }
+  ]
+}

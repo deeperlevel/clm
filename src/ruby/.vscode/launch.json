@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "rdbg",
+      "name": "Ruby: Debug main.rb",
+      "request": "launch",
+      "command": "ruby",
+      "script": "${workspaceFolder}/main.rb",
+      "cwd": "${workspaceFolder}",
+      "args": [],
+      "askParameters": false,
+      "preLaunchTask": "Ruby: Build (syntax check)"
+    }
+  ]
+}

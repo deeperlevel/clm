@@ -1,130 +1,132 @@
-# =============================================================================
-# CLM — Cross Language Modules
-#
-# An initiative by Deeperlevel, developed with community contributions.
-# https://github.com/deeperlevel/clm
-# Contact: deeparchive@outlook.com
-#
-# Public Domain — CC0 1.0 Universal
-# https://creativecommons.org/publicdomain/zero/1.0/
-#
-# Free to use, modify, redistribute, and bundle for any purpose.
-# Attribution and retention of this notice are appreciated, not required.
-#
-# Provided AS IS, without warranty or liability.
-#
-# Don't start from scratch, bro.
-# =============================================================================
+"""ID registry checks using the CLM test reporting style."""
 
-"""Behavioral tests for clm_id's procedural API and facade."""
-
-import unittest
-
-from clm_id import (
-    IdRegistry,
-    clm_id_clear,
-    clm_id_get,
-    clm_id_is_case_sensitive,
-    clm_id_register,
-    clm_id_remove,
-    clm_id_set,
-    clm_id_set_case_sensitive,
-)
+from clm import bpa, id as ids
+from tests.test import TestResult, clm_test_assert, clm_test_begin, clm_test_summary
 
 
-class TestIdRegistry(unittest.TestCase):
-    def setUp(self):
-        clm_id_clear()
-        clm_id_set_case_sensitive(True)
+def run_tests() -> int:
+    """Run ID registry checks and return the number of failed assertions."""
+    result = TestResult()
+    clm_test_begin("CLM - ID")
 
-    def tearDown(self):
-        clm_id_clear()
-        clm_id_set_case_sensitive(True)
+    cleared = ids.clm_id_clear()
+    host = ids.clm_id_register("host", 1001)
+    alias = ids.clm_id_map("mapped-name", 1002)
+    same_value = ids.clm_id_register("default_host", 1001)
+    clm_test_assert(
+        result,
+        ids.clm_id_is_case_sensitive()
+        and cleared == bpa.CLM_BPA_SUCCESS
+        and host == bpa.CLM_BPA_SET_SUCCESS
+        and alias == bpa.CLM_BPA_SET_SUCCESS
+        and same_value == bpa.CLM_BPA_SET_SUCCESS
+        and ids.clm_id_get("host") == 1001
+        and ids.clm_id_get("mapped-name") == 1002,
+        "register names, map aliases, and allow multiple names per ID",
+    )
 
-    def test_default_sensitive(self):
-        self.assertTrue(clm_id_is_case_sensitive())
-        clm_id_register("Host", 123)
-        self.assertEqual(clm_id_get("Host"), 123)
-        with self.assertRaises(KeyError):
-            clm_id_get("host")
-        clm_id_register("host", 456)
-        self.assertEqual(clm_id_get("host"), 456)
+    try_status, try_value = ids.clm_id_try_get("host")
+    missing_status, missing_value = ids.clm_id_try_get("missing")
+    clm_test_assert(
+        result,
+        ids.clm_id_register("host", 1002) == bpa.CLM_BPA_FAILURE
+        and ids.clm_id_register(b"\xC0\xAF", 1003) == bpa.CLM_BPA_FAILURE
+        and ids.clm_id_get("HOST") == ids.CLM_ID_NOT_FOUND
+        and (try_status, try_value) == (bpa.CLM_BPA_GET_SUCCESS, 1001)
+        and (missing_status, missing_value) == (bpa.CLM_BPA_FAILURE, None),
+        "reject duplicate or malformed UTF-8 names and provide status lookup",
+    )
 
-    def test_insensitive_register_lookup_and_remove(self):
-        IdRegistry.set_case_sensitive(False)
-        self.assertFalse(IdRegistry.is_case_sensitive())
-        IdRegistry.register("WebAPI.Host", 123)
-        self.assertEqual(IdRegistry.get("webapi.host"), 123)
-        self.assertEqual(IdRegistry.get("WEBAPI.HOST"), 123)
-        with self.assertRaises(KeyError):
-            IdRegistry.register("webapi.HOST", 456)
-        IdRegistry.remove("WEBAPI.host")
-        with self.assertRaises(KeyError):
-            IdRegistry.get("WebAPI.Host")
+    update_existing = ids.clm_id_set("host", 2001)
+    insert_with_set = ids.clm_id_set("new_name", 3001)
+    remove_name = ids.clm_id_remove("new_name")
+    clm_test_assert(
+        result,
+        update_existing == bpa.CLM_BPA_SET_SUCCESS
+        and ids.clm_id_get("host") == 2001
+        and ids.clm_id_get("default_host") == 1001
+        and insert_with_set == bpa.CLM_BPA_SET_SUCCESS
+        and ids.clm_id_remove("missing") == bpa.CLM_BPA_FAILURE
+        and remove_name == bpa.CLM_BPA_SUCCESS
+        and ids.clm_id_get("new_name") == ids.CLM_ID_NOT_FOUND,
+        "update one mapping, insert through set, and remove by name",
+    )
 
-    def test_switch_modes_preserves_spelling(self):
-        clm_id_register("Host", 10)
-        clm_id_set_case_sensitive(False)
-        self.assertEqual(clm_id_get("HOST"), 10)
-        clm_id_set_case_sensitive(True)
-        self.assertEqual(clm_id_get("Host"), 10)
-        with self.assertRaises(KeyError):
-            clm_id_get("HOST")
+    registered_case_alias = ids.clm_id_register("Host", 4001)
+    rejected_case_mode = ids.clm_id_set_case_sensitive(False)
+    preserved_policy = ids.clm_id_is_case_sensitive()
+    removed_case_alias = ids.clm_id_remove("Host")
+    enabled_case_mode = ids.clm_id_set_case_sensitive(False)
+    insensitive_lookup = ids.clm_id_get("HOST")
+    update_spelling = ids.clm_id_set("HOST", 2002)
+    non_ascii = (
+        ids.clm_id_register("Ä", 6001),
+        ids.clm_id_register("ä", 6002),
+    )
+    clm_test_assert(
+        result,
+        registered_case_alias == bpa.CLM_BPA_SET_SUCCESS
+        and rejected_case_mode == bpa.CLM_BPA_FAILURE
+        and preserved_policy
+        and removed_case_alias == bpa.CLM_BPA_SUCCESS
+        and enabled_case_mode == bpa.CLM_BPA_SUCCESS
+        and not ids.clm_id_is_case_sensitive()
+        and insensitive_lookup == 2001
+        and update_spelling == bpa.CLM_BPA_SET_SUCCESS
+        and ids.clm_id_get("host") == 2002
+        and non_ascii == (bpa.CLM_BPA_SET_SUCCESS, bpa.CLM_BPA_SET_SUCCESS)
+        and ids.clm_id_get("Ä") == 6001
+        and ids.clm_id_get("ä") == 6002,
+        "ASCII-insensitive mode rejects collisions and leaves non-ASCII case distinct",
+    )
 
-    def test_switch_with_collisions_rolls_back(self):
-        clm_id_register("Host", 1)
-        clm_id_register("host", 2)
-        with self.assertRaises(ValueError):
-            clm_id_set_case_sensitive(False)
-        self.assertTrue(clm_id_is_case_sensitive())
-        self.assertEqual(clm_id_get("Host"), 1)
-        self.assertEqual(clm_id_get("host"), 2)
+    alias_id = ids.clm_id_register("alias", 2002)
+    unmap_id = ids.clm_id_unmap(2002)
+    unmap_name = ids.clm_id_unmap_name("default_host")
+    clm_test_assert(
+        result,
+        alias_id == bpa.CLM_BPA_SET_SUCCESS
+        and unmap_id == bpa.CLM_BPA_SUCCESS
+        and ids.clm_id_get("host") == ids.CLM_ID_NOT_FOUND
+        and ids.clm_id_get("alias") == ids.CLM_ID_NOT_FOUND
+        and unmap_name == bpa.CLM_BPA_SUCCESS
+        and ids.clm_id_get("default_host") == ids.CLM_ID_NOT_FOUND,
+        "unmap removes one or all names associated with an ID",
+    )
 
-    def test_unicode_casefold(self):
-        clm_id_set_case_sensitive(False)
-        clm_id_register("Straße", 77)
-        self.assertEqual(clm_id_get("STRASSE"), 77)
+    ids.clm_id_gen_reset()
+    generated = [ids.clm_id_gen_next() for _ in range(3)]
+    ids.clm_id_gen_reset()
+    reset_value = ids.clm_id_gen_next()
+    clm_test_assert(
+        result,
+        generated == [0, 1, 2] and reset_value == 0,
+        "generate sequential IDs and reset the generator",
+    )
 
-    def test_set_add_and_remove_errors(self):
-        clm_id_set("port", 8080)
-        self.assertEqual(clm_id_get("port"), 8080)
-        clm_id_set("port", 9090)
-        self.assertEqual(clm_id_get("port"), 9090)
-        with self.assertRaises(KeyError):
-            clm_id_register("port", 7)
-        clm_id_remove("port")
-        with self.assertRaises(KeyError):
-            clm_id_remove("port")
+    clear_status = ids.clm_id_clear()
+    mode_preserved = not ids.clm_id_is_case_sensitive()
+    reuse_status = ids.clm_id_register("after-clear", 5001)
+    lookup_after_clear = ids.clm_id_get("AFTER-CLEAR")
+    shutdown_status = ids.clm_id_shutdown()
+    lookup_after_shutdown = ids.clm_id_get("after-shutdown")
+    recreate_status = ids.clm_id_register("after-shutdown", 5002)
+    recreate_lookup = ids.clm_id_get("after-shutdown")
+    shutdown_again = ids.clm_id_shutdown()
+    restore_mode = ids.clm_id_set_case_sensitive(True)
+    clm_test_assert(
+        result,
+        clear_status == bpa.CLM_BPA_SUCCESS
+        and mode_preserved
+        and reuse_status == bpa.CLM_BPA_SET_SUCCESS
+        and lookup_after_clear == 5001
+        and shutdown_status == bpa.CLM_BPA_SUCCESS
+        and lookup_after_shutdown == ids.CLM_ID_NOT_FOUND
+        and recreate_status == bpa.CLM_BPA_SET_SUCCESS
+        and recreate_lookup == 5002
+        and shutdown_again == bpa.CLM_BPA_SUCCESS
+        and restore_mode == bpa.CLM_BPA_SUCCESS,
+        "clear preserves policy and shutdown releases storage for lazy recreation",
+    )
 
-    def test_distinct_names_can_share_id(self):
-        clm_id_register("host", 123)
-        clm_id_register("hostname", 123)
-        self.assertEqual(clm_id_get("hostname"), 123)
-
-    def test_clear_retains_mode(self):
-        clm_id_set_case_sensitive(False)
-        clm_id_register("host", 1)
-        IdRegistry.clear()
-        self.assertFalse(IdRegistry.is_case_sensitive())
-        with self.assertRaises(KeyError):
-            clm_id_get("HOST")
-
-    # noinspection bad-argument-type
-    def test_validation(self):
-        with self.assertRaises(ValueError):
-            clm_id_register("", 1)
-        with self.assertRaises(ValueError):
-            clm_id_get(None)
-        with self.assertRaises(TypeError):
-            clm_id_set("x", True)
-        with self.assertRaises(TypeError):
-            clm_id_set_case_sensitive(0)
-
-    def test_facade_shares_functions(self):
-        self.assertIs(IdRegistry.get, clm_id_get)
-        self.assertIs(IdRegistry.register, clm_id_register)
-        self.assertIsNotNone(IdRegistry.get.__doc__)
-
-
-if __name__ == "__main__":
-    unittest.main()
+    return clm_test_summary(result)

@@ -222,3 +222,6 @@ __marimo__/
 /src/cpp/.idea
 /src/go/.idea
 /src/c/.idea
+/src/python/tests.old
+/src/python/clm.old
+/src/ruby/.idea

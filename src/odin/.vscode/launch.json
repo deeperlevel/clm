@@ -5,7 +5,7 @@
       "name": "Debug Odin",
       "type": "cppvsdbg",
       "request": "launch",
-      "program": "${workspaceFolder}\\main.exe",
+      "program": "${workspaceFolder}\\build\\main.exe",
       "cwd": "${workspaceFolder}",
       "preLaunchTask": "Build Odin (debug)",
       "console": "integratedTerminal"

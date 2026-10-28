@@ -17,14 +17,48 @@
 #
 # Don't start from scratch, bro.
 # =============================================================================
-module Base
-  alias :int :ClmId
-  Position    = Data.define(:x, :y)
-  Position3D  = Data.define(:x, :y, :z)
+module CLM
+end
 
-  Size        = Data.define(:width, :height)
-  Size3D      = Data.define(:width, :height, :depth)
+module CLM::Base
+  ID_MIN = 0
+  ID_MAX = (1 << 64) - 1
 
-  Block       = Data.define(:x, :y, :width, :height)
-  Block3D     = Data.define(:x, :y, :z, :width, :height, :depth)
+  RECORD_FAMILIES = {
+    'Position' => %i[x y],
+    'Position3D' => %i[x y z],
+    'Size' => %i[width height],
+    'Size3D' => %i[width height depth],
+    'Block' => %i[x y width height],
+    'Block3D' => %i[x y z width height depth]
+  }.freeze
+
+  TYPE_SUFFIXES = {
+    'I8' => 'SByte',
+    'U8' => 'Byte',
+    'I16' => 'Short',
+    'U16' => 'UShort',
+    'I32' => 'Int',
+    'U32' => 'UInt',
+    'I64' => 'Long',
+    'U64' => 'ULong',
+    'F32' => 'Float',
+    'F64' => 'Double'
+  }.freeze
+
+  def self.valid_id?(value)
+    value.is_a?(Integer) && value.between?(ID_MIN, ID_MAX)
+  end
+
+  RECORD_FAMILIES.each do |family, fields|
+    TYPE_SUFFIXES.each do |suffix, alias_name|
+      record = Struct.new(*fields, keyword_init: true)
+      const_set("#{family}#{suffix}", record)
+      const_set("#{family}#{alias_name}", record)
+
+      if suffix == 'I32'
+        const_set(family, record)
+      end
+    end
+  end
 end

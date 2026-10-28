@@ -25,6 +25,7 @@ import "core:fmt"
  
 base_tests :: proc() -> i32 {
 	result: test_result
+	test_begin("CLM Base")
 
 	assert_test(&result, clm.make_id(0) == clm.idkey(0))
 	assert_test(&result, clm.make_id(1001) == clm.idkey(1001))
@@ -149,7 +150,7 @@ base_tests :: proc() -> i32 {
 	assert_test(&result, size_of(clm.block_3d_f32) == 24)
 	assert_test(&result, size_of(clm.block_3d_f64) == 48)
 
-	test_summary("CLM Base", result.passed, result.failed)
+	test_summary_counts(result.passed, result.failed)
 
 	return result.failed
 }
