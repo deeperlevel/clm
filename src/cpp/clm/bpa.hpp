@@ -67,6 +67,20 @@ struct clm_bpa_pool_class {
     std::size_t active{};
     std::size_t capacity{};
 };
+struct bpa_byte_buffer : public std::vector<unsigned char> {
+    using std::vector<unsigned char>::vector;
+    bpa_byte_buffer() = default;
+    bpa_byte_buffer(const std::vector<unsigned char>& v) : std::vector<unsigned char>(v) {}
+    bpa_byte_buffer(std::vector<unsigned char>&& v) : std::vector<unsigned char>(std::move(v)) {}
+
+    operator char*() { return reinterpret_cast<char*>(this->data()); }
+    operator const char*() const { return reinterpret_cast<const char*>(this->data()); }
+    operator void*() { return this->data(); }
+    operator const void*() const { return this->data(); }
+    operator unsigned char*() { return this->data(); }
+    operator const unsigned char*() const { return this->data(); }
+};
+
 struct clm_bpa_block_node {
     clm_id id{};
     clm_byte type{};
@@ -74,7 +88,7 @@ struct clm_bpa_block_node {
     clm_uint block_size{};
     clm_byte encoding{};
     clm_uint length{};
-    std::vector<unsigned char> data;
+    bpa_byte_buffer data;
 };
 struct clm_bpaa_array_node {
     clm_id id{};
@@ -1548,4 +1562,111 @@ namespace detail {
         std::ranges::fill(detail::pool_active, 0);
         return pool_cleanup();
     }
+}
+
+using clm_bpa_block_node = clm::bpa::clm_bpa_block_node;
+using clm_bpaa_array_node = clm::bpa::clm_bpaa_array_node;
+
+static inline bool clm_bpa_is_existing(const clm_id id)
+{
+    return clm::bpa::block_exists(id);
+}
+
+static inline bool clm_bpaa_is_existing(const clm_id id)
+{
+    return clm::bpa::array_exists(id);
+}
+
+static inline int clm_bpa_create(const clm_id id, const clm_byte type)
+{
+    return clm::bpa::create(id, type);
+}
+
+static inline int clm_bpa_delete(const clm_id id)
+{
+    if (clm::bpa::block_exists(id))
+        return clm::bpa::erase_block(id);
+    if (clm::bpa::array_exists(id))
+        return clm::bpa::erase_array(id);
+    return clm::bpa::CLM_BPA_FAILURE;
+}
+
+static inline int clm_bpa_set_string(const clm_id id, const char* text, const clm_uint size)
+{
+    return clm::bpa::set_string(id, text, size);
+}
+
+static inline int clm_bpa_get_string(const clm_id id, char* buffer, const clm_uint size)
+{
+    return clm::bpa::get_string(id, buffer, size);
+}
+
+static inline int clm_bpa_create_sized(const clm_id id, const clm_byte type, const clm_uint size)
+{
+    return clm::bpa::create_sized(id, type, size);
+}
+
+static inline clm_bpa_block_node* clm_bpa_find_block(const clm_id id)
+{
+    return clm::bpa::detail::find_block(id);
+}
+
+static inline int clm_bpa_set(const clm_id id, const void* input, const clm_uint size)
+{
+    return clm::bpa::set(id, input, size);
+}
+
+static inline int clm_bpa_get(const clm_id id, void* output, const clm_uint size)
+{
+    return clm::bpa::get(id, output, size);
+}
+
+static inline clm_bpaa_array_node* clm_bpaa_find_array(const clm_id id)
+{
+    return clm::bpa::detail::find_array(id);
+}
+
+static inline int clm_bpaa_get_raw(const clm_id id, const clm_int index, void* output, const clm_uint size)
+{
+    return clm::bpa::get_raw(id, index, output, size);
+}
+
+static inline int clm_bpaa_create(const clm_id id, const clm_byte type, const clm_uint block_size, const clm_uint reserved)
+{
+    return clm::bpa::create(id, type, block_size, reserved);
+}
+
+static inline int clm_bpaa_append_raw(const clm_id id, const void* input, const clm_uint size)
+{
+    return clm::bpa::append_raw(id, input, size);
+}
+
+static inline int clm_bpaa_insert_raw(const clm_id id, const clm_int index, const void* input, const clm_uint size)
+{
+    return clm::bpa::insert_raw(id, index, input, size);
+}
+
+static inline int clm_bpaa_remove(const clm_id id, const clm_int index)
+{
+    return clm::bpa::remove(id, index);
+}
+
+static inline int clm_bpaa_clear(const clm_id id)
+{
+    return clm::bpa::clear(id);
+}
+
+static inline int clm_bpaa_get_string_raw(const clm_id id, const clm_int index, void* output, const clm_uint size)
+{
+    return clm::bpa::get_string_raw(id, index, output, size);
+}
+
+static inline int clm_bpaa_append_string_raw(const clm_id id, const void* input, const clm_uint size)
+{
+    return clm::bpa::append_string_raw(id, input, size);
+}
+
+static inline int clm_bpaa_set_string_raw(const clm_id id, const clm_int index, const void* input, const clm_uint size)
+{
+    return clm::bpa::set_string_raw(id, index, input, size);
 }

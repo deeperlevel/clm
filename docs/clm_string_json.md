@@ -22,11 +22,10 @@ tree.
 
 ## Serialization
 
-Output is compact and contains no comments. Object names and all scalar leaves
-are JSON-quoted; typed numbers, booleans, and null markers are converted to
-their textual spellings and emitted as JSON strings. This quote-all behavior is
-valid JSON but intentionally does not preserve scalar types across a round
-trip. Arrays retain order.
+Output is compact and contains no comments. Object names and string leaves are
+JSON-quoted; numeric leaves, booleans, and null markers are emitted as native
+JSON literals. Supported scalar types and array order are preserved on a
+parse/serialize round-trip.
 
 ## Operations
 
@@ -43,5 +42,4 @@ success/failure statuses.
 Use object nodes keyed by registered numeric IDs, ordered array nodes, and
 distinct string, numeric, boolean, and null scalar representations. Do not
 serialize comments. Preserve array order and object insertion order where the
-target tree supports it. Quote-all output is a text representation choice, not
-a change to the types held by the parsed tree.
+target tree supports it.

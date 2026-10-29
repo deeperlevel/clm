@@ -25,6 +25,11 @@
 #include "tests/test_clm_id.hpp"
 #include "tests/test_clm_storage.hpp"
 #include "tests/test_clm_string.hpp"
+#include "tests/test_clm_clp.hpp"
+#include "tests/test_clm_channel.hpp"
+#include "tests/test_clm_async.hpp"
+#include "tests/test_clm_path.hpp"
+#include "tests/test_clm_container.hpp"
 
 auto main() -> int {
     if (!clm_test_log_open("main.log")) {
@@ -39,6 +44,11 @@ auto main() -> int {
     test_clm_id();
     test_clm_string();
     test_clm_storage();
+    test_clm_clp();
+    test_clm_channel();
+    test_clm_async();
+    test_clm_path();
+    test_clm_container();
     clm_overall_test_summary("CLM Tests Summary");
 
     const int log_closed = clm_test_log_close();

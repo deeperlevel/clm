@@ -19,6 +19,7 @@
  * Don't start from scratch, bro.
  * =============================================================================
  */
+
 #include "dictionary.h"
 
 #include <stdbool.h>

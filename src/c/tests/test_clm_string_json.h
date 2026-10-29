@@ -93,10 +93,10 @@ static int clm_string_json_tests(void)
                    clm_string_json_dumps(root_id, destination_id) ==
                        CLM_FORMAT_SERIALIZE_SUCCESS &&
                    strcmp((const char*)clm_bpa_find_block(destination_id)->data,
-                       "{\"json_name\":\"Ada\\nLovelace\",\"json_count\":\"12\","
-                       "\"json_active\":\"true\",\"json_none\":\"null\","
-                       "\"json_items\":[\"1\",\"x\",{\"json_flag\":\"false\"}]}") == 0,
-               "dump compact JSON with quoted scalar values and no comments");
+                       "{\"json_name\":\"Ada\\nLovelace\",\"json_count\":12,"
+                       "\"json_active\":true,\"json_none\":null,"
+                       "\"json_items\":[1,\"x\",{\"json_flag\":false}]}" ) == 0,
+               "dump compact JSON while preserving scalar types");
     CLM_ASSERT(clm_string_new(source_id, "") &&
                    clm_string_set(source_id, "{\"json_name\":1,}") == 16 &&
                    clm_string_json_loads(source_id, invalid_root_id) ==

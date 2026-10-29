@@ -16,11 +16,11 @@ names that resolve to the same ID fail. Registrations created by a successful
 parse remain in the registry; registrations created by a failed parse are
 rolled back.
 
-With `has_header` disabled, the first record is ignored and the parsed table
-has zero columns. Later records are represented as empty rows; their field
-values are not retained because there is no column schema. When serializing in
-this mode, no header is emitted. A table with zero columns emits one blank
-record per row.
+With `has_header` disabled, every record is data. The first record determines
+the column count; columns are named `column_1`, `column_2`, and so on, and each
+name is registered through `clm_id` using the same collision-safe policy.
+Every field value is retained. Serialization in this mode omits the header
+record and emits all rows as data.
 
 When a header is present, each data record must have exactly the header's field
 count. Values are stored as strings. An empty file produces an empty table;

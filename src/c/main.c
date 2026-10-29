@@ -22,6 +22,14 @@
 #define CLM_STRING_IMPLEMENTATION
 #define CLM_ID_IMPLEMENTATION
 #define CLM_FILE_IMPLEMENTATION
+#define CLM_ASYNC_IMPLEMENTATION
+#define CLM_ASYNC_POOL_IMPLEMENTATION
+#define CLM_CONTAINER_IMPLEMENTATION
+#define CLM_CHANNEL_IMPLEMENTATION
+#define CLM_DISPATCH_IMPLEMENTATION
+#define CLM_ECS_IMPLEMENTATION
+#define CLM_MANAGED_IMPLEMENTATION
+#define CLM_MATH_CORE_IMPLEMENTATION
 
 #include "tests/test.h"
 #include "tests/test_clm_base.h"
@@ -45,6 +53,15 @@
 #include "tests/test_clm_url.h"
 #include "tests/test_clm_file.h"
 #include "tests/test_clm_directory.h"
+#include "tests/test_clm_async.h"
+#include "tests/test_clm_container.h"
+#include "tests/test_clm_channel.h"
+#include "tests/test_clm_dispatch.h"
+#include "tests/test_clm_ecs.h"
+#include "tests/test_clm_managed.h"
+#include "tests/test_clm_clp.h"
+#include "tests/test_clm_ua.h"
+#include "tests/test_clm_math.h"
 
 int main(void)
 {
@@ -74,6 +91,15 @@ int main(void)
     clm_url_tests();
     clm_file_tests();
     clm_directory_tests();
+    clm_async_tests();
+    clm_container_tests();
+    clm_channel_tests();
+    clm_dispatch_tests();
+    clm_ecs_tests();
+    clm_managed_tests();
+    clm_clp_tests();
+    clm_ua_tests();
+    clm_math_tests();
     clm_overall_test_summary("CLM Tests Summary");
 
     const int files_closed = clm_file_shutdown();

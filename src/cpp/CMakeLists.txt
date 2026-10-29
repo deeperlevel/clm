@@ -14,5 +14,10 @@ add_executable(main
     tests/test_clm_id.hpp
     tests/test_clm_storage.hpp
     tests/test_clm_string.hpp
+    tests/test_clm_clp.hpp
+    tests/test_clm_channel.hpp
+    tests/test_clm_async.hpp
+    tests/test_clm_path.hpp
+    tests/test_clm_container.hpp
     tests/test.hpp
 )

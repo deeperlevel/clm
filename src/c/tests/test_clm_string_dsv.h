@@ -20,6 +20,8 @@ static int clm_string_dsv_tests(void)
 	const clm_id invalid_separator_table_id = 76610;
 	clm_id name_column_id = 0;
 	clm_id note_column_id = 0;
+	clm_id generated_column_one_id = 0;
+	clm_id generated_column_two_id = 0;
 	clm_id bad_column_id = 0;
 	const char input[] =
 		"dsv_name,dsv_note\r\n"
@@ -104,14 +106,27 @@ static int clm_string_dsv_tests(void)
 		"ignored,header\none,two\nthree,four\n") >= 0 &&
 		clm_string_dsv_loads_with_options(source_string_id, headerless_table_id,
 			&headerless_options) == CLM_BPA_SUCCESS &&
-		clm_table_column_count(headerless_table_id) == 0 &&
-		clm_table_row_count(headerless_table_id) == 2 &&
+		clm_table_column_count(headerless_table_id) == 2 &&
+		clm_table_row_count(headerless_table_id) == 3 &&
+		clm_id_try_get("column_1", &generated_column_one_id) == CLM_BPA_GET_SUCCESS &&
+		clm_id_try_get("column_2", &generated_column_two_id) == CLM_BPA_GET_SUCCESS &&
+		clm_table_get(headerless_table_id, 0, generated_column_one_id,
+			output_string_id) == CLM_BPA_GET_SUCCESS &&
+		clm_string_get_block(output_string_id, &cell_block, &cell_text,
+			&cell_bytes, &cell_characters) == CLM_BPA_SUCCESS &&
+		strcmp(cell_text, "ignored") == 0 &&
+		clm_table_get(headerless_table_id, 2, generated_column_two_id,
+			output_string_id) == CLM_BPA_GET_SUCCESS &&
+		clm_string_get_block(output_string_id, &cell_block, &cell_text,
+			&cell_bytes, &cell_characters) == CLM_BPA_SUCCESS &&
+		strcmp(cell_text, "four") == 0 &&
 		clm_string_dsv_dumps_with_options(headerless_table_id, output_string_id,
 			&headerless_options) == CLM_BPA_SUCCESS &&
 		clm_string_get_block(output_string_id, &cell_block, &cell_text,
 			&cell_bytes, &cell_characters) == CLM_BPA_SUCCESS &&
-		strcmp(cell_text, "\n\n") == 0,
-		"ignore the first record and preserve empty headerless rows");
+		strcmp(cell_text,
+			"\"ignored\",\"header\"\n\"one\",\"two\"\n\"three\",\"four\"\n") == 0,
+		"treat every headerless record as data with generated column names");
 	CLM_ASSERT(clm_string_set(source_string_id,
 		"dsv_bad_column\n\"invalid\\q\"\n") >= 0 &&
 		clm_string_dsv_loads(source_string_id, failed_table_id) == CLM_BPA_FAILURE &&
@@ -133,7 +148,9 @@ static int clm_string_dsv_tests(void)
 	CLM_ASSERT(clm_id_remove("dsv_name") == CLM_BPA_SUCCESS &&
 		clm_id_remove("dsv_note") == CLM_BPA_SUCCESS &&
 		clm_id_remove("dsv_pair") == CLM_BPA_SUCCESS &&
-		clm_id_remove("dsv_payload") == CLM_BPA_SUCCESS,
+		clm_id_remove("dsv_payload") == CLM_BPA_SUCCESS &&
+		clm_id_remove("column_1") == CLM_BPA_SUCCESS &&
+		clm_id_remove("column_2") == CLM_BPA_SUCCESS,
 		"remove DSV column mappings");
 
 	clm_test_summary(result.passed, result.failed);

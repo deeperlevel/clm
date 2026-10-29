@@ -264,4 +264,64 @@ inline clm_id gen_next()
     return result;
 }
 
+inline int get_name(
+    const clm_id id,
+    char* buffer,
+    const std::size_t capacity,
+    std::size_t* byte_length)
+{
+    if (byte_length == nullptr || (buffer == nullptr && capacity != 0))
+        return CLM_BPA_FAILURE;
+    const auto& registry = detail::registry();
+    for (const auto& [_, item] : registry.mappings) {
+        if (item.value == id) {
+            *byte_length = item.spelling.size();
+            if (capacity <= item.spelling.size()) {
+                if (buffer != nullptr && capacity != 0) {
+                    std::memcpy(buffer, item.spelling.data(), capacity - 1);
+                    buffer[capacity - 1] = '\0';
+                }
+                return CLM_BPA_FAILURE;
+            }
+            std::memcpy(buffer, item.spelling.data(), item.spelling.size() + 1);
+            return CLM_BPA_GET_SUCCESS;
+        }
+    }
+    return CLM_BPA_FAILURE;
+}
+
+inline int remove(const char* name)
+{
+    return erase(name);
+}
+
+}
+
+static inline int clm_id_register(const char* name, const clm_id id)
+{
+    return clm::id::add(name, id);
+}
+
+static inline int clm_id_remove(const char* name)
+{
+    return clm::id::erase(name);
+}
+
+static inline int clm_id_try_get(const char* name, clm_id* out_id)
+{
+    return clm::id::try_get(name, out_id);
+}
+
+static inline clm_id clm_id_gen_next()
+{
+    return clm::id::gen_next();
+}
+
+static inline int clm_id_get_name(
+    const clm_id id,
+    char* buffer,
+    const std::size_t capacity,
+    std::size_t* byte_length)
+{
+    return clm::id::get_name(id, buffer, capacity, byte_length);
 }

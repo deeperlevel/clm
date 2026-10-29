@@ -39,14 +39,26 @@ static inline int clm_test_log_open(const char* path)
 {
     if (path == nullptr || clm_test_log_file != nullptr)
         return 0;
-#if defined(_MSC_VER)
+#if defined(_WIN32)
     std::FILE* stream = nullptr;
-    if (fopen_s(&stream, path, "w") != 0)
-        return 0;
+    if (fopen_s(&stream, path, "w") != 0) {
+        char temp_dir[MAX_PATH];
+        const DWORD len = GetTempPathA(MAX_PATH, temp_dir);
+        if (len > 0 && len < MAX_PATH) {
+            std::strcat(temp_dir, "main.log");
+            if (fopen_s(&stream, temp_dir, "w") != 0)
+                return 0;
+        } else {
+            return 0;
+        }
+    }
 #else
     std::FILE* stream = std::fopen(path, "w");
-    if (stream == nullptr)
-        return 0;
+    if (stream == nullptr) {
+        stream = std::fopen("/tmp/main.log", "w");
+        if (stream == nullptr)
+            return 0;
+    }
 #endif
     clm_test_log_file = stream;
     clm_test_log_failed = 0;

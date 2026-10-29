@@ -33,6 +33,27 @@ add_executable(main
     clm/string_toml.h
     clm/string_json.h
     clm/string_yaml.h
+    clm/async.h
+    clm/async_pool.h
+    clm/container.h
+    clm/channel.h
+    clm/dispatch.h
+    clm/ecs.h
+    clm/managed.h
+    clm/math_core.h
+    clm/math.h
+    clm/math_number.h
+    clm/math_random.h
+    clm/math_vector.h
+    clm/math_matrix.h
+    clm/math_interpolation.h
+    clm/math_geometry.h
+    clm/math_quaternion.h
+    clm/math_collision.h
+    clm/math_physics2d.h
+    clm/math_pathfinding.h
+    clm/clp.h
+    clm/ua.h
     clm/gen.h
     clm/id.h
     clm/string.h
@@ -60,9 +81,19 @@ add_executable(main
     clm/directory.h
     tests/test_clm_file.h
     tests/test_clm_directory.h
+    tests/test_clm_async.h
+    tests/test_clm_container.h
+    tests/test_clm_channel.h
+    tests/test_clm_dispatch.h
+    tests/test_clm_ecs.h
+    tests/test_clm_managed.h
+    tests/test_clm_math.h
+    tests/test_clm_clp.h
+    tests/test_clm_ua.h
 )
 
-target_link_libraries(main PRIVATE uriparser::uriparser)
+find_package(Threads REQUIRED)
+target_link_libraries(main PRIVATE uriparser::uriparser Threads::Threads)
 include(CTest)
 add_test(NAME clm COMMAND main)
 if(WIN32)
@@ -70,6 +101,6 @@ if(WIN32)
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(IDN2 REQUIRED IMPORTED_TARGET libidn2)
-    target_link_libraries(main PRIVATE PkgConfig::IDN2)
+    target_link_libraries(main PRIVATE PkgConfig::IDN2 m)
     target_compile_definitions(main PRIVATE _XOPEN_SOURCE=700 _GNU_SOURCE _FILE_OFFSET_BITS=64)
 endif()

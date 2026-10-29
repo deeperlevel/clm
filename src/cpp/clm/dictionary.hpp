@@ -268,3 +268,23 @@ inline int keys_to(const clm_id id, clm_id* buffer, const std::size_t capacity)
 }
 
 }
+
+static inline int clm_typed_dictionary_new(const clm_id id, const clm_byte type, const std::size_t size)
+{
+    return clm::dictionary::create(id, type, size);
+}
+
+static inline int clm_typed_dictionary_delete(const clm_id id)
+{
+    return clm::dictionary::erase(id);
+}
+
+static inline int clm_typed_dictionary_set_from(const clm_id id, const clm_id key, const void* value, const std::size_t size)
+{
+    return clm::dictionary::set_from(id, key, value, size);
+}
+
+static inline int clm_typed_dictionary_get_to(const clm_id id, const clm_id key, void* value, const std::size_t size)
+{
+    return clm::dictionary::get_to(id, key, value, size);
+}
