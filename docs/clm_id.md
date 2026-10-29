@@ -88,6 +88,15 @@ clm_id_register("WebApi.host", 101)
 assert clm_id_get("WebApi.host") == 101
 ```
 
+### `clm_id_get_name(identifier, buffer, capacity, &byte_length)`
+
+Copies the first registered spelling associated with an integer ID. Since
+multiple names may be aliases for one ID, reverse lookup is not unique; this
+operation deterministically selects the earliest remaining registration in
+insertion order. Pass a null buffer with zero capacity to query the UTF-8 byte
+length excluding the terminator. A real destination must have room for the
+complete name and NUL terminator.
+
 ### `clm_id_set(name, identifier)`
 
 Creates or updates a name-to-ID mapping.
@@ -167,6 +176,7 @@ To restore baseline state, explicitly enable case sensitivity after clearing.
 |---|---|---|
 | `clm_id_register` | Name, integer ID | Inserts a new mapping; rejects duplicate names. |
 | `clm_id_get` | Name | Retrieves the mapped integer ID. |
+| `clm_id_get_name` | Integer ID, caller buffer/capacity, output byte length | Copies the earliest registered spelling for that ID. |
 | `clm_id_set` | Name, integer ID | Inserts or replaces a mapping. |
 | `clm_id_remove` | Name | Removes a mapping. |
 | `clm_id_set_case_sensitive` | Boolean | Switches matching mode after collision validation. |

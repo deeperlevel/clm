@@ -20,10 +20,11 @@ Currently supported explicit external encodings are **UTF-8**, **Latin-1 (ISO-88
 ```text
 string.get_bytes(id, destination_buffer, byte_capacity) → encoded_byte_count
 string.from_bytes(id, encoding, source_buffer, exact_byte_length) → status
+string.from_enc(id, encoding, source_buffer, exact_byte_length) → status
 string.change_encoding(id, encoding) → status
 ```
 
-`get_bytes` emits exactly the encoded bytes (no terminator or BOM), and supports querying the required byte count with no buffer. `from_bytes` decodes into UTF-8 text and creates or replaces the specified string ID. `change_encoding` updates the string's preferred byte-export encoding without changing text; it fails if the string cannot be represented in the target encoding. Decoding/encoding errors and embedded NUL/U+0000 are rejected. The runtime default is shared state and is not thread-safe to change during concurrent operations.
+`get_bytes` emits exactly the encoded bytes (no terminator or BOM), and supports querying the required byte count with no buffer. `from_bytes` decodes into UTF-8 text and creates or replaces the specified string ID; it sets the string's preferred byte-export encoding to the input encoding. `from_enc` also decodes an exact-length byte sequence, but follows the `from_from` constructor behavior: a new string uses the runtime default encoding, while an existing string keeps its current preference. Both reject invalid input, unsupported encodings, and embedded NUL/U+0000. `change_encoding` updates the string's preferred byte-export encoding without changing text; it fails if the string cannot be represented in the target encoding. The runtime default is shared state and is not thread-safe to change during concurrent operations.
 
 ## 3. Results and error behavior
 
@@ -47,6 +48,7 @@ Operations returning a count or length return a nonnegative `clm_int` on success
 | `clm_string_new(id, text)` | Creates a BPA string block, copies UTF-8 input, and records the runtime default preferred export encoding. Returns a boolean. |
 | `clm_string_delete(id)` | Deletes the resource only if it exists and is a BPA string block. |
 | `clm_string_set(id, text)` | Replaces the full value; returns its character count. |
+| `clm_string_set_from(id, text)` | Alias of `clm_string_set`. |
 | `clm_string_length(id)` | Returns the character count in Unicode code points. |
 
 Creation rejects null text, duplicate IDs, invalid UTF-8, and allocation failure. On an initialization failure after block creation, the newly created block is removed. `set` and later edits preserve the existing string if validation or replacement allocation fails.
@@ -66,6 +68,8 @@ Indices are zero-based and always count Unicode code points; they are independen
 
 The C implementation performs byte-sequence matching. Because both the stored text and UTF-8 search/replacement strings are validated, a valid multi-byte search sequence matches on its encoding boundaries. Replacement is global, left-to-right, and non-overlapping.
 
+`clm_string_replace_from(id, search, replacement)` is an alias of `clm_string_replace`.
+
 ### 4.3 Unicode slicing
 
 ```text
@@ -84,6 +88,27 @@ string.new(MESSAGE, "Hello, 世界!")
 string.slice(MESSAGE, start=7, length=2, destination_string_id=WORD)
 # WORD is "世界"; it can now be appended, searched, or encoded independently.
 ```
+
+### 4.4 Copy and decode constructors
+
+These constructors create a missing destination string or update an existing
+string block. If the destination ID already names a non-string BPA resource,
+the operation fails without changing it.
+
+| Operation | Behavior |
+|---|---|
+| `clm_string_from(destination_id, source_id)` | Copies a string block's UTF-8 text and preferred export encoding. The source must be a valid string block. |
+| `clm_string_from_from(destination_id, text)` | Copies NUL-terminated UTF-8 text. A new string uses the runtime default encoding; an existing string keeps its preference. |
+| `clm_string_from_enc(destination_id, encoding, bytes, byte_length)` | Decodes an exact-length UTF-8, Latin-1, or UTF-16LE byte sequence, then applies `clm_string_from_from` behavior. |
+| `clm_string_from_from_enc(destination_id, encoding, bytes, byte_length)` | Alias of `clm_string_from_enc`. |
+
+These functions return `CLM_BPA_SUCCESS` or `CLM_BPA_FAILURE`, not a character
+count. The encoding-aware constructors accept bytes without a terminator or
+BOM; malformed sequences, unsupported encodings, and embedded U+0000 fail.
+`clm_string_from` copies the source's preferred export encoding, whereas
+`clm_string_from_enc` treats the input encoding only as a decoding instruction.
+For `from_enc`, a newly created destination uses the current default encoding,
+and an existing destination retains its preference.
 
 ## 5. String arrays
 

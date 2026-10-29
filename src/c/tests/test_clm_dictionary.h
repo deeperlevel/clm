@@ -3,7 +3,24 @@
 #include "test.h"
 #include "../clm/dictionary.h"
 
-static int clm_dictionary_tests(void)
+#define clm_dictionary_metadata clm_typed_dictionary_metadata
+#define clm_dictionary_new clm_typed_dictionary_new
+#define clm_dictionary_delete clm_typed_dictionary_delete
+#define clm_dictionary_set_from clm_typed_dictionary_set_from
+#define clm_dictionary_set clm_typed_dictionary_set
+#define clm_dictionary_get_to clm_typed_dictionary_get_to
+#define clm_dictionary_get clm_typed_dictionary_get
+#define clm_dictionary_contains clm_typed_dictionary_contains
+#define clm_dictionary_count clm_typed_dictionary_count
+#define clm_dictionary_remove clm_typed_dictionary_remove
+#define clm_dictionary_iterate_reset clm_typed_dictionary_iterate_reset
+#define clm_dictionary_iterate_next clm_typed_dictionary_iterate_next
+#define clm_dictionary_add_from clm_typed_dictionary_add_from
+#define clm_dictionary_update_from clm_typed_dictionary_update_from
+#define clm_dictionary_keys_to clm_typed_dictionary_keys_to
+#define clm_dictionary_clear clm_typed_dictionary_clear
+
+static int clm_dictionary_typed_tests(void)
 {
     clm_test_result result = {0};
     clm_test_begin("CLM - Dictionary");
@@ -263,4 +280,167 @@ static int clm_dictionary_tests(void)
 
     clm_test_summary(result.passed, result.failed);
     return result.failed == 0 ? 0 : 1;
+}
+
+#undef clm_dictionary_metadata
+#undef clm_dictionary_new
+#undef clm_dictionary_delete
+#undef clm_dictionary_set_from
+#undef clm_dictionary_set
+#undef clm_dictionary_get_to
+#undef clm_dictionary_get
+#undef clm_dictionary_contains
+#undef clm_dictionary_count
+#undef clm_dictionary_remove
+#undef clm_dictionary_iterate_reset
+#undef clm_dictionary_iterate_next
+#undef clm_dictionary_add_from
+#undef clm_dictionary_update_from
+#undef clm_dictionary_keys_to
+#undef clm_dictionary_clear
+
+static int clm_dictionary_dynamic_tests(void)
+{
+    clm_test_result result = {0};
+    clm_test_begin("CLM - Heterogeneous Dictionary");
+
+    const clm_id dictionary_id = 71100;
+    const clm_id integer_source_id = 71101;
+    const clm_id string_source_id = 71102;
+    const clm_id integer_destination_id = 71103;
+    const clm_id string_destination_id = 71104;
+    const clm_id wrong_destination_id = 71105;
+    clm_int integer_value = 41;
+    clm_int integer_result = 0;
+    clm_byte type = 0;
+    clm_id stored_id = 0;
+    char string_result[32] = {0};
+
+    CLM_ASSERT(clm_dictionary_new(dictionary_id) == CLM_BPA_SUCCESS &&
+                   clm_dictionary_count(dictionary_id) == 0,
+               "create an empty heterogeneous dictionary");
+    CLM_ASSERT(clm_dictionary_new(dictionary_id) == CLM_BPA_FAILURE,
+               "reject a duplicate heterogeneous dictionary ID");
+    CLM_ASSERT(clm_bpa_create(integer_source_id, CLM_BPA_TYPE_INT) ==
+                   CLM_BPA_SUCCESS &&
+                   clm_bpa_set(integer_source_id, &integer_value,
+                               sizeof(integer_value)) == CLM_BPA_SET_SUCCESS &&
+                   clm_bpa_create(string_source_id, CLM_BPA_TYPE_STRING) ==
+                   CLM_BPA_SUCCESS &&
+                   clm_bpa_set_string(string_source_id, "borrowed text", 14) ==
+                       13,
+               "create borrowed integer and string values");
+
+    CLM_ASSERT(clm_dictionary_add(dictionary_id, 10, integer_source_id) ==
+                   CLM_BPA_SET_SUCCESS &&
+                   clm_dictionary_set(dictionary_id, 20, string_source_id) ==
+                       CLM_BPA_SET_SUCCESS &&
+                   clm_dictionary_count(dictionary_id) == 2,
+               "store differently typed borrowed values");
+    CLM_ASSERT(clm_dictionary_get_type(dictionary_id, 10, &type) ==
+                       CLM_BPA_GET_SUCCESS && type == CLM_BPA_TYPE_INT &&
+                   clm_dictionary_get_type(dictionary_id, 20, &type) ==
+                       CLM_BPA_GET_SUCCESS && type == CLM_BPA_TYPE_STRING,
+               "report each heterogeneous value's BPA type");
+    CLM_ASSERT(clm_dictionary_get_id(dictionary_id, 10, &stored_id) ==
+                       CLM_BPA_GET_SUCCESS && stored_id == integer_source_id &&
+                   clm_dictionary_get_to(dictionary_id, 10, &integer_result,
+                                         sizeof(integer_result)) ==
+                       CLM_BPA_GET_SUCCESS && integer_result == integer_value &&
+                   clm_dictionary_get_to(dictionary_id, 20, string_result,
+                                         sizeof(string_result)) ==
+                       CLM_BPA_GET_SUCCESS &&
+                   strcmp(string_result, "borrowed text") == 0,
+               "retrieve borrowed values by ID and by copy");
+    CLM_ASSERT(clm_dictionary_add(dictionary_id, 10, string_source_id) ==
+                       CLM_BPA_FAILURE &&
+                   clm_dictionary_update(dictionary_id, 30,
+                                         integer_source_id) == CLM_BPA_FAILURE,
+               "add rejects duplicates and update rejects missing keys");
+    CLM_ASSERT(clm_dictionary_update(dictionary_id, 10, string_source_id) ==
+                       CLM_BPA_SET_SUCCESS &&
+                   clm_dictionary_get_type(dictionary_id, 10, &type) ==
+                       CLM_BPA_GET_SUCCESS && type == CLM_BPA_TYPE_STRING &&
+                   clm_dictionary_set(dictionary_id, 10, integer_source_id) ==
+                       CLM_BPA_SET_SUCCESS &&
+                   clm_dictionary_get_type(dictionary_id, 10, &type) ==
+                       CLM_BPA_GET_SUCCESS && type == CLM_BPA_TYPE_INT,
+               "replace a key with values of different types");
+
+    CLM_ASSERT(clm_bpa_create(integer_destination_id, CLM_BPA_TYPE_INT) ==
+                       CLM_BPA_SUCCESS &&
+                   clm_dictionary_get(dictionary_id, 10,
+                                      integer_destination_id) ==
+                       CLM_BPA_GET_SUCCESS &&
+                   clm_bpa_get(integer_destination_id, &integer_result,
+                               sizeof(integer_result)) == CLM_BPA_GET_SUCCESS &&
+                   integer_result == integer_value &&
+                   clm_bpa_create(string_destination_id, CLM_BPA_TYPE_STRING) ==
+                       CLM_BPA_SUCCESS &&
+                   clm_dictionary_get(dictionary_id, 20,
+                                      string_destination_id) ==
+                       CLM_BPA_GET_SUCCESS,
+               "copy heterogeneous values into compatible BPA destinations");
+    CLM_ASSERT(clm_bpa_create(wrong_destination_id, CLM_BPA_TYPE_DOUBLE) ==
+                       CLM_BPA_SUCCESS &&
+                   clm_dictionary_get(dictionary_id, 10,
+                                      wrong_destination_id) ==
+                       CLM_BPA_FAILURE,
+               "reject an incompatible typed destination");
+
+    const clm_int copied_integer = 9876;
+    CLM_ASSERT(clm_dictionary_set_from(dictionary_id, 40, CLM_BPA_TYPE_INT,
+                                       &copied_integer,
+                                       sizeof(copied_integer)) ==
+                       CLM_BPA_SET_SUCCESS &&
+                   clm_dictionary_get_id(dictionary_id, 40, &stored_id) ==
+                       CLM_BPA_GET_SUCCESS && stored_id != integer_source_id &&
+                   clm_dictionary_get_to(dictionary_id, 40, &integer_result,
+                                         sizeof(integer_result)) ==
+                       CLM_BPA_GET_SUCCESS && integer_result == copied_integer,
+               "copy caller-owned bytes into a dictionary-owned value block");
+    const clm_id owned_integer_id = stored_id;
+
+    const char copied_text[] = "owned text";
+    CLM_ASSERT(clm_dictionary_set_from(dictionary_id, 50, CLM_BPA_TYPE_STRING,
+                                       copied_text, sizeof(copied_text)) ==
+                       CLM_BPA_SET_SUCCESS &&
+                   clm_dictionary_get_id(dictionary_id, 50, &stored_id) ==
+                       CLM_BPA_GET_SUCCESS && stored_id != string_source_id &&
+                   clm_dictionary_get_to(dictionary_id, 50, string_result,
+                                         sizeof(string_result)) ==
+                       CLM_BPA_GET_SUCCESS &&
+                   strcmp(string_result, copied_text) == 0,
+               "copy a string into a dictionary-owned value block");
+    const clm_id owned_string_id = stored_id;
+
+    CLM_ASSERT(clm_dictionary_remove(dictionary_id, 40) == CLM_BPA_SUCCESS &&
+                   clm_bpa_find_block(owned_integer_id) == NULL &&
+                   clm_dictionary_contains(dictionary_id, 40) == false &&
+                   clm_bpa_find_block(integer_source_id) != NULL,
+               "remove owned values but preserve borrowed source blocks");
+    CLM_ASSERT(clm_dictionary_clear(dictionary_id) == CLM_BPA_SUCCESS &&
+                   clm_dictionary_count(dictionary_id) == 0 &&
+                   clm_bpa_find_block(owned_string_id) == NULL &&
+                   clm_bpa_find_block(string_source_id) != NULL,
+               "clear releases owned values and preserves borrowed blocks");
+    CLM_ASSERT(clm_dictionary_delete(dictionary_id) == CLM_BPA_SUCCESS &&
+                   clm_dictionary_count(dictionary_id) == CLM_BPA_FAILURE,
+               "delete heterogeneous dictionary and its index");
+    CLM_ASSERT(clm_bpa_delete(integer_source_id) == CLM_BPA_SUCCESS &&
+                   clm_bpa_delete(string_source_id) == CLM_BPA_SUCCESS &&
+                   clm_bpa_delete(integer_destination_id) == CLM_BPA_SUCCESS &&
+                   clm_bpa_delete(string_destination_id) == CLM_BPA_SUCCESS &&
+                   clm_bpa_delete(wrong_destination_id) == CLM_BPA_SUCCESS,
+               "caller releases borrowed values and destination blocks");
+
+    clm_test_summary(result.passed, result.failed);
+    return result.failed == 0 ? 0 : 1;
+}
+
+static int clm_dictionary_tests(void)
+{
+    const int typed_result = clm_dictionary_typed_tests();
+    const int dynamic_result = clm_dictionary_dynamic_tests();
+    return typed_result != 0 || dynamic_result != 0;
 }

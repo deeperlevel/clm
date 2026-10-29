@@ -21,8 +21,45 @@
  */
 
  
+#include <limits.h>
 #include <stdint.h>
 typedef uint64_t clm_id;
+
+#define BYTE_MIN 0
+#define BYTE_MAX 255
+
+#define SBYTE_MIN -128
+#define SBYTE_MAX 127
+
+#define SHORT_MIN -32768
+#define SHORT_MAX 32767
+
+#define USHORT_MIN 0
+#define USHORT_MAX 65535
+
+#undef INT_MIN
+#undef INT_MAX
+#define INT_MIN (-2147483647 - 1)
+#define INT_MAX 2147483647
+
+#define UINT_MIN 0
+#undef UINT_MAX
+#define UINT_MAX 4294967295U
+
+#undef LONG_MIN
+#undef LONG_MAX
+#define LONG_MIN (-9223372036854775807LL - 1)
+#define LONG_MAX 9223372036854775807LL
+
+#define ULONG_MIN 0
+#undef ULONG_MAX
+#define ULONG_MAX 18446744073709551615ULL
+
+#define FLOAT_MIN -3.402823466e+38F
+#define FLOAT_MAX 3.402823466e+38F
+
+#define DOUBLE_MIN -1.7976931348623157e+308
+#define DOUBLE_MAX 1.7976931348623157e+308
 
 typedef int8_t   clm_sbyte;
 typedef uint8_t  clm_byte;

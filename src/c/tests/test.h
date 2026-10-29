@@ -21,11 +21,27 @@
 #pragma once
 
 #include "../clm/console.h"
+#include "../clm/string.h"
 
 typedef struct {
     int passed;
     int failed;
 } clm_test_result;
+
+typedef clm_int (*clm_test_string_parser_fn)(const clm_id, const clm_id);
+
+static inline clm_int clm_test_parse_text(
+    const clm_id source_string_id,
+    const char* text,
+    const clm_id destination_id,
+    const clm_test_string_parser_fn parser)
+{
+    if (text == NULL || parser == NULL || !clm_string_new(source_string_id, text))
+        return CLM_BPA_FAILURE;
+    const clm_int status = parser(source_string_id, destination_id);
+    (void)clm_string_delete(source_string_id);
+    return status;
+}
 
 static int clm_tests_passed = 0;
 static int clm_tests_failed = 0;

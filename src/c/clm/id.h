@@ -126,13 +126,13 @@ static inline bool clm_id_internal_names_equal(
 /** Initializes private dictionaries and the shared BPA string scratch block. */
 static inline int clm_id_internal_ensure_storage(void)
 {
-    const clm_int index_a_count = clm_dictionary_count(ID_STORAGE_ID);
+    const clm_int index_a_count = clm_typed_dictionary_count(ID_STORAGE_ID);
     const clm_int index_b_count =
-        clm_dictionary_count(CLM_ID_INDEX_STORAGE_ID);
+        clm_typed_dictionary_count(CLM_ID_INDEX_STORAGE_ID);
     const clm_int names_count =
-        clm_dictionary_count(CLM_ID_NAMES_STORAGE_ID);
+        clm_typed_dictionary_count(CLM_ID_NAMES_STORAGE_ID);
     const clm_int values_count =
-        clm_dictionary_count(CLM_ID_VALUES_STORAGE_ID);
+        clm_typed_dictionary_count(CLM_ID_VALUES_STORAGE_ID);
     const clm_bpa_block_node* buffer =
         clm_bpa_find_block(CLM_ID_NAME_BUFFER_ID);
 
@@ -153,33 +153,33 @@ static inline int clm_id_internal_ensure_storage(void)
         clm_bpaa_is_existing(CLM_ID_NAME_BUFFER_ID))
         return CLM_BPA_FAILURE;
 
-    if (clm_dictionary_new(ID_STORAGE_ID, CLM_BPA_TYPE_STRUCT,
-                           sizeof(clm_id)) != CLM_BPA_SUCCESS)
+    if (clm_typed_dictionary_new(ID_STORAGE_ID, CLM_BPA_TYPE_STRUCT,
+                                 sizeof(clm_id)) != CLM_BPA_SUCCESS)
         return CLM_BPA_FAILURE;
-    if (clm_dictionary_new(CLM_ID_INDEX_STORAGE_ID, CLM_BPA_TYPE_STRUCT,
-                           sizeof(clm_id)) != CLM_BPA_SUCCESS) {
-        (void)clm_dictionary_delete(ID_STORAGE_ID);
+    if (clm_typed_dictionary_new(CLM_ID_INDEX_STORAGE_ID, CLM_BPA_TYPE_STRUCT,
+                                 sizeof(clm_id)) != CLM_BPA_SUCCESS) {
+        (void)clm_typed_dictionary_delete(ID_STORAGE_ID);
         return CLM_BPA_FAILURE;
     }
-    if (clm_dictionary_new(CLM_ID_NAMES_STORAGE_ID, CLM_BPA_TYPE_STRING, 0) !=
+    if (clm_typed_dictionary_new(CLM_ID_NAMES_STORAGE_ID, CLM_BPA_TYPE_STRING, 0) !=
         CLM_BPA_SUCCESS) {
-        (void)clm_dictionary_delete(CLM_ID_INDEX_STORAGE_ID);
-        (void)clm_dictionary_delete(ID_STORAGE_ID);
+        (void)clm_typed_dictionary_delete(CLM_ID_INDEX_STORAGE_ID);
+        (void)clm_typed_dictionary_delete(ID_STORAGE_ID);
         return CLM_BPA_FAILURE;
     }
-    if (clm_dictionary_new(CLM_ID_VALUES_STORAGE_ID, CLM_BPA_TYPE_STRUCT,
-                           sizeof(clm_id)) != CLM_BPA_SUCCESS) {
-        (void)clm_dictionary_delete(CLM_ID_NAMES_STORAGE_ID);
-        (void)clm_dictionary_delete(CLM_ID_INDEX_STORAGE_ID);
-        (void)clm_dictionary_delete(ID_STORAGE_ID);
+    if (clm_typed_dictionary_new(CLM_ID_VALUES_STORAGE_ID, CLM_BPA_TYPE_STRUCT,
+                                 sizeof(clm_id)) != CLM_BPA_SUCCESS) {
+        (void)clm_typed_dictionary_delete(CLM_ID_NAMES_STORAGE_ID);
+        (void)clm_typed_dictionary_delete(CLM_ID_INDEX_STORAGE_ID);
+        (void)clm_typed_dictionary_delete(ID_STORAGE_ID);
         return CLM_BPA_FAILURE;
     }
     if (clm_bpa_create(CLM_ID_NAME_BUFFER_ID, CLM_BPA_TYPE_STRING) !=
         CLM_BPA_SUCCESS) {
-        (void)clm_dictionary_delete(CLM_ID_VALUES_STORAGE_ID);
-        (void)clm_dictionary_delete(CLM_ID_NAMES_STORAGE_ID);
-        (void)clm_dictionary_delete(CLM_ID_INDEX_STORAGE_ID);
-        (void)clm_dictionary_delete(ID_STORAGE_ID);
+        (void)clm_typed_dictionary_delete(CLM_ID_VALUES_STORAGE_ID);
+        (void)clm_typed_dictionary_delete(CLM_ID_NAMES_STORAGE_ID);
+        (void)clm_typed_dictionary_delete(CLM_ID_INDEX_STORAGE_ID);
+        (void)clm_typed_dictionary_delete(ID_STORAGE_ID);
         return CLM_BPA_FAILURE;
     }
     clm_id_active_index = ID_STORAGE_ID;
@@ -195,8 +195,8 @@ static inline int clm_id_internal_copy_name(
     const clm_bpa_block_node* buffer;
     char* copy;
     if (out_name == NULL ||
-        clm_dictionary_get(CLM_ID_NAMES_STORAGE_ID, entry_id,
-                           CLM_ID_NAME_BUFFER_ID) != CLM_BPA_GET_SUCCESS)
+        clm_typed_dictionary_get(CLM_ID_NAMES_STORAGE_ID, entry_id,
+                     CLM_ID_NAME_BUFFER_ID) != CLM_BPA_GET_SUCCESS)
         return CLM_BPA_FAILURE;
     buffer = clm_bpa_find_block(CLM_ID_NAME_BUFFER_ID);
     if (buffer == NULL || buffer->type != CLM_BPA_TYPE_STRING ||
@@ -219,7 +219,7 @@ static inline int clm_id_internal_find_name(
     clm_id* out_slot_key,
     bool* out_found)
 {
-    const clm_int entry_count = clm_dictionary_count(index_id);
+    const clm_int entry_count = clm_typed_dictionary_count(index_id);
     const uint32_t hash = clm_id_internal_hash_name(name, case_sensitive);
     clm_id first_tombstone = CLM_ID_NOT_FOUND;
     if (entry_count < 0 || out_slot_key == NULL || out_found == NULL)
@@ -228,15 +228,15 @@ static inline int clm_id_internal_find_name(
     *out_found = false;
     for (clm_uint probe = 0; probe <= (clm_uint)entry_count; ++probe) {
         const clm_id candidate = (clm_id)(hash + probe);
-        if (!clm_dictionary_contains(index_id, candidate)) {
+        if (!clm_typed_dictionary_contains(index_id, candidate)) {
             *out_slot_key = first_tombstone != CLM_ID_NOT_FOUND
                 ? first_tombstone : candidate;
             return CLM_BPA_SUCCESS;
         }
 
         clm_id entry_id;
-        if (clm_dictionary_get_to(index_id, candidate, &entry_id,
-                                  sizeof(entry_id)) != CLM_BPA_GET_SUCCESS)
+        if (clm_typed_dictionary_get_to(index_id, candidate, &entry_id,
+                           sizeof(entry_id)) != CLM_BPA_GET_SUCCESS)
             return CLM_BPA_FAILURE;
         if (entry_id == CLM_ID_NOT_FOUND) {
             if (first_tombstone == CLM_ID_NOT_FOUND)
@@ -270,13 +270,13 @@ static inline int clm_id_internal_find_name(
 /** Allocates an unused internal entry key without colliding with active entries. */
 static inline int clm_id_internal_allocate_entry_id(clm_id* out_entry_id)
 {
-    const clm_int count = clm_dictionary_count(CLM_ID_NAMES_STORAGE_ID);
+    const clm_int count = clm_typed_dictionary_count(CLM_ID_NAMES_STORAGE_ID);
     if (count < 0 || out_entry_id == NULL)
         return CLM_BPA_FAILURE;
     for (clm_uint attempt = 0; attempt <= (clm_uint)count; ++attempt) {
         const clm_id candidate = clm_id_next_entry_value + attempt;
         if (candidate != CLM_ID_NOT_FOUND &&
-            !clm_dictionary_contains(CLM_ID_NAMES_STORAGE_ID, candidate)) {
+            !clm_typed_dictionary_contains(CLM_ID_NAMES_STORAGE_ID, candidate)) {
             *out_entry_id = candidate;
             clm_id_next_entry_value = candidate == CLM_ID_NOT_FOUND - 1
                 ? 0 : candidate + 1;
@@ -292,11 +292,11 @@ static inline int clm_id_internal_store_index(
     const clm_id slot_key,
     const clm_id entry_id)
 {
-    return clm_dictionary_contains(index_id, slot_key)
-        ? clm_dictionary_update_from(index_id, slot_key, &entry_id,
-                                     sizeof(entry_id))
-        : clm_dictionary_add_from(index_id, slot_key, &entry_id,
-                                  sizeof(entry_id));
+    return clm_typed_dictionary_contains(index_id, slot_key)
+        ? clm_typed_dictionary_update_from(index_id, slot_key, &entry_id,
+                                           sizeof(entry_id))
+        : clm_typed_dictionary_add_from(index_id, slot_key, &entry_id,
+                                        sizeof(entry_id));
 }
 
 /** Inserts a new, nonempty name mapping and rejects duplicate effective names.
@@ -320,18 +320,19 @@ static inline int clm_id_register(const char* name, const clm_id id)
         clm_id_internal_allocate_entry_id(&entry_id) != CLM_BPA_SUCCESS)
         return CLM_BPA_FAILURE;
 
-    if (clm_dictionary_set_from(CLM_ID_NAMES_STORAGE_ID, entry_id, name,
-                                strlen(name) + 1) != CLM_BPA_SET_SUCCESS)
+    if (clm_typed_dictionary_set_from(CLM_ID_NAMES_STORAGE_ID, entry_id,
+                                      name, strlen(name) + 1) !=
+        CLM_BPA_SET_SUCCESS)
         return CLM_BPA_FAILURE;
-    if (clm_dictionary_set_from(CLM_ID_VALUES_STORAGE_ID, entry_id, &id,
-                                sizeof(id)) != CLM_BPA_SET_SUCCESS) {
-        (void)clm_dictionary_remove(CLM_ID_NAMES_STORAGE_ID, entry_id);
+    if (clm_typed_dictionary_set_from(CLM_ID_VALUES_STORAGE_ID, entry_id,
+                                      &id, sizeof(id)) != CLM_BPA_SET_SUCCESS) {
+        (void)clm_typed_dictionary_remove(CLM_ID_NAMES_STORAGE_ID, entry_id);
         return CLM_BPA_FAILURE;
     }
     if (clm_id_internal_store_index(clm_id_active_index, slot_key, entry_id) !=
         CLM_BPA_SET_SUCCESS) {
-        (void)clm_dictionary_remove(CLM_ID_VALUES_STORAGE_ID, entry_id);
-        (void)clm_dictionary_remove(CLM_ID_NAMES_STORAGE_ID, entry_id);
+        (void)clm_typed_dictionary_remove(CLM_ID_VALUES_STORAGE_ID, entry_id);
+        (void)clm_typed_dictionary_remove(CLM_ID_NAMES_STORAGE_ID, entry_id);
         return CLM_BPA_FAILURE;
     }
     return CLM_BPA_SET_SUCCESS;
@@ -364,8 +365,8 @@ static inline clm_id clm_id_get(const char* name)
                                   clm_id_case_sensitive, &entry_id, &slot_key,
                                   &found) != CLM_BPA_SUCCESS ||
         !found ||
-        clm_dictionary_get_to(CLM_ID_VALUES_STORAGE_ID, entry_id, &value,
-                              sizeof(value)) != CLM_BPA_GET_SUCCESS)
+        clm_typed_dictionary_get_to(CLM_ID_VALUES_STORAGE_ID, entry_id, &value,
+                        sizeof(value)) != CLM_BPA_GET_SUCCESS)
         return CLM_ID_NOT_FOUND;
     return value;
 }
@@ -390,11 +391,63 @@ static inline int clm_id_try_get(const char* name, clm_id* out_id)
                                   clm_id_case_sensitive, &entry_id, &slot_key,
                                   &found) != CLM_BPA_SUCCESS ||
         !found ||
-        clm_dictionary_get_to(CLM_ID_VALUES_STORAGE_ID, entry_id, &value,
-                              sizeof(value)) != CLM_BPA_GET_SUCCESS)
+        clm_typed_dictionary_get_to(CLM_ID_VALUES_STORAGE_ID, entry_id, &value,
+                        sizeof(value)) != CLM_BPA_GET_SUCCESS)
         return CLM_BPA_FAILURE;
     *out_id = value;
     return CLM_BPA_GET_SUCCESS;
+}
+
+/** Copies the first registered spelling associated with an ID.
+ * Aliases are permitted, so reverse lookup returns the earliest remaining
+ * registration in insertion order. Pass buffer=NULL and capacity=0 to query
+ * the UTF-8 byte length excluding NUL.
+ * @param id Numeric ID to resolve.
+ * @param buffer Receives the NUL-terminated name, or NULL for a size query.
+ * @param capacity Buffer size including space for NUL.
+ * @param byte_length Receives the name byte length excluding NUL.
+ * @return CLM_BPA_GET_SUCCESS, or CLM_BPA_FAILURE if unmapped/too small.
+ */
+static inline int clm_id_get_name(
+    const clm_id id,
+    char* buffer,
+    const size_t capacity,
+    size_t* byte_length)
+{
+    clm_id entry_id;
+    size_t found_length;
+    char* name;
+    if (byte_length == NULL || (buffer == NULL && capacity != 0) ||
+        clm_id_internal_ensure_storage() != CLM_BPA_SUCCESS ||
+        clm_typed_dictionary_iterate_reset(CLM_ID_VALUES_STORAGE_ID) !=
+            CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    while (clm_typed_dictionary_iterate_next(CLM_ID_VALUES_STORAGE_ID,
+                                              &entry_id) == CLM_BPA_GET_SUCCESS) {
+        clm_id mapped_id;
+        if (clm_typed_dictionary_get_to(CLM_ID_VALUES_STORAGE_ID, entry_id,
+                                        &mapped_id, sizeof(mapped_id)) !=
+            CLM_BPA_GET_SUCCESS)
+            return CLM_BPA_FAILURE;
+        if (mapped_id != id)
+            continue;
+        if (clm_id_internal_copy_name(entry_id, &name) != CLM_BPA_SUCCESS)
+            return CLM_BPA_FAILURE;
+        found_length = strlen(name);
+        *byte_length = found_length;
+        if (buffer == NULL) {
+            free(name);
+            return CLM_BPA_GET_SUCCESS;
+        }
+        if (capacity <= found_length) {
+            free(name);
+            return CLM_BPA_FAILURE;
+        }
+        memcpy(buffer, name, found_length + 1);
+        free(name);
+        return CLM_BPA_GET_SUCCESS;
+    }
+    return CLM_BPA_FAILURE;
 }
 
 /** Inserts a mapping or replaces the ID for an existing effective name.
@@ -417,8 +470,8 @@ static inline int clm_id_set(const char* name, const clm_id id)
         return CLM_BPA_FAILURE;
     if (!found)
         return clm_id_register(name, id);
-    return clm_dictionary_update_from(CLM_ID_VALUES_STORAGE_ID, entry_id, &id,
-                                      sizeof(id));
+    return clm_typed_dictionary_update_from(CLM_ID_VALUES_STORAGE_ID, entry_id,
+                                            &id, sizeof(id));
 }
 
 /** Removes one mapping by name, leaving mappings for aliases intact.
@@ -441,9 +494,9 @@ static inline int clm_id_remove(const char* name)
     const clm_id tombstone = CLM_ID_NOT_FOUND;
     if (clm_id_internal_store_index(clm_id_active_index, slot_key, tombstone) !=
             CLM_BPA_SET_SUCCESS ||
-        clm_dictionary_remove(CLM_ID_VALUES_STORAGE_ID, entry_id) !=
+        clm_typed_dictionary_remove(CLM_ID_VALUES_STORAGE_ID, entry_id) !=
             CLM_BPA_SUCCESS ||
-        clm_dictionary_remove(CLM_ID_NAMES_STORAGE_ID, entry_id) !=
+        clm_typed_dictionary_remove(CLM_ID_NAMES_STORAGE_ID, entry_id) !=
             CLM_BPA_SUCCESS)
         return CLM_BPA_FAILURE;
     return CLM_BPA_SUCCESS;
@@ -463,13 +516,13 @@ static inline int clm_id_unmap(const clm_id id)
         clm_id current_id;
         char* name;
         bool found_entry = false;
-        if (clm_dictionary_iterate_reset(CLM_ID_NAMES_STORAGE_ID) !=
+        if (clm_typed_dictionary_iterate_reset(CLM_ID_NAMES_STORAGE_ID) !=
             CLM_BPA_SUCCESS)
             return CLM_BPA_FAILURE;
-        while (clm_dictionary_iterate_next(CLM_ID_NAMES_STORAGE_ID,
-                                           &entry_id) == CLM_BPA_GET_SUCCESS) {
-            if (clm_dictionary_get_to(CLM_ID_VALUES_STORAGE_ID, entry_id,
-                                      &current_id, sizeof(current_id)) !=
+        while (clm_typed_dictionary_iterate_next(CLM_ID_NAMES_STORAGE_ID,
+                                                 &entry_id) == CLM_BPA_GET_SUCCESS) {
+            if (clm_typed_dictionary_get_to(CLM_ID_VALUES_STORAGE_ID, entry_id,
+                                            &current_id, sizeof(current_id)) !=
                 CLM_BPA_GET_SUCCESS)
                 return CLM_BPA_FAILURE;
             if (current_id == id) {
@@ -521,27 +574,27 @@ static inline int clm_id_set_case_sensitive(const bool enabled)
         return CLM_BPA_SUCCESS;
     next_index = clm_id_active_index == ID_STORAGE_ID
         ? CLM_ID_INDEX_STORAGE_ID : ID_STORAGE_ID;
-    if (clm_dictionary_clear(next_index) != CLM_BPA_SUCCESS ||
-        clm_dictionary_iterate_reset(CLM_ID_NAMES_STORAGE_ID) !=
+    if (clm_typed_dictionary_clear(next_index) != CLM_BPA_SUCCESS ||
+        clm_typed_dictionary_iterate_reset(CLM_ID_NAMES_STORAGE_ID) !=
             CLM_BPA_SUCCESS)
         return CLM_BPA_FAILURE;
 
-    while (clm_dictionary_iterate_next(CLM_ID_NAMES_STORAGE_ID, &entry_id) ==
+    while (clm_typed_dictionary_iterate_next(CLM_ID_NAMES_STORAGE_ID, &entry_id) ==
            CLM_BPA_GET_SUCCESS) {
         char* name;
         clm_id slot_key;
         bool found;
         if (clm_id_internal_copy_name(entry_id, &name) != CLM_BPA_SUCCESS) {
-            (void)clm_dictionary_clear(next_index);
+            (void)clm_typed_dictionary_clear(next_index);
             return CLM_BPA_FAILURE;
         }
         const int search_result = clm_id_internal_find_name(
             next_index, name, enabled, NULL, &slot_key, &found);
         free(name);
         if (search_result != CLM_BPA_SUCCESS || found ||
-            clm_dictionary_add_from(next_index, slot_key, &entry_id,
-                                    sizeof(entry_id)) != CLM_BPA_SET_SUCCESS) {
-            (void)clm_dictionary_clear(next_index);
+            clm_typed_dictionary_add_from(next_index, slot_key, &entry_id,
+                                          sizeof(entry_id)) != CLM_BPA_SET_SUCCESS) {
+            (void)clm_typed_dictionary_clear(next_index);
             return CLM_BPA_FAILURE;
         }
     }
@@ -555,10 +608,10 @@ static inline int clm_id_set_case_sensitive(const bool enabled)
 static inline int clm_id_clear(void)
 {
     if (clm_id_internal_ensure_storage() != CLM_BPA_SUCCESS ||
-        clm_dictionary_clear(ID_STORAGE_ID) != CLM_BPA_SUCCESS ||
-        clm_dictionary_clear(CLM_ID_INDEX_STORAGE_ID) != CLM_BPA_SUCCESS ||
-        clm_dictionary_clear(CLM_ID_NAMES_STORAGE_ID) != CLM_BPA_SUCCESS ||
-        clm_dictionary_clear(CLM_ID_VALUES_STORAGE_ID) != CLM_BPA_SUCCESS)
+        clm_typed_dictionary_clear(ID_STORAGE_ID) != CLM_BPA_SUCCESS ||
+        clm_typed_dictionary_clear(CLM_ID_INDEX_STORAGE_ID) != CLM_BPA_SUCCESS ||
+        clm_typed_dictionary_clear(CLM_ID_NAMES_STORAGE_ID) != CLM_BPA_SUCCESS ||
+        clm_typed_dictionary_clear(CLM_ID_VALUES_STORAGE_ID) != CLM_BPA_SUCCESS)
         return CLM_BPA_FAILURE;
     clm_id_active_index = ID_STORAGE_ID;
     clm_id_next_entry_value = 0;
@@ -573,13 +626,13 @@ static inline int clm_id_clear(void)
 static inline int clm_id_shutdown(void)
 {
     int status = CLM_BPA_SUCCESS;
-    if (clm_dictionary_delete(CLM_ID_VALUES_STORAGE_ID) != CLM_BPA_SUCCESS)
+    if (clm_typed_dictionary_delete(CLM_ID_VALUES_STORAGE_ID) != CLM_BPA_SUCCESS)
         status = CLM_BPA_FAILURE;
-    if (clm_dictionary_delete(CLM_ID_NAMES_STORAGE_ID) != CLM_BPA_SUCCESS)
+    if (clm_typed_dictionary_delete(CLM_ID_NAMES_STORAGE_ID) != CLM_BPA_SUCCESS)
         status = CLM_BPA_FAILURE;
-    if (clm_dictionary_delete(CLM_ID_INDEX_STORAGE_ID) != CLM_BPA_SUCCESS)
+    if (clm_typed_dictionary_delete(CLM_ID_INDEX_STORAGE_ID) != CLM_BPA_SUCCESS)
         status = CLM_BPA_FAILURE;
-    if (clm_dictionary_delete(ID_STORAGE_ID) != CLM_BPA_SUCCESS)
+    if (clm_typed_dictionary_delete(ID_STORAGE_ID) != CLM_BPA_SUCCESS)
         status = CLM_BPA_FAILURE;
     if (clm_bpa_delete(CLM_ID_NAME_BUFFER_ID) != CLM_BPA_SUCCESS)
         status = CLM_BPA_FAILURE;

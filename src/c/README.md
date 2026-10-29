@@ -70,9 +70,109 @@ Include `clm/dictionary.h` to use typed integer-key dictionaries. Create each di
 
 Include `clm/id.h` to register names for numeric IDs, resolve names, update or remove mappings, and generate sequential IDs beginning at zero. Define `CLM_ID_IMPLEMENTATION` in exactly one source file. The registry uses BPA-backed dictionaries and is shared process-wide; it is not internally synchronized. Names must be valid UTF-8 and are case-sensitive by default. Optional case-insensitive mode folds ASCII letters only, not full Unicode case folding. Multiple names may map to the same ID; `clm_id_unmap(id)` removes all such aliases.
 
+## Generation module
+
+Include `clm/gen.h` for random integers, floating-point values, UUIDs, hexadecimal
+strings, alphanumeric strings, and passwords. C numeric functions require explicit
+`min` and `max` arguments; the signed-byte function is `clm_gen_random_i8`.
+Bounds are inclusive, reversed bounds are swapped, and equal bounds return that
+value. Full-width integer ranges are supported without signed overflow or modulo
+bias. Floating-point bounds must be finite; invalid bounds return NaN.
+
+Randomness comes from Windows BCrypt (link `bcrypt`, as this CMake target does)
+or `/dev/urandom` on Unix-like systems. Numeric generators abort if OS randomness
+is unavailable because their return types cannot report failure. Text generators
+instead return `GENERATION_FAILURE` on randomness, allocation, or validation errors
+without replacing the destination. They return `GENERATION_SUCCESS` on success.
+
+Create an existing `CLM_BPA_TYPE_STRING` destination before generating text. UUIDs
+use the canonical 36-character version-4 format and RFC variant. Hexadecimal and
+alphanumeric generators accept zero length and the mixed, upper, or lower casing
+constants; mixed casing allows both cases but does not guarantee both in each
+result. Passwords require at least four characters and always contain uppercase,
+lowercase, digits, and symbols, with their positions shuffled. Use a longer length
+(for example, 16 or more) for practical passwords.
+
+Use `clm_gen_hex_to(length, casing, buffer, buffer_size)`,
+`clm_gen_uuid_to(casing, buffer, buffer_size)`,
+`clm_gen_alphanum_to(length, casing, buffer, buffer_size)`, or
+`clm_gen_strong_password_to(length, buffer, buffer_size)` to write directly to
+caller-owned memory without a BPA destination. The buffer is a `void*` and its
+capacity is a `clm_uint` byte count including room for the NUL terminator: UUIDs
+need 37 bytes, and the other generators need `length + 1`. These functions return
+the same generation status codes, reject NULL or undersized buffers without
+writing, and NUL-terminate successful results. Discard output on failure: an OS
+randomness failure may leave partial output in a buffer.
+
 ## String module
 
 Include `clm/string.h` for string blocks and string arrays backed by BPA/BPAA. Text is validated and stored internally as UTF-8; indices and lengths count Unicode code points. The runtime default byte-export encoding is UTF-8 and can be changed to UTF-8, Latin-1, or UTF-16LE with `clm_string_set_default_encoding`. This selects the preferred encoding for newly created strings; `clm_string_from_bytes` and `clm_string_change_encoding` provide per-string control. These encodings are not arbitrary operating-system ANSI code pages. String append/insert operations return the number of characters added, removal returns the number removed, replacement returns the number of matches replaced, and `clm_string_length` returns the character count; failures return `CLM_BPA_FAILURE`. String array helpers support indexed editing, searching, sorting, cursor iteration, and drawing; draw shuffles the array when its active deck is exhausted.
+
+## Path and URL modules
+
+Include `clm/path.h` for native path manipulation, UNC helpers, filesystem metadata,
+canonicalization, and working-directory access. Include `clm/url.h` for RFC 3986
+parsing and resolution, component editing, encoding, query fields, IDNA/IRI, and
+file-URL conversion. URL includes Path for shared UTF-8/native filesystem helpers.
+
+Both modules operate on existing BPA string IDs. Operations return 0 on success
+and 1 on error; predicates return 0/1 or -1 on invalid input or query failure.
+Syntax validators return false for malformed text and -1 for invalid string IDs.
+Destinations must already be strings. Aliasing is supported except identical key
+and value outputs in `clm_url_query_get_at`. Failed operations do not change output
+strings. Successful writes select UTF-8 export encoding. Use `CLM_URL_ABSENT_ID`
+for absent optional builder components, never as the builder's path argument.
+
+CMake fetches pinned uriparser 0.9.9 on first configuration and links it statically.
+Consumers building outside this CMake target must provide uriparser headers and
+link its library (`URI_STATIC_BUILD` when using a static build). Windows also
+requires `normaliz` for native IDNA. Unix-like builds require `pkg-config` and the
+libidn2 development package (for example `libidn2-dev` on Debian/Ubuntu), and expose
+POSIX.1-2008 interfaces with `_XOPEN_SOURCE=700`.
+
+Windows paths use UTF-16 filesystem calls at the OS boundary; POSIX paths use
+`stat`/`lstat` and `realpath`. Default metadata predicates follow links except
+`is_symlink` and `is_hidden`, which inspect entries. IDNA uses Windows Normaliz or
+libidn2 and therefore follows the installed platform's IDNA rules, not a promised
+identical Unicode mapping across operating systems. Unix branches have not been
+runtime-verified in the current Windows environment.
+
+Both suites run from `main.c` and through CTest (`clm`). They include native path,
+UNC, temporary file/directory, symbolic-link, URI component, RFC resolution,
+encoding, query, Unicode host, file-URL, aliasing, and invalid-input checks.
+Symbolic-link fixture tests explicitly report a skip if OS permissions forbid creation.
+
+## File and Directory Modules
+
+Include `clm/file.h` for ID-managed open-file resources and whole-file/text I/O;
+include `clm/directory.h` for tree operations, listings, and callback traversal.
+Define `CLM_FILE_IMPLEMENTATION` in exactly one translation unit for the shared
+resource registry. Call `clm_file_close(id)` for individual resources and
+`clm_file_shutdown()` at teardown, before releasing BPA state. Closed IDs are
+retired until shutdown to avoid stale IDs silently referring to new handles.
+Applications must synchronize registry access themselves.
+
+Operations return 0, -1 (failure), or -2 (unsupported). Directory callback stop
+returns 1; existence/open-state predicates return 0/1 or -1 for errors. Existing
+BPA string, binary-block, and string-array destinations must have the right type.
+Caller buffers are bounded, size queries do not create temporary entries, and
+streaming calls expose actual transfer counts. Text memory is UTF-8; file encodings
+are explicit ASCII, UTF-8, and little/big-endian UTF-16 with matching BOM variants.
+
+File opens reject final symlinks/reparse points. Recursive directory deletion does
+not traverse links; recursive copy returns unsupported for link/special entries.
+Callbacks can opt into following links, with native identity cycle checks and a
+256-depth safety limit. Globs support case-sensitive `*` and `?`; the latter matches
+one UTF-8 code point. Whole-tree mutations are not transactions, and these APIs
+are not a sandbox against malicious concurrent ancestor-directory replacement.
+
+Windows uses Unicode native handles, requires `bcrypt` for secure temporary names,
+and inherits parent ACLs for new entries.
+POSIX uses private creation modes and descriptor-relative recursive deletion;
+Linux no-overwrite moves use `renameat2`, while unsupported non-Linux rename
+semantics return -2. POSIX consumers require `_XOPEN_SOURCE=700`, `_GNU_SOURCE`
+on Linux, and `_FILE_OFFSET_BITS=64`. POSIX runtime behavior is not verified by
+the Windows test run. Both suites are registered in the main runner and CTest.
 
 ## Console module
 

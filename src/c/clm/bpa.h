@@ -46,6 +46,7 @@
 #define CLM_BPA_TYPE_STRING 11
 #define CLM_BPA_TYPE_UUID 12
 #define CLM_BPA_TYPE_DATETIME 13
+#define CLM_BPA_TYPE_ANY 99
 
 typedef struct {
     clm_byte type;

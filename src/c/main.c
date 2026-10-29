@@ -21,15 +21,30 @@
 #define CLM_BPA_IMPLEMENTATION
 #define CLM_STRING_IMPLEMENTATION
 #define CLM_ID_IMPLEMENTATION
+#define CLM_FILE_IMPLEMENTATION
 
 #include "tests/test.h"
 #include "tests/test_clm_base.h"
 #include "tests/test_clm_bpa.h"
 #include "tests/test_clm_console.h"
 #include "tests/test_clm_dictionary.h"
+#include "tests/test_clm_tree.h"
+#include "tests/test_clm_table.h"
+#include "tests/test_clm_string_format.h"
+#include "tests/test_clm_string_dsv.h"
+#include "tests/test_clm_string_ini.h"
+#include "tests/test_clm_string_env.h"
+#include "tests/test_clm_string_toml.h"
+#include "tests/test_clm_string_json.h"
+#include "tests/test_clm_string_yaml.h"
+#include "tests/test_clm_gen.h"
 #include "tests/test_clm_id.h"
 #include "tests/test_clm_string.h"
 #include "tests/test_clm_storage.h"
+#include "tests/test_clm_path.h"
+#include "tests/test_clm_url.h"
+#include "tests/test_clm_file.h"
+#include "tests/test_clm_directory.h"
 
 int main(void)
 {
@@ -42,14 +57,31 @@ int main(void)
     clm_bpa_tests();
     clm_console_tests();
     clm_dictionary_tests();
+    clm_tree_tests();
+    clm_table_tests();
+    clm_string_format_tests();
+    clm_string_ini_tests();
+    clm_string_env_tests();
+    clm_string_toml_tests();
+    clm_string_json_tests();
+    clm_string_yaml_tests();
+    clm_gen_tests();
     clm_id_tests();
+    clm_string_dsv_tests();
     clm_string_tests();
     clm_storage_tests();
+    clm_path_tests();
+    clm_url_tests();
+    clm_file_tests();
+    clm_directory_tests();
     clm_overall_test_summary("CLM Tests Summary");
 
+    const int files_closed = clm_file_shutdown();
     const int log_closed = clm_test_log_close();
     clm_bpa_shutdown();
     if (!log_closed)
         fputs("Failed while writing or closing main.log.\n", stderr);
-    return clm_tests_failed == 0 && log_closed ? 0 : 1;
+    if (files_closed != 0)
+        fputs("Failed while closing registered files.\n", stderr);
+    return clm_tests_failed == 0 && log_closed && files_closed == 0 ? 0 : 1;
 }

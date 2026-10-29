@@ -1,5 +1,25 @@
-/* CLM — Cross Language Modules | CC0 1.0 | Don't start from scratch, bro. */
 #pragma once
+
+/*
+ * =============================================================================
+ * CLM — Cross Language Modules
+ *
+ * An initiative by deeperlevel, developed with community contributions.
+ * https://github.com/deeperlevel/clm
+ * Contact: deeparchive@outlook.com
+ *
+ * Public Domain — CC0 1.0 Universal
+ * https://creativecommons.org/publicdomain/zero/1.0/
+ *
+ * Free to use, modify, redistribute, and bundle for any purpose.
+ * Attribution and retention of this notice are appreciated, not required.
+ *
+ * Provided AS IS, without warranty or liability.
+ *
+ * Don't start from scratch, bro.
+ * =============================================================================
+ */
+
 #include "bpa.h"
 #include <limits.h>
 #include <stdint.h>

@@ -48,7 +48,7 @@ static inline bool clm_string_encoding_supported(const clm_byte encoding)
 /** Changes the preferred byte-export encoding for subsequently created strings.
  * Does not change Unicode text or existing strings' preferences.
  */
-static inline int clm_string_set_default_encoding(const clm_byte encoding)
+static inline clm_int clm_string_set_default_encoding(const clm_byte encoding)
 {
     if (!clm_string_encoding_supported(encoding)) return CLM_BPA_FAILURE;
     clm_string_global_default_encoding = encoding;
@@ -106,7 +106,7 @@ static inline bool clm_string_utf8_next(
     return true;
 }
 
-static inline int clm_string_measure(
+static inline clm_int clm_string_measure(
     const char* text,
     const size_t byte_length,
     const clm_byte encoding,
@@ -129,7 +129,7 @@ static inline int clm_string_measure(
     return CLM_BPA_SUCCESS;
 }
 
-static inline int clm_string_offset(
+static inline clm_int clm_string_offset(
     const char* text,
     const size_t byte_length,
     const clm_byte encoding,
@@ -154,7 +154,7 @@ static inline int clm_string_offset(
     return CLM_BPA_SUCCESS;
 }
 
-static inline int clm_string_get_block(
+static inline clm_int clm_string_get_block(
     const clm_id id,
     clm_bpa_block_node** block,
     const char** text,
@@ -177,7 +177,7 @@ static inline int clm_string_get_block(
     return CLM_BPA_SUCCESS;
 }
 
-static inline int clm_string_replace_bytes(
+static inline clm_int clm_string_replace_bytes(
     const clm_id id,
     const char* text,
     const size_t byte_length)
@@ -235,21 +235,31 @@ static inline bool clm_string_delete(const clm_id id)
            clm_bpa_delete(id) == CLM_BPA_SUCCESS;
 }
 
-/** Replaces a string block's value; returns its character count or failure. */
-static inline clm_int clm_string_set(const clm_id id, const char* text)
+/** Replaces an existing string's value with valid UTF-8 text.
+ * @param dest_id ID of the string block to update; it must already exist.
+ * @param text NUL-terminated UTF-8 text to copy.
+ * @return Unicode code-point count on success, or CLM_BPA_FAILURE.
+ */
+static inline clm_int clm_string_set(const clm_id dest_id, const char* text)
 {
     size_t character_count;
     if (text == NULL)
         return CLM_BPA_FAILURE;
-    const clm_bpa_block_node* block = clm_bpa_find_block(id);
+    const clm_bpa_block_node* block = clm_bpa_find_block(dest_id);
     const size_t byte_length = strlen(text);
     if (block == NULL || block->type != CLM_BPA_TYPE_STRING ||
         byte_length >= UINT_MAX ||
         clm_string_measure(text, byte_length, CLM_STRING_ENCODING_UTF8,
                            &character_count) != CLM_BPA_SUCCESS ||
-        clm_bpa_replace(id, text, (clm_uint)(byte_length + 1)) < 0)
+        clm_bpa_replace(dest_id, text, (clm_uint)(byte_length + 1)) < 0)
         return CLM_BPA_FAILURE;
     return (clm_int)character_count;
+}
+
+/** Replaces a string block's value; returns its character count or failure. */
+static inline clm_int clm_string_set_from(const clm_id dest_id, const char* text)
+{
+    return clm_string_set(dest_id, text);
 }
 
 /** Appends text and returns the number of characters appended, or CLM_BPA_FAILURE.
@@ -424,7 +434,7 @@ static inline clm_int clm_string_length(const clm_id id)
 /** Replaces every non-overlapping occurrence; returns replacements made or failure.
  * An empty search string is invalid. The replacement may be empty.
  */
-static inline clm_int clm_string_replace(
+static inline clm_int clm_string_replace_from(
     const clm_id id,
     const char* search,
     const char* replacement)
@@ -483,9 +493,20 @@ static inline clm_int clm_string_replace(
     return (clm_int)count;
 }
 
+/** Replaces every non-overlapping occurrence in a string.
+ * Returns the replacement count, zero when there are no matches, or
+ * CLM_BPA_FAILURE for invalid UTF-8, an empty search, or an invalid string ID.
+ */
+static inline clm_int clm_string_replace(
+    const clm_id id,
+    const char* search,
+    const char* replacement)
+{
+    return clm_string_replace_from(id, search, replacement);
+}
+
 /** Decodes one validated UTF-8 scalar value. */
-static inline int clm_string_utf8_decode_one(const unsigned char* data, size_t size,
-                                               size_t* offset, uint32_t* scalar)
+static inline clm_int clm_string_utf8_decode_one(const unsigned char* data, size_t size, size_t* offset, uint32_t* scalar)
 {
     size_t begin = *offset, end = begin;
     if (!clm_string_utf8_next(data, size, &end)) return CLM_BPA_FAILURE;
@@ -522,7 +543,7 @@ static inline size_t clm_string_utf8_encode_one(uint32_t cp, unsigned char* out)
 /** Convert bytes to validated UTF-8 in an allocated temporary buffer.
  * Rejects embedded U+0000 because BPA currently stores NUL-terminated strings.
  * Call free() on the returned buffer. */
-static inline int clm_string_decode_bytes(const clm_byte encoding,
+static inline clm_int clm_string_decode_bytes(const clm_byte encoding,
     const void* input, size_t size, char** output, size_t* output_length)
 {
     if (!clm_string_encoding_supported(encoding) || output == NULL || output_length == NULL ||
@@ -643,8 +664,7 @@ static inline clm_int clm_string_get_bytes(const clm_id id, void* buffer, const 
  * If replacing, preserve resource identity; update preferred export encoding.
  * Fails on invalid UTF-8, UTF-16, embedded U+0000, or allocation failure.
  */
-static inline int clm_string_from_bytes(const clm_id id, const clm_byte encoding,
-                                        const void* buffer, const clm_uint buffer_size)
+static inline clm_int clm_string_from_bytes(const clm_id id, const clm_byte encoding, const void* buffer, const clm_uint buffer_size)
 {
     char* converted = NULL;
     size_t len = 0, chars = 0;
@@ -676,7 +696,7 @@ static inline int clm_string_from_bytes(const clm_id id, const clm_byte encoding
  * Text remains unchanged and stored as UTF-8. Does NOT transcode in place.
  * Fails if the current text cannot be represented in the new encoding.
  */
-static inline int clm_string_change_encoding(const clm_id id, const clm_byte new_encoding)
+static inline clm_int clm_string_change_encoding(const clm_id id, const clm_byte new_encoding)
 {
     clm_bpa_block_node* block = clm_bpa_find_block(id);
     if (block == NULL || block->type != CLM_BPA_TYPE_STRING ||
@@ -697,7 +717,7 @@ static inline int clm_string_change_encoding(const clm_id id, const clm_byte new
  * source's preferred byte-export encoding. The destination ID must be unused.
  * @return CLM_BPA_SUCCESS on success; CLM_BPA_FAILURE otherwise.
  */
-static inline int clm_string_slice(const clm_id source_id, const clm_int start,
+static inline clm_int clm_string_slice(const clm_id source_id, const clm_int start,
                                    const clm_int length, const clm_id destination_id)
 {
     clm_bpa_block_node* source;
@@ -741,7 +761,7 @@ static inline int clm_string_slice(const clm_id source_id, const clm_int start,
  * @param byte_length Receives the view length in bytes, excluding any terminator.
  * @return CLM_BPA_SUCCESS, or CLM_BPA_FAILURE for invalid input/range.
  */
-static inline int clm_string_slice_borrow(
+static inline clm_int clm_string_slice_borrow(
     const clm_id source_id,
     const clm_int start,
     const clm_int length,
@@ -771,7 +791,99 @@ static inline int clm_string_slice_borrow(
     return CLM_BPA_SUCCESS;
 }
 
-static inline int clm_string_array_get_node(
+/** Copies a string block into a destination string, creating it if needed.
+ * An existing destination must be a string block. The source must contain
+ * valid UTF-8 and have a supported, representable export encoding; that
+ * encoding preference is copied to the destination.
+ * @param dest_id ID to create or update.
+ * @param source_id ID of the source string block.
+ * @return CLM_BPA_SUCCESS, or CLM_BPA_FAILURE on invalid input or allocation failure.
+ */
+static inline clm_int clm_string_from(const clm_id dest_id, const clm_id source_id)
+{
+    clm_bpa_block_node* source;
+    const char* text;
+    size_t byte_length, character_count;
+    if (clm_string_get_block(source_id, &source, &text, &byte_length,
+                             &character_count) != CLM_BPA_SUCCESS ||
+        clm_string_get_bytes(source_id, NULL, 0) < 0)
+        return CLM_BPA_FAILURE;
+
+    clm_bpa_block_node* destination = clm_bpa_find_block(dest_id);
+    bool created = false;
+    if (destination == NULL) {
+        if (clm_bpa_create(dest_id, CLM_BPA_TYPE_STRING) != CLM_BPA_SUCCESS)
+            return CLM_BPA_FAILURE;
+        created = true;
+        destination = clm_bpa_find_block(dest_id);
+    }
+    if (destination == NULL || destination->type != CLM_BPA_TYPE_STRING ||
+        byte_length >= UINT_MAX ||
+        clm_bpa_set_string(dest_id, text, (clm_uint)(byte_length + 1)) < 0) {
+        if (created)
+            (void)clm_bpa_delete(dest_id);
+        return CLM_BPA_FAILURE;
+    }
+    destination->encoding = source->encoding;
+    return CLM_BPA_SUCCESS;
+}
+
+/** Initializes a string from NUL-terminated UTF-8 text, creating the
+ * destination with the current default encoding if it does not yet exist.
+ * An existing destination must be a string block and retains its encoding.
+ * @param dest_id ID to create or update.
+ * @param source Valid NUL-terminated UTF-8 text.
+ * @return CLM_BPA_SUCCESS, or CLM_BPA_FAILURE on invalid input or allocation failure.
+ */
+static inline clm_int clm_string_from_from(const clm_id dest_id, const char* source)
+{
+    if (source == NULL)
+        return CLM_BPA_FAILURE;
+    clm_bpa_block_node* destination = clm_bpa_find_block(dest_id);
+    if (destination == NULL)
+        return clm_string_new(dest_id, source) ? CLM_BPA_SUCCESS : CLM_BPA_FAILURE;
+    if (destination->type != CLM_BPA_TYPE_STRING ||
+        clm_string_set(dest_id, source) < 0)
+        return CLM_BPA_FAILURE;
+    return CLM_BPA_SUCCESS;
+}
+
+/** Decodes an externally encoded byte sequence and initializes a string from
+ * the resulting UTF-8 text. New destinations use the global default encoding;
+ * existing string destinations retain their encoding preference.
+ * @param dest_id ID to create or update.
+ * @param encoding Encoding of the input bytes.
+ * @param source Exact input byte sequence; may be NULL only when source_size is zero.
+ * @param source_size Number of input bytes, excluding any terminator.
+ * @return CLM_BPA_SUCCESS, or CLM_BPA_FAILURE for invalid input or allocation failure.
+ */
+static inline clm_int clm_string_from_enc(
+    const clm_id dest_id,
+    const clm_byte encoding,
+    const void* source,
+    const clm_uint source_size)
+{
+    char* converted = NULL;
+    size_t converted_length;
+    if (clm_string_decode_bytes(encoding, source, source_size,
+                                &converted, &converted_length) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    const clm_int result = clm_string_from_from(dest_id, converted);
+    free(converted);
+    return result;
+}
+
+/** Alias of clm_string_from_enc for callers using the from_from naming form. */
+static inline clm_int clm_string_from_from_enc(
+    const clm_id dest_id,
+    const clm_byte encoding,
+    const void* source,
+    const clm_uint source_size)
+{
+    return clm_string_from_enc(dest_id, encoding, source, source_size);
+}
+
+static inline clm_int clm_string_array_get_node(
     const clm_id id,
     clm_bpaa_array_node** array)
 {
@@ -783,7 +895,7 @@ static inline int clm_string_array_get_node(
     return CLM_BPA_SUCCESS;
 }
 
-static inline int clm_string_array_validate_block(
+static inline clm_int clm_string_array_validate_block(
     const clm_bpaa_array_node* array,
     const clm_id block_id)
 {
@@ -798,7 +910,7 @@ static inline int clm_string_array_validate_block(
         block->length, CLM_STRING_ENCODING_UTF8, &characters);
 }
 
-static inline int clm_string_array_replace_bytes(
+static inline clm_int clm_string_array_replace_bytes(
     clm_bpaa_array_node* array,
     const clm_int index,
     const char* text,
@@ -1131,7 +1243,7 @@ static inline int clm_string_array_get(
 }
 
 /** Replaces an array item with an existing string BPA block's value. */
-static inline int clm_string_array_set(
+static inline clm_int clm_string_array_set(
     const clm_id id,
     const clm_int index,
     const clm_id source_string_id)
@@ -1144,7 +1256,7 @@ static inline int clm_string_array_set(
 }
 
 /** Inserts a string block at an array index. */
-static inline int clm_string_array_insert(
+static inline clm_int clm_string_array_insert(
     const clm_id id,
     const clm_int index,
     const clm_id source_string_id)
@@ -1157,7 +1269,7 @@ static inline int clm_string_array_insert(
 }
 
 /** Appends a string block to an array. */
-static inline int clm_string_array_append(const clm_id id, const clm_id source_string_id)
+static inline clm_int clm_string_array_append(const clm_id id, const clm_id source_string_id)
 {
     clm_bpaa_array_node* array;
     if (clm_string_array_get_node(id, &array) != CLM_BPA_SUCCESS ||
@@ -1167,7 +1279,7 @@ static inline int clm_string_array_append(const clm_id id, const clm_id source_s
 }
 
 /** Removes an array item by zero-based index. */
-static inline int clm_string_array_remove(const clm_id id, const clm_int index)
+static inline clm_int clm_string_array_remove(const clm_id id, const clm_int index)
 {
     clm_bpaa_array_node* array;
     return clm_string_array_get_node(id, &array) == CLM_BPA_SUCCESS
@@ -1175,7 +1287,7 @@ static inline int clm_string_array_remove(const clm_id id, const clm_int index)
 }
 
 /** Clears array items while preserving its reserved capacity. */
-static inline int clm_string_array_clear(const clm_id id)
+static inline clm_int clm_string_array_clear(const clm_id id)
 {
     clm_bpaa_array_node* array;
     return clm_string_array_get_node(id, &array) == CLM_BPA_SUCCESS
@@ -1200,7 +1312,7 @@ static inline clm_int clm_string_array_find(
     return CLM_BPA_FAILURE;
 }
 
-static inline int clm_string_array_compare(const void* left, const void* right)
+static inline clm_int clm_string_array_compare(const void* left, const void* right)
 {
     const char* const* left_string = (const char* const*)left;
     const char* const* right_string = (const char* const*)right;
@@ -1208,7 +1320,7 @@ static inline int clm_string_array_compare(const void* left, const void* right)
 }
 
 /** Sorts strings lexicographically by their encoded bytes. */
-static inline int clm_string_array_sort(const clm_id id)
+static inline clm_int clm_string_array_sort(const clm_id id)
 {
     clm_bpaa_array_node* array;
     if (clm_string_array_get_node(id, &array) != CLM_BPA_SUCCESS)
@@ -1222,7 +1334,7 @@ static inline int clm_string_array_sort(const clm_id id)
 }
 
 /** Randomly shuffles string items and resets the draw deck. */
-static inline int clm_string_array_shuffle(const clm_id id)
+static inline clm_int clm_string_array_shuffle(const clm_id id)
 {
     clm_bpaa_array_node* array;
     if (clm_string_array_get_node(id, &array) != CLM_BPA_SUCCESS)
@@ -1239,7 +1351,7 @@ static inline int clm_string_array_shuffle(const clm_id id)
 }
 
 /** Moves the array cursor to the first item. */
-static inline int clm_string_array_move_first(const clm_id id)
+static inline clm_int clm_string_array_move_first(const clm_id id)
 {
     clm_bpaa_array_node* array;
     return clm_string_array_get_node(id, &array) == CLM_BPA_SUCCESS
@@ -1247,7 +1359,7 @@ static inline int clm_string_array_move_first(const clm_id id)
 }
 
 /** Moves the array cursor to the previous item. */
-static inline int clm_string_array_move_previous(const clm_id id)
+static inline clm_int clm_string_array_move_previous(const clm_id id)
 {
     clm_bpaa_array_node* array;
     return clm_string_array_get_node(id, &array) == CLM_BPA_SUCCESS
@@ -1255,7 +1367,7 @@ static inline int clm_string_array_move_previous(const clm_id id)
 }
 
 /** Moves the array cursor to the next item. */
-static inline int clm_string_array_move_next(const clm_id id)
+static inline clm_int clm_string_array_move_next(const clm_id id)
 {
     clm_bpaa_array_node* array;
     return clm_string_array_get_node(id, &array) == CLM_BPA_SUCCESS
@@ -1263,7 +1375,7 @@ static inline int clm_string_array_move_next(const clm_id id)
 }
 
 /** Moves the array cursor to the last item. */
-static inline int clm_string_array_move_last(const clm_id id)
+static inline clm_int clm_string_array_move_last(const clm_id id)
 {
     clm_bpaa_array_node* array;
     return clm_string_array_get_node(id, &array) == CLM_BPA_SUCCESS
@@ -1271,7 +1383,7 @@ static inline int clm_string_array_move_last(const clm_id id)
 }
 
 /** Moves the array cursor to an item. */
-static inline int clm_string_array_move_to(const clm_id id, const clm_int index)
+static inline clm_int clm_string_array_move_to(const clm_id id, const clm_int index)
 {
     clm_bpaa_array_node* array;
     return clm_string_array_get_node(id, &array) == CLM_BPA_SUCCESS
@@ -1279,7 +1391,7 @@ static inline int clm_string_array_move_to(const clm_id id, const clm_int index)
 }
 
 /** Copies the current array item into a string BPA block. */
-static inline int clm_string_array_get_current(
+static inline clm_int clm_string_array_get_current(
     const clm_id id,
     const clm_id destination_string_id)
 {
@@ -1292,7 +1404,7 @@ static inline int clm_string_array_get_current(
 }
 
 /** Draws an indexed item from the active deck into a string BPA block. */
-static inline int clm_string_array_draw_at(
+static inline clm_int clm_string_array_draw_at(
     const clm_id id,
     const clm_int deck_index,
     const clm_id destination_string_id)
@@ -1312,7 +1424,7 @@ static inline int clm_string_array_draw_at(
 }
 
 /** Draws the next item, shuffling again when the active deck is exhausted. */
-static inline int clm_string_array_draw(
+static inline clm_int clm_string_array_draw(
     const clm_id id,
     const clm_id destination_string_id)
 {
@@ -1329,3 +1441,5 @@ static inline int clm_string_array_draw(
 #ifdef CLM_STRING_IMPLEMENTATION
 clm_byte clm_string_global_default_encoding = CLM_STRING_ENCODING_UTF8;
 #endif
+
+
