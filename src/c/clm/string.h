@@ -154,6 +154,129 @@ static inline clm_int clm_string_offset(
     return CLM_BPA_SUCCESS;
 }
 
+static inline clm_int clm_string_utf8_decode_one(
+    const unsigned char* data,
+    size_t size,
+    size_t* offset,
+    uint32_t* scalar);
+
+static inline bool clm_string_is_whitespace(const uint32_t codepoint)
+{
+    return (codepoint >= 0x0009 && codepoint <= 0x000D) ||
+           codepoint == 0x0020 || codepoint == 0x0085 ||
+           codepoint == 0x00A0 || codepoint == 0x1680 ||
+           (codepoint >= 0x2000 && codepoint <= 0x200A) ||
+           codepoint == 0x2028 || codepoint == 0x2029 ||
+           codepoint == 0x202F || codepoint == 0x205F ||
+           codepoint == 0x3000;
+}
+
+static inline uint32_t clm_string_casefold_codepoint(const uint32_t codepoint)
+{
+    if ((codepoint >= 'A' && codepoint <= 'Z') ||
+        (codepoint >= 0x00C0 && codepoint <= 0x00D6) ||
+        (codepoint >= 0x00D8 && codepoint <= 0x00DE) ||
+        (codepoint >= 0x0391 && codepoint <= 0x03A1) ||
+        (codepoint >= 0x03A3 && codepoint <= 0x03AB) ||
+        (codepoint >= 0x0410 && codepoint <= 0x042F))
+        return codepoint + 0x20;
+    if (codepoint >= 0x0400 && codepoint <= 0x040F)
+        return codepoint + 0x50;
+    if (codepoint == 0x0178)
+        return 0x00FF;
+    if (codepoint == 0x03C2)
+        return 0x03C3;
+    if ((codepoint >= 0x0100 && codepoint <= 0x012F &&
+         (codepoint & 1u) == 0) ||
+        (codepoint >= 0x0132 && codepoint <= 0x0137 &&
+         (codepoint & 1u) == 0) ||
+        (codepoint >= 0x014A && codepoint <= 0x0177 &&
+         (codepoint & 1u) == 0))
+        return codepoint + 1;
+    if (codepoint >= 0x0139 && codepoint <= 0x0148 &&
+        (codepoint & 1u) == 1)
+        return codepoint + 1;
+    return codepoint;
+}
+
+static inline clm_int clm_string_compare_text(
+    const char* left,
+    const size_t left_bytes,
+    const char* right,
+    const size_t right_bytes,
+    const bool ignore_case)
+{
+    size_t left_offset = 0, right_offset = 0;
+    while (left_offset < left_bytes && right_offset < right_bytes) {
+        uint32_t left_codepoint, right_codepoint;
+        if (clm_string_utf8_decode_one((const unsigned char*)left, left_bytes,
+                                       &left_offset, &left_codepoint) != CLM_BPA_SUCCESS ||
+            clm_string_utf8_decode_one((const unsigned char*)right, right_bytes,
+                                       &right_offset, &right_codepoint) != CLM_BPA_SUCCESS)
+            return CLM_BPA_FAILURE;
+        if (ignore_case) {
+            left_codepoint = clm_string_casefold_codepoint(left_codepoint);
+            right_codepoint = clm_string_casefold_codepoint(right_codepoint);
+        }
+        if (left_codepoint != right_codepoint)
+            return left_codepoint < right_codepoint ? -1 : 1;
+    }
+    if (left_offset < left_bytes) return 1;
+    if (right_offset < right_bytes) return -1;
+    return 0;
+}
+
+static inline clm_int clm_string_trim_bounds(
+    const char* text,
+    const size_t byte_length,
+    const bool trim_left,
+    const bool trim_right,
+    size_t* begin,
+    size_t* end,
+    size_t* removed)
+{
+    size_t first = 0, last = byte_length, count = 0;
+    if (text == NULL || begin == NULL || end == NULL || removed == NULL)
+        return CLM_BPA_FAILURE;
+    if (trim_left) {
+        while (first < last) {
+            size_t next = first;
+            uint32_t codepoint;
+            if (clm_string_utf8_decode_one((const unsigned char*)text, last,
+                                           &next, &codepoint) != CLM_BPA_SUCCESS)
+                return CLM_BPA_FAILURE;
+            if (!clm_string_is_whitespace(codepoint))
+                break;
+            first = next;
+            ++count;
+        }
+    }
+    if (trim_right) {
+        size_t offset = first, last_non_whitespace = first;
+        size_t trailing_count = 0;
+        while (offset < last) {
+            size_t next = offset;
+            uint32_t codepoint;
+            if (clm_string_utf8_decode_one((const unsigned char*)text, last,
+                                           &next, &codepoint) != CLM_BPA_SUCCESS)
+                return CLM_BPA_FAILURE;
+            if (clm_string_is_whitespace(codepoint)) {
+                ++trailing_count;
+            } else {
+                last_non_whitespace = next;
+                trailing_count = 0;
+            }
+            offset = next;
+        }
+        last = last_non_whitespace;
+        count += trailing_count;
+    }
+    *begin = first;
+    *end = last;
+    *removed = count;
+    return CLM_BPA_SUCCESS;
+}
+
 static inline clm_int clm_string_get_block(
     const clm_id id,
     clm_bpa_block_node** block,
@@ -187,6 +310,8 @@ static inline clm_int clm_string_replace_bytes(
     return clm_bpa_replace(id, text, (clm_uint)(byte_length + 1)) < 0
         ? CLM_BPA_FAILURE : CLM_BPA_SUCCESS;
 }
+
+static inline clm_int clm_string_from_from(const clm_id dest_id, const char* source);
 
 static inline char* clm_string_temp_alloc(const size_t bytes)
 {
@@ -429,6 +554,329 @@ static inline clm_int clm_string_length(const clm_id id)
     return clm_string_get_block(id, &block, &current, &current_bytes,
                                 &current_characters) == CLM_BPA_SUCCESS
         ? (clm_int)current_characters : CLM_BPA_FAILURE;
+}
+
+static inline clm_int clm_string_compare_case(
+    const clm_id left_id,
+    const clm_id right_id,
+    const bool ignore_case)
+{
+    clm_bpa_block_node* left_block;
+    clm_bpa_block_node* right_block;
+    const char* left;
+    const char* right;
+    size_t left_bytes, right_bytes, left_characters, right_characters;
+    if (clm_string_get_block(left_id, &left_block, &left, &left_bytes,
+                             &left_characters) != CLM_BPA_SUCCESS ||
+        clm_string_get_block(right_id, &right_block, &right, &right_bytes,
+                             &right_characters) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    (void)left_block;
+    (void)right_block;
+    return clm_string_compare_text(left, left_bytes, right, right_bytes,
+                                   ignore_case);
+}
+
+/** Compares two string blocks lexicographically by Unicode code point.
+ * The default comparison is case-sensitive.
+ */
+static inline clm_int clm_string_compare(
+    const clm_id left_id,
+    const clm_id right_id)
+{
+    return clm_string_compare_case(left_id, right_id, false);
+}
+
+/** Compares two string blocks ignoring case using simple mappings for common
+ * Latin, Greek, and Cyrillic letters; other code points compare exactly.
+ */
+static inline clm_int clm_string_compare_ignore_case(
+    const clm_id left_id,
+    const clm_id right_id)
+{
+    return clm_string_compare_case(left_id, right_id, true);
+}
+
+/** Compares two valid NUL-terminated UTF-8 strings; case-sensitive by default. */
+static inline clm_int clm_string_compare_from(
+    const char* left,
+    const char* right)
+{
+    size_t left_characters, right_characters;
+    if (left == NULL || right == NULL ||
+        clm_string_measure(left, strlen(left), CLM_STRING_ENCODING_UTF8,
+                           &left_characters) != CLM_BPA_SUCCESS ||
+        clm_string_measure(right, strlen(right), CLM_STRING_ENCODING_UTF8,
+                           &right_characters) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    return clm_string_compare_text(left, strlen(left), right, strlen(right), false);
+}
+
+/** Compares two valid NUL-terminated UTF-8 strings ignoring case using the
+ * same simple mappings as clm_string_compare_ignore_case.
+ */
+static inline clm_int clm_string_compare_ignore_case_from(
+    const char* left,
+    const char* right)
+{
+    size_t left_characters, right_characters;
+    if (left == NULL || right == NULL ||
+        clm_string_measure(left, strlen(left), CLM_STRING_ENCODING_UTF8,
+                           &left_characters) != CLM_BPA_SUCCESS ||
+        clm_string_measure(right, strlen(right), CLM_STRING_ENCODING_UTF8,
+                           &right_characters) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    return clm_string_compare_text(left, strlen(left), right, strlen(right), true);
+}
+
+static inline clm_int clm_string_array_append_bytes(
+    const clm_id array_id,
+    const char* text,
+    const size_t byte_length)
+{
+    clm_bpaa_array_node* array = clm_bpaa_find_array(array_id);
+    if (array == NULL || array->type != CLM_BPA_TYPE_STRING ||
+        array->count > INT_MAX || text == NULL || byte_length > INT_MAX)
+        return CLM_BPA_FAILURE;
+    char* terminated = clm_string_temp_alloc(byte_length + 1);
+    if (terminated == NULL)
+        return CLM_BPA_FAILURE;
+    memcpy(terminated, text, byte_length);
+    terminated[byte_length] = '\0';
+    const clm_int result = clm_bpaa_insert_raw(
+        array_id, (clm_int)array->count, terminated, (clm_uint)(byte_length + 1));
+    clm_string_temp_free(terminated, byte_length + 1);
+    return result;
+}
+
+static inline clm_int clm_string_split_text(
+    const clm_id destination_array_id,
+    const char* text,
+    const size_t text_bytes,
+    const char* delimiter,
+    const size_t delimiter_bytes)
+{
+    size_t characters;
+    if (text == NULL || delimiter == NULL || delimiter_bytes == 0 ||
+        text_bytes > INT_MAX ||
+        clm_string_measure(text, text_bytes, CLM_STRING_ENCODING_UTF8,
+                           &characters) != CLM_BPA_SUCCESS ||
+        clm_string_measure(delimiter, delimiter_bytes,
+                           CLM_STRING_ENCODING_UTF8, &characters) != CLM_BPA_SUCCESS ||
+        clm_bpaa_create(destination_array_id, CLM_BPA_TYPE_STRING, 0,
+                        CLM_STRING_ENCODING_UTF8) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+
+    size_t start = 0;
+    while (start <= text_bytes) {
+        const char* match = strstr(text + start, delimiter);
+        const size_t end = match != NULL ? (size_t)(match - text) : text_bytes;
+        if (clm_string_array_append_bytes(destination_array_id, text + start,
+                                          end - start) != CLM_BPA_SUCCESS) {
+            (void)clm_bpaa_delete(destination_array_id);
+            return CLM_BPA_FAILURE;
+        }
+        if (match == NULL)
+            break;
+        start = end + delimiter_bytes;
+    }
+    return CLM_BPA_SUCCESS;
+}
+
+/** Splits a string block by a nonempty delimiter string into a new string array.
+ * Empty fields, including leading and trailing fields, are retained.
+ */
+static inline clm_int clm_string_split(
+    const clm_id destination_array_id,
+    const clm_id source_string_id,
+    const clm_id delimiter_string_id)
+{
+    clm_bpa_block_node* source_block;
+    clm_bpa_block_node* delimiter_block;
+    const char* source;
+    const char* delimiter;
+    size_t source_bytes, delimiter_bytes, source_characters, delimiter_characters;
+    if (clm_string_get_block(source_string_id, &source_block, &source,
+                             &source_bytes, &source_characters) != CLM_BPA_SUCCESS ||
+        clm_string_get_block(delimiter_string_id, &delimiter_block, &delimiter,
+                             &delimiter_bytes, &delimiter_characters) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    (void)source_block;
+    (void)delimiter_block;
+    return clm_string_split_text(destination_array_id, source, source_bytes,
+                                 delimiter, delimiter_bytes);
+}
+
+/** Splits UTF-8 text by a nonempty UTF-8 delimiter; see clm_string_split. */
+static inline clm_int clm_string_split_from(
+    const clm_id destination_array_id,
+    const char* text,
+    const char* delimiter)
+{
+    if (text == NULL || delimiter == NULL)
+        return CLM_BPA_FAILURE;
+    return clm_string_split_text(destination_array_id, text, strlen(text),
+                                 delimiter, strlen(delimiter));
+}
+
+static inline clm_int clm_string_split_lines_text(
+    const clm_id destination_array_id,
+    const char* text,
+    const size_t text_bytes)
+{
+    size_t characters;
+    if (text == NULL || text_bytes > INT_MAX ||
+        clm_string_measure(text, text_bytes, CLM_STRING_ENCODING_UTF8,
+                           &characters) != CLM_BPA_SUCCESS ||
+        clm_bpaa_create(destination_array_id, CLM_BPA_TYPE_STRING, 0,
+                        CLM_STRING_ENCODING_UTF8) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    size_t start = 0, offset = 0;
+    while (offset < text_bytes) {
+        const size_t character_start = offset;
+        uint32_t codepoint;
+        if (clm_string_utf8_decode_one((const unsigned char*)text, text_bytes,
+                                       &offset, &codepoint) != CLM_BPA_SUCCESS) {
+            (void)clm_bpaa_delete(destination_array_id);
+            return CLM_BPA_FAILURE;
+        }
+        if (codepoint == '\r' || codepoint == '\n' || codepoint == 0x85 ||
+            codepoint == 0x2028 || codepoint == 0x2029) {
+            const size_t line_end = character_start;
+            if (codepoint == '\r' && offset < text_bytes && text[offset] == '\n')
+                ++offset;
+            if (clm_string_array_append_bytes(destination_array_id, text + start,
+                                              line_end - start) != CLM_BPA_SUCCESS) {
+                (void)clm_bpaa_delete(destination_array_id);
+                return CLM_BPA_FAILURE;
+            }
+            start = offset;
+        }
+    }
+    if (clm_string_array_append_bytes(destination_array_id, text + start,
+                                      text_bytes - start) != CLM_BPA_SUCCESS) {
+        (void)clm_bpaa_delete(destination_array_id);
+        return CLM_BPA_FAILURE;
+    }
+    return CLM_BPA_SUCCESS;
+}
+
+/** Splits a string block at CR, LF, CRLF, NEL, line separator, and paragraph separator. */
+static inline clm_int clm_string_split_lines(
+    const clm_id destination_array_id,
+    const clm_id source_string_id)
+{
+    clm_bpa_block_node* block;
+    const char* text;
+    size_t byte_length, characters;
+    if (clm_string_get_block(source_string_id, &block, &text, &byte_length,
+                             &characters) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    (void)block;
+    return clm_string_split_lines_text(destination_array_id, text, byte_length);
+}
+
+/** Splits UTF-8 text into lines; trailing empty lines are retained. */
+static inline clm_int clm_string_split_lines_from(
+    const clm_id destination_array_id,
+    const char* text)
+{
+    if (text == NULL)
+        return CLM_BPA_FAILURE;
+    return clm_string_split_lines_text(destination_array_id, text, strlen(text));
+}
+
+static inline clm_int clm_string_trim_id(
+    const clm_id id,
+    const bool trim_left,
+    const bool trim_right)
+{
+    clm_bpa_block_node* block;
+    const char* text;
+    size_t byte_length, characters, begin, end, removed;
+    if (clm_string_get_block(id, &block, &text, &byte_length, &characters) != CLM_BPA_SUCCESS ||
+        clm_string_trim_bounds(text, byte_length, trim_left, trim_right,
+                               &begin, &end, &removed) != CLM_BPA_SUCCESS ||
+        removed > INT_MAX)
+        return CLM_BPA_FAILURE;
+    if (removed != 0) {
+        char* trimmed = clm_string_temp_alloc(end - begin + 1);
+        if (trimmed == NULL)
+            return CLM_BPA_FAILURE;
+        memcpy(trimmed, text + begin, end - begin);
+        trimmed[end - begin] = '\0';
+        const clm_int status = clm_string_replace_bytes(id, trimmed, end - begin);
+        clm_string_temp_free(trimmed, end - begin + 1);
+        if (status != CLM_BPA_SUCCESS)
+            return CLM_BPA_FAILURE;
+    }
+    return (clm_int)removed;
+}
+
+static inline clm_int clm_string_trim_text_to_id(
+    const clm_id destination_string_id,
+    const char* text,
+    const bool trim_left,
+    const bool trim_right)
+{
+    size_t text_characters, begin, end, removed;
+    if (text == NULL ||
+        clm_string_measure(text, strlen(text), CLM_STRING_ENCODING_UTF8,
+                           &text_characters) != CLM_BPA_SUCCESS ||
+        clm_string_trim_bounds(text, strlen(text), trim_left, trim_right,
+                               &begin, &end, &removed) != CLM_BPA_SUCCESS ||
+        removed > INT_MAX)
+        return CLM_BPA_FAILURE;
+    char* trimmed = clm_string_temp_alloc(end - begin + 1);
+    if (trimmed == NULL)
+        return CLM_BPA_FAILURE;
+    memcpy(trimmed, text + begin, end - begin);
+    trimmed[end - begin] = '\0';
+    const clm_int result = clm_string_from_from(destination_string_id, trimmed);
+    clm_string_temp_free(trimmed, end - begin + 1);
+    return result < 0 ? CLM_BPA_FAILURE : (clm_int)removed;
+}
+
+/** Removes leading Unicode White_Space characters from a string block. */
+static inline clm_int clm_string_left_trim(const clm_id id)
+{
+    return clm_string_trim_id(id, true, false);
+}
+
+/** Removes trailing Unicode White_Space characters from a string block. */
+static inline clm_int clm_string_right_trim(const clm_id id)
+{
+    return clm_string_trim_id(id, false, true);
+}
+
+/** Removes leading and trailing Unicode White_Space characters from a string block. */
+static inline clm_int clm_string_trim(const clm_id id)
+{
+    return clm_string_trim_id(id, true, true);
+}
+
+/** Copies raw UTF-8 text to a string block after removing leading whitespace. */
+static inline clm_int clm_string_left_trim_from(
+    const clm_id destination_string_id,
+    const char* text)
+{
+    return clm_string_trim_text_to_id(destination_string_id, text, true, false);
+}
+
+/** Copies raw UTF-8 text to a string block after removing trailing whitespace. */
+static inline clm_int clm_string_right_trim_from(
+    const clm_id destination_string_id,
+    const char* text)
+{
+    return clm_string_trim_text_to_id(destination_string_id, text, false, true);
+}
+
+/** Copies raw UTF-8 text to a string block after removing surrounding whitespace. */
+static inline clm_int clm_string_trim_from(
+    const clm_id destination_string_id,
+    const char* text)
+{
+    return clm_string_trim_text_to_id(destination_string_id, text, true, true);
 }
 
 /** Replaces every non-overlapping occurrence; returns replacements made or failure.
@@ -934,6 +1382,230 @@ static inline clm_int clm_string_array_replace_bytes(
     return CLM_BPA_SUCCESS;
 }
 
+static inline clm_int clm_string_array_compare_text(
+    const clm_id array_id,
+    const clm_int index,
+    const char* text,
+    const size_t text_bytes,
+    const bool ignore_case)
+{
+    clm_bpaa_array_node* array;
+    size_t array_characters, text_characters;
+    if (text == NULL ||
+        clm_string_array_get_node(array_id, &array) != CLM_BPA_SUCCESS ||
+        index < 0 || (clm_uint)index >= array->count ||
+        clm_string_measure(array->items.strings[index],
+                           strlen(array->items.strings[index]),
+                           CLM_STRING_ENCODING_UTF8,
+                           &array_characters) != CLM_BPA_SUCCESS ||
+        clm_string_measure(text, text_bytes, CLM_STRING_ENCODING_UTF8,
+                           &text_characters) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    return clm_string_compare_text(array->items.strings[index],
+                                   strlen(array->items.strings[index]),
+                                   text, text_bytes, ignore_case);
+}
+
+/** Compares an indexed array item with a string block; case-sensitive by default. */
+static inline clm_int clm_string_array_compare(
+    const clm_id array_id,
+    const clm_int index,
+    const clm_id string_id)
+{
+    clm_bpa_block_node* block;
+    const char* text;
+    size_t byte_length, characters;
+    if (clm_string_get_block(string_id, &block, &text, &byte_length,
+                             &characters) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    (void)block;
+    return clm_string_array_compare_text(array_id, index, text, byte_length, false);
+}
+
+/** Compares an indexed array item with a string block, ignoring case. */
+static inline clm_int clm_string_array_compare_ignore_case(
+    const clm_id array_id,
+    const clm_int index,
+    const clm_id string_id)
+{
+    clm_bpa_block_node* block;
+    const char* text;
+    size_t byte_length, characters;
+    if (clm_string_get_block(string_id, &block, &text, &byte_length,
+                             &characters) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    (void)block;
+    return clm_string_array_compare_text(array_id, index, text, byte_length, true);
+}
+
+/** Compares an indexed array item with raw UTF-8 text; case-sensitive by default. */
+static inline clm_int clm_string_array_compare_from(
+    const clm_id array_id,
+    const clm_int index,
+    const char* text)
+{
+    return text != NULL
+        ? clm_string_array_compare_text(array_id, index, text, strlen(text), false)
+        : CLM_BPA_FAILURE;
+}
+
+/** Compares an indexed array item with raw UTF-8 text, ignoring case. */
+static inline clm_int clm_string_array_compare_ignore_case_from(
+    const clm_id array_id,
+    const clm_int index,
+    const char* text)
+{
+    return text != NULL
+        ? clm_string_array_compare_text(array_id, index, text, strlen(text), true)
+        : CLM_BPA_FAILURE;
+}
+
+static inline clm_int clm_string_array_trim_all(
+    const clm_id id,
+    const bool trim_left,
+    const bool trim_right)
+{
+    clm_bpaa_array_node* array;
+    size_t total_removed = 0;
+    if (clm_string_array_get_node(id, &array) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    for (clm_uint index = 0; index < array->count; ++index) {
+        size_t begin, end, removed;
+        const char* text = array->items.strings[index];
+        if (clm_string_trim_bounds(text, strlen(text), trim_left, trim_right,
+                                   &begin, &end, &removed) != CLM_BPA_SUCCESS ||
+            removed > (size_t)INT_MAX - total_removed)
+            return CLM_BPA_FAILURE;
+        total_removed += removed;
+    }
+    if (total_removed == 0)
+        return 0;
+    for (clm_uint index = 0; index < array->count; ++index) {
+        size_t begin, end, removed;
+        const char* text = array->items.strings[index];
+        const size_t byte_length = strlen(text);
+        if (clm_string_trim_bounds(text, byte_length, trim_left, trim_right,
+                                   &begin, &end, &removed) != CLM_BPA_SUCCESS)
+            return CLM_BPA_FAILURE;
+        if (removed != 0) {
+            char* trimmed = clm_string_temp_alloc(end - begin + 1);
+            if (trimmed == NULL)
+                return CLM_BPA_FAILURE;
+            memcpy(trimmed, text + begin, end - begin);
+            trimmed[end - begin] = '\0';
+            const clm_int status = clm_string_array_replace_bytes(
+                array, (clm_int)index, trimmed, end - begin);
+            clm_string_temp_free(trimmed, end - begin + 1);
+            if (status != CLM_BPA_SUCCESS)
+                return CLM_BPA_FAILURE;
+        }
+    }
+    return (clm_int)total_removed;
+}
+
+/** Removes leading Unicode whitespace from every array item; returns chars removed. */
+static inline clm_int clm_string_array_left_trim(const clm_id id)
+{
+    return clm_string_array_trim_all(id, true, false);
+}
+
+/** Removes trailing Unicode whitespace from every array item; returns chars removed. */
+static inline clm_int clm_string_array_right_trim(const clm_id id)
+{
+    return clm_string_array_trim_all(id, false, true);
+}
+
+/** Removes surrounding Unicode whitespace from every array item; returns chars removed. */
+static inline clm_int clm_string_array_trim(const clm_id id)
+{
+    return clm_string_array_trim_all(id, true, true);
+}
+
+static inline clm_int clm_string_array_join_text(
+    const clm_id destination_string_id,
+    const clm_id array_id,
+    const char* separator,
+    const size_t separator_bytes)
+{
+    clm_bpaa_array_node* array;
+    size_t separator_characters, output_bytes = 0, output_characters = 0;
+    if (separator == NULL ||
+        clm_string_array_get_node(array_id, &array) != CLM_BPA_SUCCESS ||
+        clm_string_measure(separator, separator_bytes, CLM_STRING_ENCODING_UTF8,
+                           &separator_characters) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    for (clm_uint index = 0; index < array->count; ++index) {
+        const char* item = array->items.strings[index];
+        size_t item_characters;
+        const size_t item_bytes = strlen(item);
+        if (clm_string_measure(item, item_bytes, CLM_STRING_ENCODING_UTF8,
+                               &item_characters) != CLM_BPA_SUCCESS ||
+            item_bytes > (size_t)INT_MAX - output_bytes ||
+            item_characters > (size_t)INT_MAX - output_characters)
+            return CLM_BPA_FAILURE;
+        output_bytes += item_bytes;
+        output_characters += item_characters;
+        if (index + 1 < array->count) {
+            if (separator_bytes > (size_t)INT_MAX - output_bytes ||
+                separator_characters > (size_t)INT_MAX - output_characters)
+                return CLM_BPA_FAILURE;
+            output_bytes += separator_bytes;
+            output_characters += separator_characters;
+        }
+    }
+    char* result = clm_string_temp_alloc(output_bytes + 1);
+    if (result == NULL)
+        return CLM_BPA_FAILURE;
+    size_t offset = 0;
+    for (clm_uint index = 0; index < array->count; ++index) {
+        const size_t item_bytes = strlen(array->items.strings[index]);
+        memcpy(result + offset, array->items.strings[index], item_bytes);
+        offset += item_bytes;
+        if (index + 1 < array->count) {
+            memcpy(result + offset, separator, separator_bytes);
+            offset += separator_bytes;
+        }
+    }
+    result[output_bytes] = '\0';
+    const clm_int status = clm_string_from_from(destination_string_id, result);
+    clm_string_temp_free(result, output_bytes + 1);
+    return status < 0 ? CLM_BPA_FAILURE : (clm_int)output_characters;
+}
+
+/** Joins an array into a string block using a string block as the separator.
+ * Returns the joined Unicode character count, or CLM_BPA_FAILURE.
+ */
+static inline clm_int clm_string_array_join(
+    const clm_id destination_string_id,
+    const clm_id array_id,
+    const clm_id separator_string_id)
+{
+    clm_bpa_block_node* block;
+    const char* separator;
+    size_t separator_bytes, separator_characters;
+    if (clm_string_get_block(separator_string_id, &block, &separator,
+                             &separator_bytes, &separator_characters) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    (void)block;
+    return clm_string_array_join_text(destination_string_id, array_id,
+                                      separator, separator_bytes);
+}
+
+/** Joins an array into a string block using raw UTF-8 text as separator. */
+static inline clm_int clm_string_array_join_from(
+    const clm_id destination_string_id,
+    const clm_id array_id,
+    const char* separator)
+{
+    size_t separator_characters;
+    if (separator == NULL ||
+        clm_string_measure(separator, strlen(separator), CLM_STRING_ENCODING_UTF8,
+                           &separator_characters) != CLM_BPA_SUCCESS)
+        return CLM_BPA_FAILURE;
+    return clm_string_array_join_text(destination_string_id, array_id,
+                                      separator, strlen(separator));
+}
+
 /** Creates a string array; strings use the canonical UTF-8 internal encoding. */
 static inline bool clm_string_array_new(const clm_id id, const clm_int reserved)
 {
@@ -1312,7 +1984,7 @@ static inline clm_int clm_string_array_find(
     return CLM_BPA_FAILURE;
 }
 
-static inline clm_int clm_string_array_compare(const void* left, const void* right)
+static inline int clm_string_array_sort_compare(const void* left, const void* right)
 {
     const char* const* left_string = (const char* const*)left;
     const char* const* right_string = (const char* const*)right;
@@ -1327,7 +1999,7 @@ static inline clm_int clm_string_array_sort(const clm_id id)
         return CLM_BPA_FAILURE;
     if (array->count > 1)
         qsort(array->items.strings, array->count, sizeof(char*),
-              clm_string_array_compare);
+              clm_string_array_sort_compare);
     array->index = 0;
     array->deck_size = array->count;
     return CLM_BPA_SUCCESS;
@@ -1441,5 +2113,3 @@ static inline clm_int clm_string_array_draw(
 #ifdef CLM_STRING_IMPLEMENTATION
 clm_byte clm_string_global_default_encoding = CLM_STRING_ENCODING_UTF8;
 #endif
-
-

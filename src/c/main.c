@@ -30,10 +30,15 @@
 #define CLM_ECS_IMPLEMENTATION
 #define CLM_MANAGED_IMPLEMENTATION
 #define CLM_MATH_CORE_IMPLEMENTATION
+#define CLM_NET_IMPLEMENTATION
+#define CLM_CRYPTO_IMPLEMENTATION
 
+#include "clm/net.h"
 #include "tests/test.h"
 #include "tests/test_clm_base.h"
 #include "tests/test_clm_bpa.h"
+#include "tests/test_clm_hash.h"
+#include "tests/test_clm_crypto.h"
 #include "tests/test_clm_console.h"
 #include "tests/test_clm_dictionary.h"
 #include "tests/test_clm_tree.h"
@@ -62,6 +67,7 @@
 #include "tests/test_clm_clp.h"
 #include "tests/test_clm_ua.h"
 #include "tests/test_clm_math.h"
+#include "tests/test_clm_net.h"
 
 int main(void)
 {
@@ -72,6 +78,8 @@ int main(void)
 
     clm_base_tests();
     clm_bpa_tests();
+    clm_hash_tests();
+    clm_crypto_tests();
     clm_console_tests();
     clm_dictionary_tests();
     clm_tree_tests();
@@ -100,6 +108,7 @@ int main(void)
     clm_clp_tests();
     clm_ua_tests();
     clm_math_tests();
+    clm_net_tests();
     clm_overall_test_summary("CLM Tests Summary");
 
     const int files_closed = clm_file_shutdown();

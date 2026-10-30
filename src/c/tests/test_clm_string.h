@@ -150,6 +150,110 @@ static int clm_string_tests(void)
     CLM_ASSERT(!clm_string_delete(UINT64_C(90008)) && clm_bpa_is_existing(UINT64_C(90008)), "clm_string_delete preserves non-string blocks");
     CLM_ASSERT(clm_bpa_delete(UINT64_C(90008)) == CLM_BPA_SUCCESS, "delete non-string test block");
 
+    {
+        const clm_id compare_left_id = UINT64_C(90301);
+        const clm_id compare_right_id = UINT64_C(90302);
+        const clm_id trim_id = UINT64_C(90303);
+        const clm_id raw_trim_id = UINT64_C(90304);
+        const clm_id split_source_id = UINT64_C(90305);
+        const clm_id split_delimiter_id = UINT64_C(90306);
+        const clm_id split_array_id = UINT64_C(90307);
+        const clm_id lines_array_id = UINT64_C(90308);
+        const clm_id trim_array_id = UINT64_C(90309);
+        const clm_id joined_id = UINT64_C(90310);
+        const clm_id array_compare_id = UINT64_C(90311);
+        const clm_id line_source_id = UINT64_C(90312);
+        const clm_id line_source_array_id = UINT64_C(90313);
+        const clm_id left_trim_array_id = UINT64_C(90314);
+        const clm_id right_trim_array_id = UINT64_C(90315);
+
+        CLM_ASSERT(clm_string_new(compare_left_id, "CAF\xC3\x89") &&
+                   clm_string_new(compare_right_id, "caf\xC3\xA9"), "create compare operands");
+        CLM_ASSERT(clm_string_compare(compare_left_id, compare_right_id) != 0 &&
+                   clm_string_compare_ignore_case(compare_left_id, compare_right_id) == 0,
+                   "string ID compare supports case-sensitive and case-insensitive modes");
+        CLM_ASSERT(clm_string_compare_from("AbC", "aBc") != 0 &&
+                   clm_string_compare_ignore_case_from("AbC", "aBc") == 0,
+                   "raw UTF-8 compare variants support both case modes");
+
+        CLM_ASSERT(clm_string_new(trim_id, " \tvalue\xE3\x80\x80"), "create Unicode-trim input");
+        CLM_ASSERT(clm_string_trim(trim_id) == 3 &&
+                   clm_string_test_equals(trim_id, "value"), "string trim removes Unicode whitespace on both sides");
+        CLM_ASSERT(clm_string_left_trim_from(raw_trim_id, " \tvalue\n") == 2 &&
+                   clm_string_test_equals(raw_trim_id, "value\n"), "raw left-trim writes trimmed text to destination ID");
+        CLM_ASSERT(clm_string_right_trim(raw_trim_id) == 1 &&
+                   clm_string_test_equals(raw_trim_id, "value"), "string right-trim mutates destination ID");
+
+        CLM_ASSERT(clm_string_new(split_source_id, "a::b::") &&
+                   clm_string_new(split_delimiter_id, "::"), "create split input and delimiter");
+        CLM_ASSERT(clm_string_split(split_array_id, split_source_id,
+                                    split_delimiter_id) == CLM_BPA_SUCCESS &&
+                   clm_string_array_count(split_array_id) == 3, "split by string retains trailing empty fields");
+        CLM_ASSERT(strcmp(clm_bpaa_find_array(split_array_id)->items.strings[0], "a") == 0 &&
+                   strcmp(clm_bpaa_find_array(split_array_id)->items.strings[1], "b") == 0 &&
+                   strcmp(clm_bpaa_find_array(split_array_id)->items.strings[2], "") == 0,
+                   "split by string produces expected elements");
+        CLM_ASSERT(clm_string_array_join_from(joined_id, split_array_id, "-") == 4 &&
+                   clm_string_test_equals(joined_id, "a-b-"), "join array using raw separator");
+        CLM_ASSERT(clm_string_array_join(joined_id, split_array_id,
+                                         split_delimiter_id) == 6 &&
+                   clm_string_test_equals(joined_id, "a::b::"),
+                   "join array using a separator string ID");
+        CLM_ASSERT(clm_string_split_lines_from(lines_array_id, "one\r\ntwo\n") == CLM_BPA_SUCCESS &&
+                   clm_string_array_count(lines_array_id) == 3 &&
+                   strcmp(clm_bpaa_find_array(lines_array_id)->items.strings[2], "") == 0,
+                   "split lines handles CRLF and retains trailing empty line");
+        CLM_ASSERT(clm_string_new(line_source_id, "x\r\ny") &&
+                   clm_string_split_lines(line_source_array_id, line_source_id) ==
+                       CLM_BPA_SUCCESS &&
+                   clm_string_array_count(line_source_array_id) == 2,
+                   "split lines accepts a string ID");
+
+        CLM_ASSERT(clm_string_split_from(trim_array_id, " \tone \n \ttwo  ", "\n") ==
+                   CLM_BPA_SUCCESS, "split raw UTF-8 text");
+        CLM_ASSERT(clm_string_array_trim(trim_array_id) == 7 &&
+                   strcmp(clm_bpaa_find_array(trim_array_id)->items.strings[0], "one") == 0 &&
+                   strcmp(clm_bpaa_find_array(trim_array_id)->items.strings[1], "two") == 0,
+                   "array trim removes whitespace from every element");
+        CLM_ASSERT(clm_string_array_compare_from(trim_array_id, 0, "one") == 0 &&
+                   clm_string_array_compare_ignore_case_from(trim_array_id, 1, "TWO") == 0,
+                   "array compare supports index and raw text");
+        CLM_ASSERT(clm_string_new(array_compare_id, "ONE") &&
+                   clm_string_array_compare(trim_array_id, 0,
+                                            array_compare_id) != 0 &&
+                   clm_string_array_compare_ignore_case(trim_array_id, 0,
+                                                       array_compare_id) == 0,
+                   "array compare supports string IDs");
+        CLM_ASSERT(clm_string_split_from(left_trim_array_id, " \ta\n b", "\n") ==
+                       CLM_BPA_SUCCESS &&
+                   clm_string_array_left_trim(left_trim_array_id) == 3 &&
+                   strcmp(clm_bpaa_find_array(left_trim_array_id)->items.strings[0],
+                          "a") == 0,
+                   "array left-trim removes leading whitespace in each item");
+        CLM_ASSERT(clm_string_split_from(right_trim_array_id, "a \t\nb  ", "\n") ==
+                       CLM_BPA_SUCCESS &&
+                   clm_string_array_right_trim(right_trim_array_id) == 4 &&
+                   strcmp(clm_bpaa_find_array(right_trim_array_id)->items.strings[1],
+                          "b") == 0,
+                   "array right-trim removes trailing whitespace in each item");
+
+        CLM_ASSERT(clm_string_array_delete(split_array_id) &&
+                   clm_string_array_delete(lines_array_id) &&
+                   clm_string_array_delete(trim_array_id) &&
+                   clm_string_array_delete(line_source_array_id) &&
+                   clm_string_array_delete(left_trim_array_id) &&
+                   clm_string_array_delete(right_trim_array_id), "delete new test arrays");
+        CLM_ASSERT(clm_string_delete(compare_left_id) &&
+                   clm_string_delete(compare_right_id) &&
+                   clm_string_delete(trim_id) &&
+                   clm_string_delete(raw_trim_id) &&
+                   clm_string_delete(split_source_id) &&
+                   clm_string_delete(split_delimiter_id) &&
+                   clm_string_delete(joined_id) &&
+                   clm_string_delete(array_compare_id) &&
+                   clm_string_delete(line_source_id), "delete new test strings");
+    }
+
     CLM_ASSERT(clm_string_new(first_value_id, "pear"), "create first array string");
     CLM_ASSERT(clm_string_new(second_value_id, "apple"), "create second array string");
     CLM_ASSERT(clm_string_new(third_value_id, "banana"), "create third array string");

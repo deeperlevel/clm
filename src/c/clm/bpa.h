@@ -27,11 +27,25 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * Block Pool Allocation (BPA) is CLM's ID-addressed storage layer. A caller
+ * creates typed blocks or arrays under unique clm_id values and accesses them
+ * through this registry instead of owning each payload allocation directly.
+ * Fixed-size payloads and string bytes use recyclable size-class pools;
+ * registries and growable array backing stores use ordinary heap allocations.
+ *
+ * BPA is process-global and not internally synchronized. Callers must
+ * serialize access when using it from multiple threads. Pointers returned by
+ * borrow/advanced APIs are temporary views, not independent ownership.
+ */
+
+/** Result codes distinguish general operations from get/set operations. */
 #define CLM_BPA_FAILURE (-1)
 #define CLM_BPA_SUCCESS 0
 #define CLM_BPA_GET_SUCCESS 1
 #define CLM_BPA_SET_SUCCESS 2
 
+/** Runtime type tags stored with blocks and arrays. */
 #define CLM_BPA_TYPE_STRUCT 0
 #define CLM_BPA_TYPE_SIGNED_BYTE 1
 #define CLM_BPA_TYPE_BYTE 2
@@ -48,6 +62,7 @@
 #define CLM_BPA_TYPE_DATETIME 13
 #define CLM_BPA_TYPE_ANY 99
 
+/** Compact serialized block metadata; pointer is an encoded address value. */
 typedef struct {
     clm_byte type;
     clm_ushort refcount;
@@ -57,6 +72,7 @@ typedef struct {
     uintptr_t pointer;
 } clm_block_allocation;
 
+/** Compact serialized array metadata; payload layout depends on its type. */
 typedef struct {
     clm_byte type;
     clm_ushort refcount;
@@ -70,6 +86,10 @@ typedef struct {
     uintptr_t pointer;
 } clm_block_array_allocation;
 
+/** Registry node for one ID-addressed value.
+ * Fixed-size values have block_size bytes; strings have length UTF-8 bytes
+ * followed by a NUL terminator. String encoding is metadata for consumers.
+ */
 typedef struct clm_bpa_block_node {
     clm_id id;
     clm_byte type;
@@ -80,6 +100,11 @@ typedef struct clm_bpa_block_node {
     void* data;
 } clm_bpa_block_node;
 
+/** Registry node for an ID-addressed growable array (BPAA).
+ * count is the number of initialized elements; capacity is allocated slots.
+ * Fixed-width items are contiguous, while string arrays own separate strings.
+ * index is the traversal cursor; deck_size tracks remaining shuffled draws.
+ */
 typedef struct clm_bpaa_array_node {
     clm_id id;
     clm_byte type;
@@ -133,7 +158,8 @@ typedef bool (*clm_bpaa_predicate_fn)(
 /* A bounded set of recyclable size-class arenas. Each arena obtains slabs of
  * CLM_BPA_POOL_SLAB_SLOTS aligned slots, then reuses released slots. Large
  * allocations fall back to malloc/free. All objects in a slab stay allocated
- * until clm_bpa_pool_cleanup() is called after releasing live resources. */
+ * until clm_bpa_pool_cleanup() is called after releasing live resources.
+ * The pool is intentionally unsynchronized, like the BPA registries. */
 #define CLM_BPA_POOL_SLAB_SLOTS 32u
 #define CLM_BPA_POOL_MAX_SLOT 4096u
 #define CLM_BPA_POOL_CLASSES 10u /* 8, 16, 32, ... 4096 */
@@ -187,6 +213,7 @@ static inline void* clm_bpa_pool_alloc(const size_t bytes)
         pool->slot_size = size;
     }
     if (pool->free_list == NULL) {
+        /* Grow by one slab only when this class has no reusable slot. */
         const size_t stride = pool->slot_size;
         if (stride > ((size_t)-1 / CLM_BPA_POOL_SLAB_SLOTS))
             return NULL;
@@ -207,6 +234,7 @@ static inline void* clm_bpa_pool_alloc(const size_t bytes)
     void* result = pool->free_list;
     pool->free_list = *(void**)result;
     ++pool->active;
+    /* A returned slot may contain its old free-list link or stale payload. */
     memset(result, 0, bytes);
     return result;
 }
@@ -221,6 +249,7 @@ static inline void clm_bpa_pool_free(void* pointer, const size_t bytes)
     const size_t idx = clm_bpa_pool_class_for(bytes);
     if (idx == CLM_BPA_POOL_CLASSES) { free(pointer); return; }
     clm_bpa_pool_class* pool = &clm_bpa_global_pools[idx];
+    /* Free slots store the next pointer in-band; slab memory remains reserved. */
     *(void**)pointer = pool->free_list;
     pool->free_list = pointer;
     --pool->active;
@@ -290,6 +319,7 @@ static inline int clm_bpa_rehash_blocks(const size_t capacity)
         calloc(capacity, sizeof(*slots));
     if (slots == NULL)
         return CLM_BPA_FAILURE;
+    /* Reinsert live nodes into the new table; tombstones are not entries. */
     for (size_t index = 0; index < clm_bpa_global_blocks_capacity; ++index) {
         clm_bpa_block_node* block = clm_bpa_global_blocks[index];
         if (block != NULL && block != CLM_BPA_BLOCK_TOMBSTONE) {
@@ -315,6 +345,7 @@ static inline int clm_bpa_rehash_arrays(const size_t capacity)
     clm_bpaa_array_node** slots = calloc(capacity, sizeof(*slots));
     if (slots == NULL)
         return CLM_BPA_FAILURE;
+    /* Rehashing also compacts deleted-slot tombstones. */
     for (size_t index = 0; index < clm_bpa_global_arrays_capacity; ++index) {
         clm_bpaa_array_node* array = clm_bpa_global_arrays[index];
         if (array != NULL && array != CLM_BPA_ARRAY_TOMBSTONE) {
@@ -402,6 +433,7 @@ static inline clm_bpa_block_node* clm_bpa_find_block(const clm_id id)
     if (clm_bpa_global_blocks_capacity == 0)
         return NULL;
     size_t slot = clm_bpa_hash_id(id) & clm_bpa_global_blocks_capacity - 1;
+    /* Linear probing skips tombstones but stops at a never-used empty slot. */
     for (size_t probes = 0; probes < clm_bpa_global_blocks_capacity; ++probes) {
         clm_bpa_block_node* block = clm_bpa_global_blocks[slot];
         if (block == NULL)
@@ -431,6 +463,7 @@ static inline clm_bpaa_array_node* clm_bpaa_find_array(const clm_id id)
     if (clm_bpa_global_arrays_capacity == 0)
         return NULL;
     size_t slot = clm_bpa_hash_id(id) & clm_bpa_global_arrays_capacity - 1;
+    /* Keep probing past tombstones so later colliding entries remain findable. */
     for (size_t probes = 0; probes < clm_bpa_global_arrays_capacity; ++probes) {
         clm_bpaa_array_node* array = clm_bpa_global_arrays[slot];
         if (array == NULL)
@@ -465,6 +498,7 @@ static inline void clm_bpa_insert_block(clm_bpa_block_node* block)
         }
         slot = slot + 1 & clm_bpa_global_blocks_capacity - 1;
     }
+    /* Reuse the first tombstone in the probe chain to preserve lookup rules. */
     if (first_tombstone != (size_t)-1) {
         slot = first_tombstone;
         --clm_bpa_global_blocks_tombstones;
@@ -487,6 +521,7 @@ static inline void clm_bpa_insert_array(clm_bpaa_array_node* array)
         }
         slot = slot + 1 & clm_bpa_global_arrays_capacity - 1;
     }
+    /* Reuse a deleted slot rather than extending the probe chain. */
     if (first_tombstone != (size_t)-1) {
         slot = first_tombstone;
         --clm_bpa_global_arrays_tombstones;
@@ -597,6 +632,8 @@ static inline int clm_bpa_create_sized(const clm_id id, const clm_byte type, con
     if (clm_bpa_find_block(id) != NULL || clm_bpa_prepare_blocks() != CLM_BPA_SUCCESS)
         return CLM_BPA_FAILURE;
 
+    /* Built-in types determine their own size; STRUCT delegates the layout to
+     * the caller, while STRING stores a separately sized NUL-terminated value. */
     if (type == CLM_BPA_TYPE_STRING) {
         if (block_size != 0)
             return CLM_BPA_FAILURE;
@@ -745,6 +782,8 @@ static inline int clm_bpa_set_string(const clm_id id, const void* buffer, const 
         clm_bpa_pool_free(copy, (size_t)length + 1);
         return CLM_BPA_FAILURE;
     }
+    /* Build the replacement first so invalid input/allocation failure leaves
+     * the block's old string intact. */
     clm_bpa_pool_free(block->data, (size_t)block->length + 1);
     block->data = copy;
     block->length = length;
@@ -771,6 +810,9 @@ static inline int clm_bpa_replace(
         : clm_bpa_set(id, buffer, buffer_size);
 }
 
+/* BPAA stores a typed sequence under its own ID. Fixed-width items occupy one
+ * contiguous backing buffer; string arrays own a pointer table and a pooled
+ * copy of each string. count and capacity are deliberately separate. */
 /** Creates an array and reserves initial slots, with an explicit struct item size.
  * @param id Unique global array ID; reserved is the initial item capacity.
  * @param type Item type; block_size is required only for STRUCT items.
@@ -1142,6 +1184,8 @@ static inline int clm_bpaa_get_capacity_to(const clm_id id, clm_uint* capacity)
  */
 static inline int clm_bpaa_resize(clm_bpaa_array_node* array, const clm_uint capacity)
 {
+    /* A successful realloc may relocate the payload; borrowed data pointers
+     * must therefore not be kept across any operation that changes capacity. */
     void* resized;
     if (array->type == CLM_BPA_TYPE_STRING) {
         if (capacity == 0) {
@@ -1187,6 +1231,7 @@ static inline int clm_bpaa_ensure_capacity(clm_bpaa_array_node* array, const clm
         return CLM_BPA_SUCCESS;
     if (array->sealed)
         return CLM_BPA_FAILURE;
+    /* Geometric growth avoids reallocating for every individual append. */
     clm_uint capacity = array->capacity == 0 ? 4 : array->capacity;
     while (capacity < needed) {
         if (capacity > ((clm_uint)-1 >> 1)) {
@@ -1720,6 +1765,7 @@ static inline int clm_bpaa_seal(const clm_id id)
     clm_bpaa_array_node* array = clm_bpaa_find_array(id);
     if (array == NULL)
         return CLM_BPA_FAILURE;
+    /* A sealed array may still change within its current reserve. */
     array->sealed = 1;
     return CLM_BPA_SUCCESS;
 }
@@ -1968,6 +2014,8 @@ static inline int clm_bpaa_shuffle(const clm_id id)
     clm_bpaa_array_node* array = clm_bpaa_find_array(id);
     if (array == NULL || array->type == CLM_BPA_TYPE_STRING || array->count > INT_MAX)
         return CLM_BPA_FAILURE;
+    /* Shuffle the stored items themselves; the deck is the active prefix
+     * [0, deck_size), consumed by draw_at/draw without replacement. */
     for (clm_uint index = array->count; index > 1; --index) {
         const clm_uint other = (clm_uint)((unsigned long)rand() % index); // NOLINT(*-msc50-cpp)
         if (clm_bpaa_swap(id, (clm_int)(index - 1), (clm_int)other) != CLM_BPA_SUCCESS)
@@ -1992,6 +2040,8 @@ static inline int clm_bpaa_draw_at_raw(const clm_id id, const clm_int index, voi
         buffer_size < array->block_size || index < 0 ||
         (clm_uint)index >= array->deck_size)
         return CLM_BPA_FAILURE;
+    /* Swap the selected entry to the deck tail, then shrink the active deck.
+     * This makes each draw O(1) without moving the remaining entries. */
     clm_uint last = array->deck_size - 1;
     if ((clm_uint)index != last) {
         unsigned char* selected = array->items.blocks + (size_t)index * array->block_size;
@@ -2023,6 +2073,7 @@ static inline int clm_bpaa_draw_raw(const clm_id id, void* buffer, const clm_uin
         buffer_size < array->block_size)
         return CLM_BPA_FAILURE;
     if (array->deck_size == 0) {
+        /* Starting another draw cycle reshuffles the items in place. */
         if (array->count == 0 || clm_bpaa_shuffle(id) != CLM_BPA_SUCCESS)
             return CLM_BPA_FAILURE;
     }

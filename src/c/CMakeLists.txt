@@ -57,8 +57,15 @@ add_executable(main
     clm/gen.h
     clm/id.h
     clm/string.h
+    clm/ext/freehash.h
+    clm/ext/freehash.c
+    clm/hash.h
+    clm/crypto.h
+    clm/ext/monocypher.h
     tests/test.h
     tests/test_clm_bpa.h
+    tests/test_clm_hash.h
+    tests/test_clm_crypto.h
     tests/test_clm_dictionary.h
     tests/test_clm_tree.h
     tests/test_clm_table.h
@@ -90,6 +97,7 @@ add_executable(main
     tests/test_clm_math.h
     tests/test_clm_clp.h
     tests/test_clm_ua.h
+    tests/test_clm_net.h
 )
 
 find_package(Threads REQUIRED)

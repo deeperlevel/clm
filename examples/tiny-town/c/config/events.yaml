@@ -1,0 +1,17 @@
+# YAML: content authored independently of the simulation engine.
+events:
+  - name: "Harvest Festival"
+    day: 3
+    food: 20
+    wood: 0
+    gold: 10
+  - name: "Storm Damage"
+    day: 6
+    food: 0
+    wood: -30
+    gold: 0
+  - name: "Market Day"
+    day: 8
+    food: -5
+    wood: -5
+    gold: 25
