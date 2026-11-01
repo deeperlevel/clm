@@ -10,7 +10,7 @@ target_compile_definitions(main PRIVATE _POSIX_C_SOURCE=200809L)
 get_filename_component(CLM_SOURCE_ROOT
     "${CMAKE_CURRENT_LIST_DIR}/../../../src/c" ABSOLUTE)
 
-find_package(Threads REQUIRED)
+include("${CLM_SOURCE_ROOT}/cmake/ClmThreads.cmake")
 
 include(FetchContent)
 set(URIPARSER_SHARED_LIBS OFF CACHE BOOL "" FORCE)
@@ -29,7 +29,7 @@ file(GLOB CLM_C_SOURCES CONFIGURE_DEPENDS "${CLM_SOURCE_ROOT}/clm/*.c")
 add_library(clm STATIC ${CLM_C_SOURCES} "${CLM_SOURCE_ROOT}/clm/ext/freehash.c")
 target_include_directories(clm PUBLIC "${CLM_SOURCE_ROOT}")
 target_compile_features(clm PUBLIC c_std_11)
-target_link_libraries(clm PUBLIC uriparser::uriparser Threads::Threads)
+target_link_libraries(clm PUBLIC uriparser::uriparser clm_threads)
 
 if(WIN32)
     target_link_libraries(clm PUBLIC bcrypt normaliz)

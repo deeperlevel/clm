@@ -273,9 +273,15 @@ const char* clm_http_utils_reason_phrase(clm_uint status);
  * Returns false when capacity is too small (at least 30 bytes are needed). */
 bool clm_http_utils_format_date(char* out, size_t capacity);
 
-/** Parses the hexadecimal size on a chunk-size line (without the CRLF), ignoring any
- * chunk extension. Returns SUCCESS, FAILURE for a malformed size or LIMIT_EXCEEDED on overflow. */
+/** Parses the hexadecimal size on a chunk-size line (without the CRLF) and validates any
+ * chunk extension with the same strict grammar as clm_http_utils_decode_chunked().
+ * Returns SUCCESS, FAILURE for a malformed size or extension, or LIMIT_EXCEEDED on overflow. */
 clm_int clm_http_utils_parse_chunk_size(const char* line, size_t length, size_t* out_size);
+
+/** Validates one chunked trailer field line (without the CRLF): header syntax, and not a
+ * field that must not appear in a trailer (Content-Length, Transfer-Encoding, Host...).
+ * Returns SUCCESS or FAILURE. */
+clm_int clm_http_utils_validate_trailer(const char* line, size_t length);
 
 /** Reads Content-Length; an absent header yields 0. Returns SUCCESS, FAILURE for a value
  * that is empty or not all digits, or LIMIT_EXCEEDED when it does not fit in size_t. */

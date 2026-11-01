@@ -34,7 +34,7 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
-#include <threads.h>
+#include "thread.h"
 
 typedef struct clm_private_dispatch_handler {
     clm_id id;
@@ -329,4 +329,3 @@ clm_dispatch_status clm_dispatch_caught(
     return clm_private_dispatch_dispatch(CLM_DISPATCH_EXCEPTION, message_id,
         message, result, log, parent);
 }
-

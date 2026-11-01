@@ -32,7 +32,7 @@
 #include "managed.h"
 
 #include <string.h>
-#include <threads.h>
+#include "thread.h"
 #include <time.h>
 
 static once_flag clm_private_managed_once = ONCE_FLAG_INIT;
@@ -469,4 +469,3 @@ void clm_managed_destroy(void){
     memset(&clm_private_managed_stats, 0, sizeof clm_private_managed_stats);
     mtx_unlock(&clm_private_managed_lock);
 }
-

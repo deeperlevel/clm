@@ -27,6 +27,25 @@ Each worker owns a scheduler and can admit tasks until its configured task limit
 
 Workers execute callbacks. An ordinary blocking callback still occupies its worker, even when scheduled through the pool. For many active idle connections, event-driven I/O that yields until readiness is more scalable than blocking read loops in each worker.
 
+## C threading portability
+
+The CMake build checks whether the compiler and runtime provide C11
+`<threads.h>`. If not (for example, on macOS or older MinGW runtimes), it
+fetches a pinned, zlib-licensed TinyCThread implementation backed by POSIX
+threads (including MinGW's winpthreads). Configuration fails explicitly if
+neither native C11 threads nor POSIX threads are available. The legacy
+TinyCThread Win32 backend is not used. Its original license notice is retained in the
+downloaded sources. Network access is required for the initial dependency fetch.
+
+CLM modules and tests include `clm/thread.h` rather than `<threads.h>` directly.
+The library and C examples share the detection in
+[`ClmThreads.cmake`](../src/c/cmake/ClmThreads.cmake).
+Link consumers to the `clm` CMake target so its threading headers, backend
+definition, and link dependencies remain consistent. Non-CMake builds without
+native C11 threads must also compile TinyCThread and define
+`CLM_USE_TINYCTHREAD`, `_TTHREAD_PLATFORM_DEFINED_`, and `_TTHREAD_POSIX_`
+consistently for the library and all consumers, and link POSIX threads.
+
 ## Shared behavioral contract
 
 - CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.

@@ -20,7 +20,7 @@ HTTP/1.x utilities for message parsing, serialization, chunked transfer coding a
 
 `clm_http_utils` handles the textual HTTP/1.x message representation, not the server socket lifecycle. Requests and responses have distinct start lines and header collections. Its parsing functions identify framing such as no body, a declared body length, chunked transfer or connection-close-delimited content where applicable.
 
-The module also provides chunked body decoding and encoding and case-insensitive header comparisons. Parsing and serialization errors must be distinguishable from incomplete incoming data.
+The module also provides chunked body decoding and encoding and case-insensitive header comparisons. Parsing and serialization errors must be distinguishable from incomplete incoming data. Chunk framing is strict: lines end in CRLF (bare LF and stray CR are rejected), chunk extensions must be well formed, and trailer fields must be valid header lines that are not framing or routing fields (Content-Length, Transfer-Encoding, Host and similar). `clm_http_utils_parse_chunk_size` and `clm_http_utils_validate_trailer` expose these checks so incremental decoders such as the `clm_net_web` request-body reader apply the identical rules as the buffered decoder.
 
 Use [clm_net_web](clm_net_web.md) for serving routes and [clm_net](clm_net.md) for raw transport.
 

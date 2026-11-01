@@ -40,7 +40,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include <threads.h>
+#include "clm/thread.h"
 #include "clm/base.h"
 #include "clm/channel.h"
 

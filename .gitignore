@@ -227,3 +227,5 @@ __marimo__/
 /src/ruby/.idea
 /examples/hello-clm/c/.idea
 /examples/web-server/c/.idea
+/src/c/cmake
+/src/c/cmake/*.cmake

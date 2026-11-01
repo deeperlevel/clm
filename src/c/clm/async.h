@@ -34,6 +34,7 @@
 #include "base.h"
 #include <stdbool.h>
 #include <stdatomic.h>
+#include <stddef.h>
 
 /* Return codes are shared by async.h and async_pool.h. */
 #define CLM_ASYNC_OPERATION_SUCCESS 0

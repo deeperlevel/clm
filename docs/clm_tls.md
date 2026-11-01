@@ -17,6 +17,12 @@ TLS-encrypted client/server sessions layered over connected TCP sockets.
 
 A TLS client opens a session on an already connected TCP socket and verifies the peer identity using the requested server name. A server opens a session with configured certificate material. After handshaking, reads return decrypted data and writes accept plaintext for encryption.
 
+## Nonblocking mode
+
+`clm_tls_client_new`/`clm_tls_server_new` create a session without handshaking; the `*_open` functions are the same plus a blocking handshake. After `clm_tls_set_nonblocking(session, true)`, `clm_tls_handshake`, `clm_tls_read` and `clm_tls_write` never wait: they return `CLM_TLS_WANT_READ` or `CLM_TLS_WANT_WRITE` and the caller retries once the socket is ready for that event (the handshake can need either, and so can reads and writes). A write that returns success only means the bytes were accepted; encrypted bytes the socket has not taken yet stay queued in the session until `clm_tls_flush` returns success. On WANT_* nothing was consumed or accepted. Closing a nonblocking session sends `close_notify` once, best effort, and never waits.
+
+`insecure_skip_verify` (client only) disables certificate and name checks. It exists for tests against throwaway certificates and must not be used for real traffic.
+
 ## Closure and ownership
 
 - An authenticated TLS `close_notify` is distinct from an unclean transport EOF, which is reported as truncated.

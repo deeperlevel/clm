@@ -50,7 +50,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <threads.h>
+#include "thread.h"
 
 #ifdef _WIN32
 #ifndef _WIN32_WINNT

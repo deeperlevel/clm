@@ -14,10 +14,10 @@ target_include_directories(main PRIVATE
 )
 
 # Threading support where required by CLM.
-find_package(Threads REQUIRED)
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../../../src/c/cmake/ClmThreads.cmake")
 
 target_link_libraries(main PRIVATE
-    Threads::Threads
+    clm_threads
 )
 
 # Windows socket library.

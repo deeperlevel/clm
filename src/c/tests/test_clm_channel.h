@@ -3,7 +3,7 @@
 #include "test.h"
 #include "../clm/channel.h"
 
-#include <threads.h>
+#include "../clm/thread.h"
 
 typedef struct clm_channel_test_send_args {
 	clm_id channel_id;

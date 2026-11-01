@@ -4,7 +4,7 @@
 #include "../clm/async_pool.h"
 
 #include <stdatomic.h>
-#include <threads.h>
+#include "../clm/thread.h"
 
 static clm_id clm_async_test_scheduler_id;
 static int clm_async_test_steps[16];

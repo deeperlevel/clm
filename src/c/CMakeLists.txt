@@ -117,7 +117,7 @@ add_executable(main
     tests/test_clm_net.h
 )
 
-find_package(Threads REQUIRED)
+include(cmake/ClmThreads.cmake)
 file(GLOB CLM_C_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/clm/*.c")
 
 # Vendored compressors. Brotli's headers are included as <brotli/...> but ship flat.
@@ -146,13 +146,13 @@ add_library(clm STATIC ${CLM_C_SOURCES} clm/ext/freehash.c ${CLM_VENDOR_SOURCES}
 target_include_directories(clm PRIVATE "${CLM_VENDOR_INCLUDE}")
 target_compile_definitions(clm PRIVATE MINIZ_NO_ZLIB_COMPATIBLE_NAMES)
 target_include_directories(clm PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(clm PUBLIC uriparser::uriparser Threads::Threads)
+target_link_libraries(clm PUBLIC uriparser::uriparser clm_threads)
 
 target_link_libraries(main PRIVATE clm)
 include(CTest)
 add_test(NAME clm COMMAND main)
 if(WIN32)
-    target_link_libraries(clm PUBLIC bcrypt normaliz secur32 crypt32)
+    target_link_libraries(clm PUBLIC bcrypt ncrypt normaliz secur32 crypt32 ws2_32)
 else()
     find_package(OpenSSL REQUIRED)
     target_link_libraries(clm PUBLIC OpenSSL::SSL OpenSSL::Crypto)

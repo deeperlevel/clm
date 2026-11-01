@@ -309,6 +309,18 @@ static int clm_http_utils_tests(void)
                    clm_http_utils_parse_chunk_size("fffffffffffffffffffff", 21, &chunk_size) ==
                        CLM_HTTP_UTILS_LIMIT_EXCEEDED,
                "parse chunk sizes with extensions, bad digits and overflow");
+    CLM_ASSERT(clm_http_utils_parse_chunk_size("5;a=\"b\"", 7, &chunk_size) == CLM_HTTP_UTILS_SUCCESS &&
+                   clm_http_utils_parse_chunk_size("5;", 2, &chunk_size) == CLM_HTTP_UTILS_FAILURE &&
+                   clm_http_utils_parse_chunk_size("5;a=\"b", 6, &chunk_size) == CLM_HTTP_UTILS_FAILURE &&
+                   clm_http_utils_parse_chunk_size("5;a=b\x01", 6, &chunk_size) == CLM_HTTP_UTILS_FAILURE &&
+                   clm_http_utils_parse_chunk_size("5 junk", 6, &chunk_size) == CLM_HTTP_UTILS_FAILURE,
+               "reject malformed chunk extensions");
+    CLM_ASSERT(clm_http_utils_validate_trailer("X-Sum: 1", 8) == CLM_HTTP_UTILS_SUCCESS &&
+                   clm_http_utils_validate_trailer("Content-Length: 5", 17) == CLM_HTTP_UTILS_FAILURE &&
+                   clm_http_utils_validate_trailer("transfer-encoding: chunked", 26) == CLM_HTTP_UTILS_FAILURE &&
+                   clm_http_utils_validate_trailer("no colon here", 13) == CLM_HTTP_UTILS_FAILURE &&
+                   clm_http_utils_validate_trailer(NULL, 0) == CLM_HTTP_UTILS_INVALID_ARGUMENT,
+               "validate chunked trailer lines");
 
     clm_http_utils_header manual[1] = {{{"Content-Length", 14}, {"42", 2}}};
     clm_http_utils_message_init(&message, CLM_HTTP_UTILS_REQUEST);

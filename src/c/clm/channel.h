@@ -36,7 +36,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdatomic.h>
-#include <threads.h>
+#include "thread.h"
 #include <time.h>
 
 /* --------------------------------------------------------------------------

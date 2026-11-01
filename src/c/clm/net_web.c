@@ -3,7 +3,7 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
-#include <threads.h>
+#include "thread.h"
 #include <time.h>
 #ifdef _WIN32
 #include <windows.h>
@@ -320,10 +320,58 @@ static const char* web_input_data(const clm_bytes_buffer* input)
     return input->storage ? (const char*)input->storage + input->offset : "";
 }
 
-/* TLS has no nonblocking mode, so async routes over TLS keep waiting in place. */
+/* Nonblocking handler I/O applies to TLS too: the TLS session is always nonblocking, and
+ * WANT_READ/WANT_WRITE map onto the same park/suspend events as a socket that would block. */
 static bool web_nonblocking(const clm_net_web_connection* connection)
 {
-    return connection->nonblocking && !connection->tls;
+    return connection->nonblocking;
+}
+
+static unsigned int web_tls_event(clm_int status)
+{
+    return status == CLM_TLS_WANT_WRITE ? CLM_NET_EVENT_WRITE : CLM_NET_EVENT_READ;
+}
+
+/* One transport write. SUCCESS means *written (> 0) bytes were accepted, AGAIN means
+ * the transport needs *event first, anything else is fatal. Over TLS, accepted bytes
+ * may still sit encrypted in the session until web_transport_flush() succeeds. */
+static clm_int web_transport_send(clm_net_web_connection* connection, const void* data,
+                                  size_t length, size_t* written, unsigned int* event)
+{
+    *written = 0;
+    if (connection->tls) {
+        clm_int status = clm_tls_write(connection->tls, data, length, written);
+        if (status == CLM_TLS_SUCCESS && *written)
+            return CLM_NET_WEB_SUCCESS;
+        if (status == CLM_TLS_WANT_READ || status == CLM_TLS_WANT_WRITE) {
+            *event = web_tls_event(status);
+            return CLM_NET_WEB_AGAIN;
+        }
+        return CLM_NET_WEB_SYSTEM_ERROR;
+    }
+    clm_net_status status = clm_net_send(connection->socket_id, data, length, written);
+    if (status == CLM_NET_SUCCESS && *written)
+        return CLM_NET_WEB_SUCCESS;
+    if (status == CLM_NET_WOULD_BLOCK) {
+        *event = CLM_NET_EVENT_WRITE;
+        return CLM_NET_WEB_AGAIN;
+    }
+    return CLM_NET_WEB_SYSTEM_ERROR;
+}
+
+/* Pushes ciphertext the TLS session is still holding; a no-op for plain sockets. */
+static clm_int web_transport_flush(clm_net_web_connection* connection, unsigned int* event)
+{
+    if (!connection->tls)
+        return CLM_NET_WEB_SUCCESS;
+    clm_int status = clm_tls_flush(connection->tls);
+    if (status == CLM_TLS_SUCCESS)
+        return CLM_NET_WEB_SUCCESS;
+    if (status == CLM_TLS_WANT_READ || status == CLM_TLS_WANT_WRITE) {
+        *event = web_tls_event(status);
+        return CLM_NET_WEB_AGAIN;
+    }
+    return CLM_NET_WEB_SYSTEM_ERROR;
 }
 
 /* Appends to the connection's output queue, preserving order with anything queued. */
@@ -359,21 +407,31 @@ static clm_int web_out_append(clm_net_web_connection* connection, const void* da
  * buffer is freed), AGAIN if the socket would block, or SYSTEM_ERROR. */
 static clm_int web_out_drain(clm_net_web_connection* connection)
 {
+    unsigned int event = 0;
     while (connection->out_offset < connection->out_length) {
         size_t written = 0;
-        clm_net_status status = clm_net_send(connection->socket_id,
+        clm_int status = web_transport_send(connection,
             connection->out_data + connection->out_offset,
-            connection->out_length - connection->out_offset, &written);
-        if (status == CLM_NET_SUCCESS && written) {
+            connection->out_length - connection->out_offset, &written, &event);
+        if (status == CLM_NET_WEB_SUCCESS) {
             connection->out_offset += written;
             continue;
         }
-        if (status == CLM_NET_WOULD_BLOCK) {
-            connection->async_events |= CLM_NET_EVENT_WRITE;
+        if (status == CLM_NET_WEB_AGAIN) {
+            connection->async_events |= event;
             return CLM_NET_WEB_AGAIN;
         }
         atomic_store_explicit(&connection->cancelled, true, memory_order_release);
         return CLM_NET_WEB_SYSTEM_ERROR;
+    }
+    clm_int flushed = web_transport_flush(connection, &event);
+    if (flushed == CLM_NET_WEB_AGAIN) {
+        connection->async_events |= event;
+        return CLM_NET_WEB_AGAIN;
+    }
+    if (flushed != CLM_NET_WEB_SUCCESS) {
+        atomic_store_explicit(&connection->cancelled, true, memory_order_release);
+        return flushed;
     }
     free(connection->out_data);
     connection->out_data = NULL;
@@ -385,12 +443,24 @@ static clm_int web_receive(clm_net_web_connection* connection, void* buffer,
                            size_t capacity, size_t* received)
 {
     if (connection->tls) {
-        clm_int status = clm_tls_read(connection->tls, buffer, capacity, received);
-        if (status == CLM_TLS_SUCCESS)
-            return CLM_NET_WEB_SUCCESS;
-        if (status == CLM_TLS_CLOSED)
-            return CLM_NET_WEB_NOT_FOUND;
-        return status == CLM_TLS_NO_MEMORY ? CLM_NET_WEB_NO_MEMORY : CLM_NET_WEB_SYSTEM_ERROR;
+        for (;;) {
+            clm_int status = clm_tls_read(connection->tls, buffer, capacity, received);
+            if (status == CLM_TLS_SUCCESS)
+                return CLM_NET_WEB_SUCCESS;
+            if (status == CLM_TLS_CLOSED)
+                return CLM_NET_WEB_NOT_FOUND;
+            if (status != CLM_TLS_WANT_READ && status != CLM_TLS_WANT_WRITE)
+                return status == CLM_TLS_NO_MEMORY ? CLM_NET_WEB_NO_MEMORY
+                                                   : CLM_NET_WEB_SYSTEM_ERROR;
+            unsigned int event = web_tls_event(status);
+            if (connection->nonblocking) {
+                connection->async_events |= event;
+                return CLM_NET_WEB_AGAIN;
+            }
+            clm_int wait_status = web_wait(connection, event);
+            if (wait_status != CLM_NET_WEB_SUCCESS)
+                return wait_status;
+        }
     }
     for (;;) {
         clm_net_status status = clm_net_receive(connection->socket_id, buffer, capacity, received);
@@ -425,36 +495,41 @@ static clm_int web_send(clm_net_web_connection* connection, const void* data,
     const unsigned char* bytes = data;
     size_t offset = 0;
     while (offset < length) {
-        if (connection->tls) {
-            size_t written = 0;
-            clm_int status = clm_tls_write(connection->tls, bytes + offset,
-                length - offset, &written);
-            if (status != CLM_TLS_SUCCESS || written == 0) {
-                atomic_store_explicit(&connection->cancelled, true, memory_order_release);
-                return CLM_NET_WEB_SYSTEM_ERROR;
-            }
-            offset += written;
-            continue;
-        }
         size_t written = 0;
-        clm_net_status status = clm_net_send(connection->socket_id,
-            bytes + offset, length - offset, &written);
-        if (status == CLM_NET_SUCCESS && written) {
+        unsigned int event = 0;
+        clm_int status = web_transport_send(connection, bytes + offset, length - offset,
+            &written, &event);
+        if (status == CLM_NET_WEB_SUCCESS) {
             offset += written;
             continue;
         }
-        if (status != CLM_NET_WOULD_BLOCK) {
+        if (status != CLM_NET_WEB_AGAIN) {
             atomic_store_explicit(&connection->cancelled, true, memory_order_release);
             return CLM_NET_WEB_SYSTEM_ERROR;
         }
-        clm_int wait_status = web_wait(connection, CLM_NET_EVENT_WRITE);
+        clm_int wait_status = web_wait(connection, event);
         if (wait_status != CLM_NET_WEB_SUCCESS) {
             if (wait_status != CLM_NET_WEB_BUSY)
                 atomic_store_explicit(&connection->cancelled, true, memory_order_release);
             return wait_status;
         }
     }
-    return CLM_NET_WEB_SUCCESS;
+    for (;;) {
+        unsigned int event = 0;
+        clm_int status = web_transport_flush(connection, &event);
+        if (status == CLM_NET_WEB_SUCCESS)
+            return CLM_NET_WEB_SUCCESS;
+        if (status != CLM_NET_WEB_AGAIN) {
+            atomic_store_explicit(&connection->cancelled, true, memory_order_release);
+            return CLM_NET_WEB_SYSTEM_ERROR;
+        }
+        clm_int wait_status = web_wait(connection, event);
+        if (wait_status != CLM_NET_WEB_SUCCESS) {
+            if (wait_status != CLM_NET_WEB_BUSY)
+                atomic_store_explicit(&connection->cancelled, true, memory_order_release);
+            return wait_status;
+        }
+    }
 }
 
 static clm_int web_stream_write(clm_stream_sink* sink, const void* data,
@@ -731,9 +806,10 @@ static clm_int web_reader_fill(clm_net_web_body_reader* reader, size_t max_bytes
     return CLM_NET_WEB_SUCCESS;
 }
 
-/* Reads one CRLF- or LF-terminated line into reader->line without its terminator.
- * Progress is kept in the reader, so AGAIN can be returned mid-line and the call
- * repeated later. */
+/* Reads one CRLF-terminated line into reader->line without its terminator. A bare LF
+ * or a CR anywhere but directly before the LF is rejected: lenient framing here would
+ * disagree with a stricter proxy and enable request smuggling. Progress is kept in the
+ * reader, so AGAIN can be returned mid-line and the call repeated later. */
 static clm_int web_chunk_read_line(clm_net_web_body_reader* reader, size_t* out_length)
 {
     for (;;) {
@@ -746,12 +822,15 @@ static clm_int web_chunk_read_line(clm_net_web_body_reader* reader, size_t* out_
             return CLM_NET_WEB_SYSTEM_ERROR;
         if (c == '\n') {
             size_t length = reader->line_length;
-            if (length && reader->line[length - 1] == '\r')
-                --length;
+            if (!length || reader->line[length - 1] != '\r')
+                return CLM_NET_WEB_INVALID_ARGUMENT;
+            --length;
             reader->line_length = 0;
             *out_length = length;
             return CLM_NET_WEB_SUCCESS;
         }
+        if (reader->line_length && reader->line[reader->line_length - 1] == '\r')
+            return CLM_NET_WEB_INVALID_ARGUMENT;
         if (reader->line_length >= sizeof(reader->line))
             return CLM_NET_WEB_LIMIT_EXCEEDED;
         reader->line[reader->line_length++] = c;
@@ -825,6 +904,8 @@ static clm_int web_chunked_read(clm_net_web_body_reader* reader,
             reader->trailer_bytes += length;
             if (reader->trailer_bytes > WEB_CHUNK_TRAILER_LIMIT)
                 return CLM_NET_WEB_LIMIT_EXCEEDED;
+            if (clm_http_utils_validate_trailer(reader->line, length) != CLM_HTTP_UTILS_SUCCESS)
+                return CLM_NET_WEB_INVALID_ARGUMENT;
             break;
         case WEB_CHUNK_DONE:
             *out_read = 0;
@@ -1316,36 +1397,23 @@ static clm_int web_send_response(clm_net_web_connection* connection,
             }
         }
     }
-    if (response->allow_park && !connection->tls) {
+    if (response->allow_park) {
+        /* Send what the transport accepts now; the rest stays queued so no worker waits
+         * on a slow reader. The queue takes ownership of the wire buffer. */
         if (connection->out_data) {
             /* Earlier output (e.g. 100-continue) is still queued; keep the wire order. */
             clm_int queued = web_out_append(connection, wire, wire_length);
             free(wire);
-            return queued == CLM_NET_WEB_SUCCESS ? WEB_SEND_PENDING : queued;
-        }
-        /* Send what the socket accepts now; queue the rest so no worker waits on a slow reader. */
-        size_t offset = 0;
-        while (offset < wire_length) {
-            size_t written = 0;
-            clm_net_status net_status = clm_net_send(connection->socket_id,
-                wire + offset, wire_length - offset, &written);
-            if (net_status == CLM_NET_SUCCESS && written) {
-                offset += written;
-                continue;
-            }
-            if (net_status != CLM_NET_WOULD_BLOCK) {
-                atomic_store_explicit(&connection->cancelled, true, memory_order_release);
-                free(wire);
-                return CLM_NET_WEB_SYSTEM_ERROR;
-            }
+            if (queued != CLM_NET_WEB_SUCCESS)
+                return queued;
+        } else {
             connection->out_data = (unsigned char*)wire;
             connection->out_length = wire_length;
-            connection->out_offset = offset;
+            connection->out_offset = 0;
             connection->out_capacity = wire_length;
-            return WEB_SEND_PENDING;
         }
-        free(wire);
-        return CLM_NET_WEB_SUCCESS;
+        clm_int drained = web_out_drain(connection);
+        return drained == CLM_NET_WEB_AGAIN ? WEB_SEND_PENDING : drained;
     }
     clm_int send_status = web_send_view(connection,
         (clm_bytes_view){(const unsigned char*)wire, wire_length});
@@ -1837,6 +1905,9 @@ static clm_async_step_result web_connection_step(clm_id task_id, clm_id context_
         WEB_TIMEOUT_NONE, memory_order_acq_rel);
     if (timeout_kind == WEB_TIMEOUT_WRITE)
         return CLM_ASYNC_STEP_COMPLETE;
+    /* A stalled handshake is simply dropped: nothing may be written in plaintext on a TLS port. */
+    if (timeout_kind != WEB_TIMEOUT_NONE && connection->tls && !connection->tls_ready)
+        return CLM_ASYNC_STEP_COMPLETE;
     if (connection->exchange) {
         if (timeout_kind == WEB_TIMEOUT_READ) {
             /* The peer stalled while an async handler waited for body data. */
@@ -1856,21 +1927,34 @@ static clm_async_step_result web_connection_step(clm_id task_id, clm_id context_
         return CLM_ASYNC_STEP_COMPLETE;
     }
     if (!connection->tls_ready && server->certificate_file) {
-        unsigned int events = 0;
-        clm_net_status ready = clm_net_wait(connection->socket_id,
-            CLM_NET_EVENT_READ, 0, &events);
-        if (ready == CLM_NET_TIMEOUT) {
-            web_connection_park(connection, CLM_NET_EVENT_READ, WEB_TIMEOUT_IDLE,
-                connection->last_activity_ms + server->config.idle_timeout_ms);
+        if (!connection->tls) {
+            unsigned int events = 0;
+            clm_net_status ready = clm_net_wait(connection->socket_id,
+                CLM_NET_EVENT_READ, 0, &events);
+            if (ready == CLM_NET_TIMEOUT) {
+                web_connection_park(connection, CLM_NET_EVENT_READ, WEB_TIMEOUT_IDLE,
+                    connection->last_activity_ms + server->config.idle_timeout_ms);
+                return CLM_ASYNC_STEP_WAIT;
+            }
+            if (ready != CLM_NET_SUCCESS || !(events & CLM_NET_EVENT_READ))
+                return CLM_ASYNC_STEP_FAIL;
+            if (clm_tls_server_new(connection->socket_id, &server->tls_options,
+                    &connection->tls) != CLM_TLS_SUCCESS)
+                return CLM_ASYNC_STEP_FAIL;
+            (void)clm_tls_set_nonblocking(connection->tls, true);
+        }
+        /* Each step advances the handshake as far as the socket allows, then parks on
+         * whatever it needs next, so a slow client never holds a worker. */
+        clm_int tls_status = clm_tls_handshake(connection->tls);
+        if (tls_status == CLM_TLS_WANT_READ || tls_status == CLM_TLS_WANT_WRITE) {
+            web_connection_park(connection, web_tls_event(tls_status), WEB_TIMEOUT_READ,
+                web_now_ms() + server->config.read_timeout_ms);
             return CLM_ASYNC_STEP_WAIT;
         }
-        if (ready != CLM_NET_SUCCESS || !(events & CLM_NET_EVENT_READ))
-            return CLM_ASYNC_STEP_FAIL;
-        clm_int tls_status = clm_tls_server_open(connection->socket_id,
-            &server->tls_options, &connection->tls);
         if (tls_status != CLM_TLS_SUCCESS)
             return CLM_ASYNC_STEP_FAIL;
         connection->tls_ready = true;
+        connection->last_activity_ms = web_now_ms();
     }
 
     clm_http_utils_message header_message;
@@ -2065,12 +2149,29 @@ static clm_async_step_result web_connection_read_more(clm_net_web_connection* co
         return CLM_ASYNC_STEP_COMPLETE;
     }
     size_t received = 0;
-    clm_net_status status = clm_net_receive(connection->socket_id, tail, free_space, &received);
+    clm_net_status status;
+    unsigned int wait_event = CLM_NET_EVENT_READ;
+    if (connection->tls) {
+        /* Map TLS results onto the socket vocabulary used below. */
+        clm_int tls_status = clm_tls_read(connection->tls, tail, free_space, &received);
+        if (tls_status == CLM_TLS_SUCCESS) {
+            status = CLM_NET_SUCCESS;
+        } else if (tls_status == CLM_TLS_WANT_READ || tls_status == CLM_TLS_WANT_WRITE) {
+            status = CLM_NET_WOULD_BLOCK;
+            wait_event = web_tls_event(tls_status);
+        } else if (tls_status == CLM_TLS_CLOSED) {
+            status = CLM_NET_CLOSED;
+        } else {
+            status = CLM_NET_ERROR_SYSTEM;
+        }
+    } else {
+        status = clm_net_receive(connection->socket_id, tail, free_space, &received);
+    }
     if (status == CLM_NET_WOULD_BLOCK) {
         int kind = connection->input.length == 0 ? WEB_TIMEOUT_IDLE : WEB_TIMEOUT_READ;
         uint32_t timeout_ms = kind == WEB_TIMEOUT_IDLE
             ? server->config.idle_timeout_ms : server->config.read_timeout_ms;
-        web_connection_park(connection, CLM_NET_EVENT_READ, kind,
+        web_connection_park(connection, wait_event, kind,
             connection->last_activity_ms + timeout_ms);
         return CLM_ASYNC_STEP_WAIT;
     }

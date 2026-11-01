@@ -34,7 +34,7 @@
 #include "async.h"
 #include <stdbool.h>
 #include <stdatomic.h>
-#include <threads.h>
+#include "thread.h"
 
 /** Placement policy when no worker is accepting new tasks. */
 typedef enum clm_async_overflow_policy

@@ -11,8 +11,8 @@ get_filename_component(CLM_SOURCE_ROOT
     "${CMAKE_CURRENT_LIST_DIR}/../../../../src/c" ABSOLUTE)
 target_include_directories(main PRIVATE "${CLM_SOURCE_ROOT}")
 
-find_package(Threads REQUIRED)
-target_link_libraries(main PRIVATE Threads::Threads)
+include("${CLM_SOURCE_ROOT}/cmake/ClmThreads.cmake")
+target_link_libraries(main PRIVATE clm_threads)
 if(WIN32)
     target_link_libraries(main PRIVATE ws2_32)
 endif()

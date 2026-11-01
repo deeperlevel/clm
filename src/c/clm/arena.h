@@ -40,6 +40,7 @@
 
 #include "base.h"
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define CLM_ARENA_SUCCESS ((clm_int)0)

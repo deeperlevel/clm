@@ -936,7 +936,18 @@ clm_int clm_http_utils_parse_chunk_size(const char* line, const size_t length, s
         size = (size << 4) | (size_t)value;
     }
     if (!digits) return HTTP_UTILS_FAIL;
+    if (!http_utils_chunk_extensions(line, digits, length)) return HTTP_UTILS_FAIL;
     *out_size = size;
+    return HTTP_UTILS_OK;
+}
+
+clm_int clm_http_utils_validate_trailer(const char* line, const size_t length)
+{
+    if (line == NULL) return CLM_HTTP_UTILS_INVALID_ARGUMENT;
+    clm_http_utils_header trailer;
+    if (http_utils_parse_header_line(line, length, &trailer) != HTTP_UTILS_OK ||
+        http_utils_forbidden_trailer(trailer.name))
+        return HTTP_UTILS_FAIL;
     return HTTP_UTILS_OK;
 }
 

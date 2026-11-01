@@ -31,10 +31,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define CLM_NET_WEB_SUCCESS ((clm_int)0)
 #define CLM_NET_WEB_NOT_FOUND ((clm_int)1)
 #define CLM_NET_WEB_INVALID_ARGUMENT ((clm_int)-1)
@@ -170,7 +166,8 @@ clm_int clm_net_web_route_add(
  *  - Middleware runs once, before the first call. Rolling read/write timeouts
  *    apply while parked: a stalled read yields 408 (or a close once the response
  *    is committed), a stalled write closes the connection.
- * Over TLS the I/O calls may still wait, because clm_tls has no nonblocking mode.
+ * Over TLS these calls are nonblocking as well: the session is nonblocking, and
+ * WANT_READ/WANT_WRITE park the connection like a socket that would block.
  * If the handler does not consume the whole request body, only the bytes already
  * received are discarded and the connection is closed after the response. */
 clm_int clm_net_web_route_add_async(
@@ -256,7 +253,3 @@ clm_int clm_net_web_response_render_template(
     clm_net_web_response* response, const clm_template* tmpl,
     const clm_template_context* context,
     const clm_template_options* options, clm_template_error* error);
-
-#ifdef __cplusplus
-}
-#endif

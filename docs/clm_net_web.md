@@ -27,11 +27,11 @@ The application initializes server configuration, creates a server, adds routes 
 
 ## Async routes
 
-`clm_net_web_route_add_async` registers a resumable handler. On a plain (non-TLS) connection, `clm_net_web_request_read_body` and `clm_net_web_response_flush` never wait on the peer. They return `CLM_NET_WEB_AGAIN` instead, and the handler returns `CLM_NET_WEB_AGAIN` to release its worker. The reactor re-invokes the handler from the top once the socket is ready, so progress must be kept in the request context (`clm_net_web_context_set/get`), not in locals. Middleware runs once, and read/write timeouts apply per stall. A stalled read gets a 408. Ordinary routes keep the blocking behavior and the `max_streaming_connections` cap.
+`clm_net_web_route_add_async` registers a resumable handler. On a plain or TLS connection, `clm_net_web_request_read_body` and `clm_net_web_response_flush` never wait on the peer. They return `CLM_NET_WEB_AGAIN` instead, and the handler returns `CLM_NET_WEB_AGAIN` to release its worker. The reactor re-invokes the handler from the top once the socket is ready, so progress must be kept in the request context (`clm_net_web_context_set/get`), not in locals. Middleware runs once, and read/write timeouts apply per stall. A stalled read gets a 408. Ordinary routes keep the blocking behavior and the `max_streaming_connections` cap.
 
 ## Present protocol limits
 
-The server speaks **HTTP/1.1** with a reactor and a worker pool. Idle connections, slow request bodies, and slow response writes are parked and do not hold workers. Ordinary (synchronous) handlers that read or flush a body still block their worker, and async routes do not yet make TLS connections nonblocking. HTTP/2, QUIC/HTTP/3 and production-grade reverse proxy behavior are future work, not promises of the current API.
+The server speaks **HTTP/1.1** with a reactor and a worker pool. Idle connections, slow request bodies, and slow response writes are parked and do not hold workers. Ordinary (synchronous) handlers that read or flush a body still block their worker. The TLS handshake and TLS I/O are nonblocking and park like plain sockets. HTTP/2, QUIC/HTTP/3 and production-grade reverse proxy behavior are future work, not promises of the current API.
 
 ## Shared behavioral contract
 

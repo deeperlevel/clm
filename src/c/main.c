@@ -115,6 +115,7 @@ int main(void)
     clm_net_web_tests();
     clm_net_web_reactor_scale_tests();
     clm_net_web_async_tests();
+    clm_net_web_tls_tests();
     clm_overall_test_summary("CLM Tests Summary");
 
     const int files_closed = clm_file_shutdown();

@@ -495,6 +495,32 @@ static int clm_net_web_tests(void)
     (void)clm_net_socket_close(bad_chunk_id);
     CLM_ASSERT(bad_chunk_ok, "reject a malformed chunk size while streaming");
 
+    /* Framing a stricter proxy would reject must be rejected here too. */
+    static const char* const smuggle_bodies[] = {
+        "3\nabc\r\n0\r\n\r\n",
+        "3\r\nabc\r\n0\n\n",
+        "3\r\r\nabc\r\n0\r\n\r\n",
+        "3;bad ext\r\nabc\r\n0\r\n\r\n",
+        "3\r\nabc\r\n0\r\nContent-Length: 0\r\n\r\n",
+        "3\r\nabc\r\n0\r\nnot a field\r\n\r\n",
+    };
+    bool smuggle_ok = live_ok;
+    for (size_t i = 0; smuggle_ok && i < sizeof(smuggle_bodies) / sizeof(smuggle_bodies[0]); ++i) {
+        char smuggle_request[512];
+        snprintf(smuggle_request, sizeof(smuggle_request),
+            "POST /upload HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n"
+            "Connection: close\r\n\r\n%s", smuggle_bodies[i]);
+        const clm_id smuggle_id = 98960 + (clm_id)i;
+        smuggle_ok = clm_net_web_test_open(smuggle_id, &bound_address, smuggle_request);
+        if (smuggle_ok) {
+            clm_net_web_test_read_all(smuggle_id, edge, sizeof(edge), 2000);
+            smuggle_ok = strstr(edge, "HTTP/1.1 400 Bad Request\r\n") != NULL;
+        }
+        (void)clm_net_socket_close(smuggle_id);
+    }
+    CLM_ASSERT(smuggle_ok,
+               "reject bare LF, stray CR, bad extensions and invalid trailers while streaming");
+
     const clm_id big_chunk_id = 98948;
     bool big_chunk_ok = live_ok && clm_net_web_test_open(big_chunk_id, &bound_address,
         "POST /upload HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n"
@@ -989,6 +1015,18 @@ static int clm_net_web_async_tests(void)
         "serve a small body through an async route");
     (void)clm_net_socket_close(sink_id);
 
+    /* 5b. Strict chunk framing also applies when the decode resumes after a stall. */
+    const clm_id strict_id = 99307;
+    bool strict_open = ok && clm_net_web_test_open(strict_id, &bound_address,
+        "POST /sink HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n"
+        "Connection: close\r\n\r\n3\r\nabc\r\n");
+    clm_net_wait(strict_id, CLM_NET_EVENT_READ, 200, &(unsigned int){0});
+    bool strict_rest = strict_open && clm_net_web_test_send_all(strict_id, "0\n\n", 3);
+    length = strict_rest ? clm_net_web_test_read_all(strict_id, tiny, sizeof(tiny), 2000) : 0;
+    CLM_ASSERT(strict_rest && !strstr(tiny, "200 OK") && !strstr(tiny, "got "),
+        "reject a bare-LF chunk terminator after an async decode resumed");
+    (void)clm_net_socket_close(strict_id);
+
     /* 6. Stopping with a handler still suspended must not hang or leak it. */
     const clm_id parked_id = 99306;
     bool parked_open = ok && clm_net_web_test_open(parked_id, &bound_address,
@@ -1004,6 +1042,190 @@ static int clm_net_web_async_tests(void)
     free(response);
     clm_net_web_server_destroy(server);
     (void)clm_net_finalize();
+    clm_test_summary(result.passed, result.failed);
+    return result.failed == 0;
+}
+
+/* Blocking TLS client for the HTTPS tests. */
+typedef struct {
+    clm_id id;
+    clm_tls_session* tls;
+} clm_net_web_test_tls_client;
+
+static bool clm_net_web_test_tls_open(clm_net_web_test_tls_client* client, clm_id id,
+                                      const clm_net_address* address, const char* request)
+{
+    clm_tls_options options = {0};
+    options.timeout_ms = 5000;
+    options.insecure_skip_verify = true;
+    client->id = id;
+    client->tls = NULL;
+    if (clm_net_socket_create(id, CLM_NET_IPV4, CLM_NET_TCP) != CLM_NET_SUCCESS ||
+        clm_net_connect(id, address) != CLM_NET_SUCCESS ||
+        clm_tls_client_open(id, "localhost", &options, &client->tls) != CLM_TLS_SUCCESS)
+        return false;
+    size_t length = strlen(request), offset = 0;
+    while (offset < length) {
+        size_t written = 0;
+        if (clm_tls_write(client->tls, request + offset, length - offset, &written) !=
+                CLM_TLS_SUCCESS)
+            return false;
+        offset += written;
+    }
+    return true;
+}
+
+static bool clm_net_web_test_tls_send(clm_net_web_test_tls_client* client,
+                                      const void* data, size_t length)
+{
+    const char* bytes = data;
+    size_t offset = 0;
+    while (offset < length) {
+        size_t written = 0;
+        if (clm_tls_write(client->tls, bytes + offset, length - offset, &written) !=
+                CLM_TLS_SUCCESS)
+            return false;
+        offset += written;
+    }
+    return true;
+}
+
+/* Reads until the server closes (the requests send Connection: close) or a read fails. */
+static size_t clm_net_web_test_tls_read_all(clm_net_web_test_tls_client* client,
+                                            char* buffer, size_t capacity)
+{
+    size_t total = 0;
+    while (total + 1 < capacity) {
+        size_t received = 0;
+        if (clm_tls_read(client->tls, buffer + total, capacity - 1 - total, &received) !=
+                CLM_TLS_SUCCESS)
+            break;
+        total += received;
+    }
+    buffer[total] = '\0';
+    return total;
+}
+
+static void clm_net_web_test_tls_close(clm_net_web_test_tls_client* client)
+{
+    if (client->tls)
+        (void)clm_tls_close(client->tls);
+    client->tls = NULL;
+    (void)clm_net_socket_close(client->id);
+}
+
+/* HTTPS: the handshake, stalled uploads and stalled downloads must park instead of
+ * holding the only worker, exactly as they do over plain HTTP. */
+static int clm_net_web_tls_tests(void)
+{
+    clm_test_result result = {0};
+    clm_test_begin("CLM - Net Web TLS");
+
+    clm_tls_test_credentials credentials;
+    bool have_credentials = clm_tls_test_credentials_create(&credentials);
+    clm_net_web_config config;
+    clm_net_web_config_init(&config);
+    config.worker_count = 1;
+    config.read_timeout_ms = 1500;
+    config.write_timeout_ms = 8000;
+    config.idle_timeout_ms = 4000;
+    config.tls = &credentials.options;
+    clm_net_web_server* server = NULL;
+    clm_net_address listen_address;
+    clm_net_address bound_address;
+    int user_context = 1;
+    bool ok = have_credentials && clm_net_initialize() == CLM_NET_SUCCESS &&
+        clm_net_web_server_create(&config, &server) == CLM_NET_WEB_SUCCESS &&
+        clm_net_web_route_add(server, "GET", "/hello/:name", clm_net_web_test_handler,
+            &user_context) == CLM_NET_WEB_SUCCESS &&
+        clm_net_web_route_add_async(server, "POST", "/echo", clm_net_web_test_async_echo,
+            NULL) == CLM_NET_WEB_SUCCESS &&
+        clm_net_web_route_add_async(server, "GET", "/flood", clm_net_web_test_async_flood,
+            NULL) == CLM_NET_WEB_SUCCESS &&
+        clm_net_address_parse("127.0.0.1", 0, &listen_address) == CLM_NET_SUCCESS &&
+        clm_net_web_server_start(server, &listen_address) == CLM_NET_WEB_SUCCESS &&
+        clm_net_web_server_local_address(server, &bound_address) == CLM_NET_WEB_SUCCESS;
+    CLM_ASSERT(ok, "start a single-worker HTTPS server");
+
+    enum { BODY = 150000, OTHER_ID = 99410 };
+    char* body = malloc(BODY);
+    char* response = malloc(BODY * 2);
+    char tiny[1024];
+    ok = ok && body && response;
+    if (body)
+        memset(body, 'a', BODY);
+    clm_net_web_test_tls_client client = {0}, other = {0};
+
+    bool opened = ok && clm_net_web_test_tls_open(&client, 99411, &bound_address,
+        "GET /hello/tls HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+    size_t length = opened ? clm_net_web_test_tls_read_all(&client, tiny, sizeof(tiny)) : 0;
+    CLM_ASSERT(opened && length && strstr(tiny, "200 OK") && strstr(tiny, "tls"),
+        "serve a request over TLS");
+    clm_net_web_test_tls_close(&client);
+
+    /* A client that connects and never handshakes must not hold the worker. */
+    clm_id idle_id = 99412;
+    bool idle = ok && clm_net_socket_create(idle_id, CLM_NET_IPV4, CLM_NET_TCP) == CLM_NET_SUCCESS &&
+        clm_net_connect(idle_id, &bound_address) == CLM_NET_SUCCESS &&
+        clm_net_send(idle_id, "\x16\x03\x01", 3, &(size_t){0}) == CLM_NET_SUCCESS;
+    uint64_t started = clm_net_web_test_now_ms();
+    opened = idle && clm_net_web_test_tls_open(&other, OTHER_ID, &bound_address,
+        "GET /hello/past HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+    length = opened ? clm_net_web_test_tls_read_all(&other, tiny, sizeof(tiny)) : 0;
+    CLM_ASSERT(opened && strstr(tiny, "past") && clm_net_web_test_now_ms() - started < 1000,
+        "serve a request while another client stalls mid-handshake");
+    clm_net_web_test_tls_close(&other);
+    (void)clm_net_socket_close(idle_id);
+
+    /* Stalled upload over TLS. */
+    bool upload = ok && clm_net_web_test_tls_open(&client, 99413, &bound_address,
+        "POST /echo HTTP/1.1\r\nHost: x\r\nContent-Length: 150000\r\nConnection: close\r\n\r\n") &&
+        clm_net_web_test_tls_send(&client, body, 80000);
+    started = clm_net_web_test_now_ms();
+    opened = upload && clm_net_web_test_tls_open(&other, OTHER_ID, &bound_address,
+        "GET /hello/other HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+    length = opened ? clm_net_web_test_tls_read_all(&other, tiny, sizeof(tiny)) : 0;
+    CLM_ASSERT(opened && strstr(tiny, "other") && clm_net_web_test_now_ms() - started < 1000,
+        "serve another TLS request on the only worker while an upload is stalled");
+    clm_net_web_test_tls_close(&other);
+    bool rest = upload && clm_net_web_test_tls_send(&client, body, BODY - 80000);
+    length = rest ? clm_net_web_test_tls_read_all(&client, response, BODY * 2) : 0;
+    CLM_ASSERT(rest && strstr(response, "200 OK") && length > BODY &&
+            strstr(response + length - 5, "0\r\n\r\n"),
+        "resume the TLS upload and stream the whole echoed body");
+    clm_net_web_test_tls_close(&client);
+
+    /* Stalled download over TLS: the client reads nothing while the server floods. */
+    bool flood = ok && clm_net_web_test_tls_open(&client, 99414, &bound_address,
+        "GET /flood HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+    clm_net_wait(99414, CLM_NET_EVENT_READ, 300, &(unsigned int){0});
+    started = clm_net_web_test_now_ms();
+    opened = flood && clm_net_web_test_tls_open(&other, OTHER_ID, &bound_address,
+        "GET /hello/third HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+    length = opened ? clm_net_web_test_tls_read_all(&other, tiny, sizeof(tiny)) : 0;
+    CLM_ASSERT(opened && strstr(tiny, "third") && clm_net_web_test_now_ms() - started < 1000,
+        "serve another TLS request while a download is blocked on a slow reader");
+    clm_net_web_test_tls_close(&other);
+    size_t downloaded = 0;
+    static char sink[65536];
+    for (; flood;) {
+        size_t received = 0;
+        if (clm_tls_read(client.tls, sink, sizeof(sink), &received) != CLM_TLS_SUCCESS)
+            break;
+        downloaded += received;
+    }
+    CLM_ASSERT(downloaded > 64u * 65536u && downloaded < 64u * 65536u + 4096,
+        "deliver the entire TLS download once the reader resumes");
+    clm_net_web_test_tls_close(&client);
+
+    free(body);
+    free(response);
+    if (server) {
+        (void)clm_net_web_server_stop(server);
+        clm_net_web_server_destroy(server);
+    }
+    (void)clm_net_finalize();
+    clm_tls_test_credentials_remove(&credentials);
     clm_test_summary(result.passed, result.failed);
     return result.failed == 0;
 }
