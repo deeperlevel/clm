@@ -1032,6 +1032,13 @@ clm_net_status clm_net_socket_peer_address(
     return clm_net_private_get_address(socket_id, true, out_address);
 }
 
+static int clm_net_private_compare_ids(const void* left, const void* right)
+{
+    clm_id a = *(const clm_id*)left;
+    clm_id b = *(const clm_id*)right;
+    return (a > b) - (a < b);
+}
+
 clm_net_status clm_net_poll(
     clm_net_poll_entry* entries,
     size_t count, 
@@ -1058,12 +1065,6 @@ clm_net_status clm_net_poll(
             status = CLM_NET_ERROR_INVALID_ARGUMENT;
             break;
         }
-        for (size_t earlier = 0; earlier < index; ++earlier) {
-            if (entries[index].socket_id == entries[earlier].socket_id) {
-                status = CLM_NET_ERROR_INVALID_ARGUMENT;
-                break;
-            }
-        }
         if (status != CLM_NET_SUCCESS) {
             break;
         }
@@ -1071,6 +1072,25 @@ clm_net_status clm_net_poll(
         if (held[index] == NULL) {
             status = CLM_NET_ERROR_NOT_FOUND;
             break;
+        }
+    }
+    if (status == CLM_NET_SUCCESS && count > 1) {
+        /* O(n log n) duplicate detection on a sorted copy of the socket ids. */
+        clm_id* ids = (clm_id*)malloc(count * sizeof(*ids));
+        if (ids == NULL) {
+            status = CLM_NET_ERROR_SYSTEM;
+        } else {
+            for (size_t index = 0; index < count; ++index) {
+                ids[index] = entries[index].socket_id;
+            }
+            qsort(ids, count, sizeof(*ids), clm_net_private_compare_ids);
+            for (size_t index = 1; index < count; ++index) {
+                if (ids[index] == ids[index - 1]) {
+                    status = CLM_NET_ERROR_INVALID_ARGUMENT;
+                    break;
+                }
+            }
+            free(ids);
         }
     }
     unsigned int* ready_flags = NULL;

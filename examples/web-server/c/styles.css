@@ -40,3 +40,22 @@
     footer a { color: #235edb; text-decoration: none; }
     footer a:hover { text-decoration: underline; }
     @media (max-width: 760px) { .page { padding: 26px 18px 45px; } header { margin-bottom: 60px; } .cards { grid-template-columns: 1fr; } .card { min-height: auto; } .bottom { grid-template-columns: 1fr; } .signal { margin-bottom: 48px; } footer { margin-top: 48px; } }
+/* Tutorial extension: the live area is rendered by clm_template on every GET. */
+.live { margin-top: 38px; background: #fff; border: 1px solid #dce4f0; border-radius: 16px; padding: 26px; box-shadow: 0 7px 30px rgba(25,52,91,.035); }
+.live-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
+.live-heading h2 { margin: 8px 0 9px; color: #182b50; font-size: 1.8rem; }
+.live-heading p { margin: 0; color: #657188; font-size: .89rem; line-height: 1.7; max-width: 570px; }
+.live-kicker { color: #2c60c7; font-size: .72rem; font-weight: 800; letter-spacing: .09em; }
+.live-badge { background: #e9f2ff; color: #2454a2; border-radius: 999px; padding: 9px 13px; font-size: .79rem; font-weight: 700; white-space: nowrap; }
+.greeting-form { margin-top: 25px; padding-top: 22px; border-top: 1px solid #e5ebf3; }
+.greeting-form label { font-weight: 700; font-size: .85rem; display: block; margin-bottom: 10px; }
+.greeting-row { display: flex; gap: 10px; }
+.greeting-row input { flex: 1; min-width: 0; border: 1px solid #cad7e6; border-radius: 9px; background: #fff; color: #1b2a41; font: inherit; padding: 12px 14px; }
+.greeting-row input:focus { outline: 2px solid #96b9ff; outline-offset: 2px; }
+.greeting-row button { border: 0; border-radius: 9px; background: #225dd4; padding: 12px 19px; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.greeting-row button:hover { background: #174dbb; }
+.form-help { color: #718099; font-size: .79rem; margin: 10px 0 0; }
+.signal { margin: 22px 0 60px; }
+.signal div { min-width: 0; }
+.signal code { overflow-wrap: anywhere; }
+@media (max-width: 560px) { .greeting-row { flex-direction: column; } .greeting-row button { width: 100%; } .live { padding: 18px; } }

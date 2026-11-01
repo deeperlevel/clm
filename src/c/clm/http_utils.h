@@ -31,7 +31,7 @@
  * =============================================================================
  */
 
-/* HTTP/1.x message parser and serializer (RFC 9112 framing).
+/* HTTP/1.x utilities: message parsing, serialization and chunked coding (RFC 9112 framing).
  *
  * Parsing is zero-copy and allocation-free: a parsed message holds spans that
  * point into the input and header entries stored in caller-owned memory. The
@@ -53,66 +53,68 @@
 extern "C" {
 #endif
 
-#define CLM_STRING_HTTPP_SUCCESS ((clm_int)0)
+#define CLM_HTTP_UTILS_SUCCESS ((clm_int)0)
 /** More input is needed; retry with more bytes. */
-#define CLM_STRING_HTTPP_INCOMPLETE ((clm_int)1)
+#define CLM_HTTP_UTILS_INCOMPLETE ((clm_int)1)
 /** Malformed or unsafe message, or a message that cannot be serialized. */
-#define CLM_STRING_HTTPP_FAILURE ((clm_int)-1)
-#define CLM_STRING_HTTPP_INVALID_ARGUMENT ((clm_int)-2)
+#define CLM_HTTP_UTILS_FAILURE ((clm_int)-1)
+#define CLM_HTTP_UTILS_INVALID_ARGUMENT ((clm_int)-2)
 /** Output capacity is too small; the required size is still reported. */
-#define CLM_STRING_HTTPP_BUFFER_TOO_SMALL ((clm_int)-3)
+#define CLM_HTTP_UTILS_BUFFER_TOO_SMALL ((clm_int)-3)
 /** The message has more header fields than the supplied storage can hold. */
-#define CLM_STRING_HTTPP_TOO_MANY_HEADERS ((clm_int)-4)
+#define CLM_HTTP_UTILS_TOO_MANY_HEADERS ((clm_int)-4)
+/** A numeric field does not fit in size_t. */
+#define CLM_HTTP_UTILS_LIMIT_EXCEEDED ((clm_int)-5)
 
 /** Borrowed, not NUL-terminated bytes; data may be NULL only when length is 0. */
 typedef struct {
     const char* data;
     size_t length;
-} clm_string_httpp_span;
+} clm_http_utils_span;
 
 typedef enum {
-    CLM_STRING_HTTPP_REQUEST = 1,
-    CLM_STRING_HTTPP_RESPONSE = 2
-} clm_string_httpp_kind;
+    CLM_HTTP_UTILS_REQUEST = 1,
+    CLM_HTTP_UTILS_RESPONSE = 2
+} clm_http_utils_kind;
 
 /** How the body of a message is framed. */
 typedef enum {
     /** No body. */
-    CLM_STRING_HTTPP_BODY_NONE = 0,
+    CLM_HTTP_UTILS_BODY_NONE = 0,
     /** body holds exactly Content-Length bytes. */
-    CLM_STRING_HTTPP_BODY_LENGTH,
+    CLM_HTTP_UTILS_BODY_LENGTH,
     /** body holds the raw chunked encoding, including terminator and trailers. */
-    CLM_STRING_HTTPP_BODY_CHUNKED,
+    CLM_HTTP_UTILS_BODY_CHUNKED,
     /** Response only: body is every remaining input byte; the end is the close. */
-    CLM_STRING_HTTPP_BODY_UNTIL_CLOSE
-} clm_string_httpp_body_kind;
+    CLM_HTTP_UTILS_BODY_UNTIL_CLOSE
+} clm_http_utils_body_kind;
 
 typedef struct {
-    clm_string_httpp_span name;
-    clm_string_httpp_span value;
-} clm_string_httpp_header;
+    clm_http_utils_span name;
+    clm_http_utils_span value;
+} clm_http_utils_header;
 
 /** Parsed or to-be-serialized message. Header names keep their original case. */
 typedef struct {
-    clm_string_httpp_kind kind;
+    clm_http_utils_kind kind;
     /** Request only. */
-    clm_string_httpp_span method;
-    clm_string_httpp_span target;
+    clm_http_utils_span method;
+    clm_http_utils_span target;
     /** Response only; reason may be empty. */
     clm_uint status;
-    clm_string_httpp_span reason;
+    clm_http_utils_span reason;
     clm_uint version_major;
     clm_uint version_minor;
     /** Caller-owned storage; header_count entries are valid in order. */
-    clm_string_httpp_header* headers;
+    clm_http_utils_header* headers;
     size_t header_count;
     size_t header_capacity;
-    clm_string_httpp_body_kind body_kind;
-    clm_string_httpp_span body;
+    clm_http_utils_body_kind body_kind;
+    clm_http_utils_span body;
     /** Parse only: input bytes used by this message, including a skipped
      * leading empty line; the next pipelined message starts after them. */
     size_t consumed;
-} clm_string_httpp_message;
+} clm_http_utils_message;
 
 /** Zeroes a message for building and sets HTTP/1.1. Responses default to
  * status 200 and BODY_LENGTH with an empty body, so serialization adds
@@ -122,8 +124,8 @@ typedef struct {
  * @param kind Request or response.
  * @return SUCCESS, or INVALID_ARGUMENT for NULL or an unknown kind.
  */
-clm_int clm_string_httpp_message_init(
-    clm_string_httpp_message* message, clm_string_httpp_kind kind);
+clm_int clm_http_utils_message_init(
+    clm_http_utils_message* message, clm_http_utils_kind kind);
 
 /** Parses one request from the start of data.
  * Leading empty lines are skipped. HTTP/1.1 requires exactly one Host field.
@@ -137,22 +139,31 @@ clm_int clm_string_httpp_message_init(
  *        the result is SUCCESS.
  * @return SUCCESS, INCOMPLETE, FAILURE, TOO_MANY_HEADERS, or INVALID_ARGUMENT.
  */
-clm_int clm_string_httpp_parse_request(
+clm_int clm_http_utils_parse_request(
     const char* data, size_t length,
-    clm_string_httpp_header* headers, size_t header_capacity,
-    clm_string_httpp_message* out);
+    clm_http_utils_header* headers, size_t header_capacity,
+    clm_http_utils_message* out);
+
+/** Parses and validates a request line and complete header section without
+ * waiting for the framed body. body is empty and consumed is the header byte
+ * count; the same strict framing/smuggling checks as parse_request apply.
+ */
+clm_int clm_http_utils_parse_request_headers(
+    const char* data, size_t length,
+    clm_http_utils_header* headers, size_t header_capacity,
+    clm_http_utils_message* out);
 
 /** Parses one response from the start of data.
  * No body for HEAD responses, 1xx, 204 and 304. Otherwise framing is
  * chunked, Content-Length, or until close. Until-close returns INCOMPLETE
- * until the caller signals EOF using clm_string_httpp_parse_response_ex.
+ * until the caller signals EOF using clm_http_utils_parse_response_ex.
  * @param head_request True when answering a HEAD request.
- * @return Same codes as clm_string_httpp_parse_request.
+ * @return Same codes as clm_http_utils_parse_request.
  */
-clm_int clm_string_httpp_parse_response(
+clm_int clm_http_utils_parse_response(
     const char* data, size_t length, bool head_request,
-    clm_string_httpp_header* headers, size_t header_capacity,
-    clm_string_httpp_message* out);
+    clm_http_utils_header* headers, size_t header_capacity,
+    clm_http_utils_message* out);
 
 /** Parse a response with the request method and connection state supplied.
  * @param head_request True if this responds to a HEAD request.
@@ -164,45 +175,45 @@ clm_int clm_string_httpp_parse_response(
  * @return SUCCESS for a complete response; INCOMPLETE if more data/EOF is
  *         required; FAILURE for malformed or truncated input.
  */
-clm_int clm_string_httpp_parse_response_ex(
+clm_int clm_http_utils_parse_response_ex(
     const char* data, size_t length,
     bool head_request, bool connect_request, bool input_closed,
-    clm_string_httpp_header* headers, size_t header_capacity,
-    clm_string_httpp_message* out);
+    clm_http_utils_header* headers, size_t header_capacity,
+    clm_http_utils_message* out);
 
 /** Parses a request from a CLM string block; spans point into the block. */
-clm_int clm_string_httpp_loads_request(
+clm_int clm_http_utils_loads_request(
     clm_id source_id,
-    clm_string_httpp_header* headers, size_t header_capacity,
-    clm_string_httpp_message* out);
+    clm_http_utils_header* headers, size_t header_capacity,
+    clm_http_utils_message* out);
 
 /** Parses a response from a CLM string block; spans point into the block. */
-clm_int clm_string_httpp_loads_response(
+clm_int clm_http_utils_loads_response(
     clm_id source_id, bool head_request,
-    clm_string_httpp_header* headers, size_t header_capacity,
-    clm_string_httpp_message* out);
+    clm_http_utils_header* headers, size_t header_capacity,
+    clm_http_utils_message* out);
 
 /** Like loads_response, but also supplies CONNECT context and input EOF state. */
-clm_int clm_string_httpp_loads_response_ex(
+clm_int clm_http_utils_loads_response_ex(
     clm_id source_id,
     bool head_request, bool connect_request, bool input_closed,
-    clm_string_httpp_header* headers, size_t header_capacity,
-    clm_string_httpp_message* out);
+    clm_http_utils_header* headers, size_t header_capacity,
+    clm_http_utils_message* out);
 
 /** Finds the first header whose name equals name, ignoring ASCII case.
  * @return true and sets value when found.
  */
-bool clm_string_httpp_find_header(
-    const clm_string_httpp_message* message, const char* name,
-    clm_string_httpp_span* value);
+bool clm_http_utils_find_header(
+    const clm_http_utils_message* message, const char* name,
+    clm_http_utils_span* value);
 
 /** Compares a span with a NUL-terminated string byte for byte. */
-bool clm_string_httpp_span_equals(
-    clm_string_httpp_span span, const char* text);
+bool clm_http_utils_span_equals(
+    clm_http_utils_span span, const char* text);
 
 /** Compares a span with a NUL-terminated string, ignoring ASCII case. */
-bool clm_string_httpp_span_equals_ignore_case(
-    clm_string_httpp_span span, const char* text);
+bool clm_http_utils_span_equals_ignore_case(
+    clm_http_utils_span span, const char* text);
 
 /** Serializes a message as HTTP/1.x text with CRLF line endings.
  * Validates tokens, status, version and field values (no CR, LF or NUL), so
@@ -216,16 +227,16 @@ bool clm_string_httpp_span_equals_ignore_case(
  * @return SUCCESS, FAILURE for an invalid message, BUFFER_TOO_SMALL (dest is
  *         unchanged), or INVALID_ARGUMENT.
  */
-clm_int clm_string_httpp_serialize(
-    const clm_string_httpp_message* message,
+clm_int clm_http_utils_serialize(
+    const clm_http_utils_message* message,
     char* dest, size_t capacity, size_t* required);
 
 /** Serializes into an existing CLM string block.
  * Fails when the result is not valid UTF-8 or the body holds a NUL byte.
  * @return SUCCESS, FAILURE, or INVALID_ARGUMENT for a missing/non-string block.
  */
-clm_int clm_string_httpp_dumps(
-    const clm_string_httpp_message* message, clm_id destination_id);
+clm_int clm_http_utils_dumps(
+    const clm_http_utils_message* message, clm_id destination_id);
 
 /** Decodes a chunked body, validating extensions and trailer field syntax.
  * Framing-sensitive trailer fields are rejected; allowed trailers are skipped.
@@ -235,7 +246,7 @@ clm_int clm_string_httpp_dumps(
  * @return SUCCESS, INCOMPLETE, FAILURE, BUFFER_TOO_SMALL, or INVALID_ARGUMENT.
  *         BUFFER_TOO_SMALL leaves dest unchanged.
  */
-clm_int clm_string_httpp_decode_chunked(
+clm_int clm_http_utils_decode_chunked(
     const char* data, size_t length,
     char* dest, size_t capacity,
     size_t* out_length, size_t* out_consumed);
@@ -244,9 +255,40 @@ clm_int clm_string_httpp_decode_chunked(
  * @param required Receives the exact output size; no NUL is appended.
  * @return SUCCESS, BUFFER_TOO_SMALL (dest unchanged), or INVALID_ARGUMENT.
  */
-clm_int clm_string_httpp_encode_chunked(
+clm_int clm_http_utils_encode_chunked(
     const void* data, size_t length,
     char* dest, size_t capacity, size_t* required);
+
+/** True when name is a non-empty RFC 9110 token, i.e. a valid header or method name. */
+bool clm_http_utils_is_token(const char* name);
+
+/** Case-insensitively looks for token in a comma-separated list value such as Connection
+ * or Accept-Encoding. Parameters are ignored except q=0, which marks the token as refused. */
+bool clm_http_utils_header_has_token(clm_http_utils_span value, const char* token);
+
+/** Standard reason phrase for a status code; "Status" for codes without one. */
+const char* clm_http_utils_reason_phrase(clm_uint status);
+
+/** Writes the current time as an IMF-fixdate (for example "Sun, 06 Nov 1994 08:49:37 GMT").
+ * Returns false when capacity is too small (at least 30 bytes are needed). */
+bool clm_http_utils_format_date(char* out, size_t capacity);
+
+/** Parses the hexadecimal size on a chunk-size line (without the CRLF), ignoring any
+ * chunk extension. Returns SUCCESS, FAILURE for a malformed size or LIMIT_EXCEEDED on overflow. */
+clm_int clm_http_utils_parse_chunk_size(const char* line, size_t length, size_t* out_size);
+
+/** Reads Content-Length; an absent header yields 0. Returns SUCCESS, FAILURE for a value
+ * that is empty or not all digits, or LIMIT_EXCEEDED when it does not fit in size_t. */
+clm_int clm_http_utils_content_length(const clm_http_utils_message* message, size_t* out_length);
+
+/** True for an HTTP/1.1 (or later) request carrying "Expect: 100-continue". */
+bool clm_http_utils_expects_continue(const clm_http_utils_message* message);
+
+/** Whether the connection should stay open after this message, per version and Connection. */
+bool clm_http_utils_keep_alive(const clm_http_utils_message* message);
+
+/** The path part of a request target: everything before the first '?' or '#'. */
+clm_http_utils_span clm_http_utils_path_from_target(clm_http_utils_span target);
 
 #ifdef __cplusplus
 }

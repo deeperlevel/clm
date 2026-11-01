@@ -36,7 +36,7 @@
 #include "tests/test_clm_string_toml.h"
 #include "tests/test_clm_string_json.h"
 #include "tests/test_clm_string_yaml.h"
-#include "tests/test_clm_string_httpp.h"
+#include "tests/test_clm_http_utils.h"
 #include "tests/test_clm_bytes.h"
 #include "tests/test_clm_gen.h"
 #include "tests/test_clm_id.h"
@@ -85,7 +85,7 @@ int main(void)
     clm_string_toml_tests();
     clm_string_json_tests();
     clm_string_yaml_tests();
-    clm_string_httpp_tests();
+    clm_http_utils_tests();
     clm_bytes_tests();
     clm_gen_tests();
     clm_id_tests();
@@ -106,12 +106,15 @@ int main(void)
     clm_ua_tests();
     clm_math_tests();
     clm_net_tests();
+    clm_net_poller_tests();
     clm_stream_tests();
     clm_template_tests();
     clm_compress_tests();
     clm_multipart_tests();
     clm_tls_tests();
     clm_net_web_tests();
+    clm_net_web_reactor_scale_tests();
+    clm_net_web_async_tests();
     clm_overall_test_summary("CLM Tests Summary");
 
     const int files_closed = clm_file_shutdown();

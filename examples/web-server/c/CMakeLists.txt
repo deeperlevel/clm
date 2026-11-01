@@ -71,6 +71,15 @@ endif()
 
 target_link_libraries(main PRIVATE clm)
 
+# Place the served files next to main.exe (TARGET_FILE_DIR also handles
+# multi-config generators, where the exe lands in Debug/ or Release/).
+add_custom_command(TARGET main POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/index.html"
+        "${CMAKE_CURRENT_SOURCE_DIR}/styles.css"
+        "$<TARGET_FILE_DIR:main>"
+    VERBATIM)
+
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
     add_custom_command(TARGET main POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E copy_directory

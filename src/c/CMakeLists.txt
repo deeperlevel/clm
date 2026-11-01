@@ -34,7 +34,7 @@ add_executable(main
     clm/string_toml.h
     clm/string_json.h
     clm/string_yaml.h
-    clm/string_httpp.h
+    clm/http_utils.h
     clm/bytes.h
     clm/stream.h
     clm/template.h
@@ -85,7 +85,7 @@ add_executable(main
     tests/test_clm_string_toml.h
     tests/test_clm_string_json.h
     tests/test_clm_string_yaml.h
-    tests/test_clm_string_httpp.h
+    tests/test_clm_http_utils.h
     tests/test_clm_bytes.h
     tests/test_clm_stream.h
     tests/test_clm_template.h

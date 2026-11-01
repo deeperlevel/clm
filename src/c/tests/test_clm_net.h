@@ -414,3 +414,221 @@ static int clm_net_tests(void)
     clm_test_summary(result.passed, result.failed);
     return result.failed != 0;
 }
+
+/* Creates a bound nonblocking loopback UDP socket and reports its endpoint. */
+static int clm_net_poller_test_udp(clm_id socket_id, clm_net_address* address)
+{
+    clm_net_address loopback = {0};
+    return clm_net_socket_create(socket_id, CLM_NET_IPV4, CLM_NET_UDP) ==
+            CLM_NET_SUCCESS &&
+        clm_net_socket_set_nonblocking(socket_id, true) == CLM_NET_SUCCESS &&
+        clm_net_address_parse("127.0.0.1", 0, &loopback) == CLM_NET_SUCCESS &&
+        clm_net_bind(socket_id, &loopback) == CLM_NET_SUCCESS &&
+        clm_net_socket_local_address(socket_id, address) == CLM_NET_SUCCESS;
+}
+
+static int clm_net_poller_test_ping(clm_id sender_id,
+    const clm_net_address* target)
+{
+    size_t sent = 0;
+    return clm_net_send_to(sender_id, target, "x", 1, &sent) ==
+            CLM_NET_SUCCESS && sent == 1;
+}
+
+static int clm_net_poller_tests(void)
+{
+    clm_test_result result = {0};
+    clm_test_begin("CLM - Net poller");
+
+    enum { PEERS = 100 };
+    const clm_id base_id = 87000;
+    const clm_id sender_id = 86999;
+    CLM_ASSERT(clm_net_initialize() == CLM_NET_SUCCESS,
+        "initialize networking for the poller tests");
+
+    clm_net_poller* poller = NULL;
+    size_t count = 99;
+    clm_net_poller_event events[8];
+    CLM_ASSERT(clm_net_poller_create(NULL) == CLM_NET_ERROR_INVALID_ARGUMENT &&
+        clm_net_poller_create(&poller) == CLM_NET_SUCCESS && poller != NULL &&
+        clm_net_poller_count(poller) == 0 &&
+        clm_net_poller_backend() != NULL,
+        "create an empty poller and name its backend");
+    CLM_ASSERT(poller != NULL &&
+        clm_net_poller_wait(poller, events, 8, CLM_NET_WAIT_FOREVER, &count) ==
+            CLM_NET_ERROR_INVALID_ARGUMENT && count == 99 &&
+        clm_net_poller_wait(poller, events, 8, 5, &count) == CLM_NET_TIMEOUT &&
+        count == 0 &&
+        clm_net_poller_wait(poller, events, 0, 5, &count) ==
+            CLM_NET_ERROR_INVALID_ARGUMENT,
+        "reject an unbounded wait on an empty poller and time out otherwise");
+
+    clm_net_address sender_address = {0};
+    clm_net_address addresses[PEERS];
+    int peers_ready = clm_net_poller_test_udp(sender_id, &sender_address);
+    for (int index = 0; index < PEERS; ++index) {
+        peers_ready &= clm_net_poller_test_udp(base_id + (clm_id)index,
+            &addresses[index]);
+    }
+    CLM_ASSERT(peers_ready, "create more UDP sockets than select() can watch");
+
+    int all_registered = poller != NULL && peers_ready;
+    for (int index = 0; all_registered && index < PEERS; ++index) {
+        all_registered = clm_net_poller_set(poller, base_id + (clm_id)index,
+            CLM_NET_EVENT_READ, &addresses[index]) == CLM_NET_SUCCESS;
+    }
+    CLM_ASSERT(all_registered && clm_net_poller_count(poller) == PEERS &&
+        clm_net_poller_set(poller, 86998, CLM_NET_EVENT_READ, NULL) ==
+            CLM_NET_ERROR_NOT_FOUND &&
+        clm_net_poller_set(poller, base_id, 0, NULL) ==
+            CLM_NET_ERROR_INVALID_ARGUMENT &&
+        clm_net_poller_set(poller, base_id, 0x40u, NULL) ==
+            CLM_NET_ERROR_INVALID_ARGUMENT &&
+        clm_net_poller_count(poller) == PEERS,
+        "register 100 sockets and reject unknown sockets and bad interests");
+
+    CLM_ASSERT(all_registered &&
+        clm_net_poller_wait(poller, events, 8, 20, &count) ==
+            CLM_NET_TIMEOUT && count == 0,
+        "report no events while nothing is ready");
+
+    int found = all_registered && clm_net_poller_test_ping(sender_id,
+        &addresses[80]) &&
+        clm_net_poller_wait(poller, events, 8, 1000, &count) ==
+            CLM_NET_SUCCESS && count == 1 &&
+        events[0].socket_id == base_id + 80 &&
+        events[0].user_data == &addresses[80] &&
+        (events[0].revents & CLM_NET_EVENT_READ) != 0;
+    CLM_ASSERT(found,
+        "report only the ready socket among 100 with its user data");
+
+    count = 0;
+    CLM_ASSERT(found &&
+        clm_net_poller_wait(poller, events, 8, 1000, &count) ==
+            CLM_NET_SUCCESS && count == 1 &&
+        events[0].socket_id == base_id + 80,
+        "report an unread socket again on the next wait (level-triggered)");
+
+    char sink[4];
+    size_t received = 0;
+    CLM_ASSERT(found &&
+        clm_net_receive_from(base_id + 80, sink, sizeof(sink), &received,
+            NULL) == CLM_NET_SUCCESS && received == 1 &&
+        clm_net_poller_wait(poller, events, 8, 20, &count) ==
+            CLM_NET_TIMEOUT && count == 0,
+        "stop reporting a socket once its data has been read");
+
+    /* Removing half the sockets exercises hash-table backward-shift deletion;
+     * every survivor must remain reachable and every victim must be silent. */
+    int removed_ok = all_registered;
+    for (int index = 1; removed_ok && index < PEERS; index += 2) {
+        removed_ok = clm_net_poller_remove(poller, base_id + (clm_id)index) ==
+            CLM_NET_SUCCESS;
+    }
+    CLM_ASSERT(removed_ok && clm_net_poller_count(poller) == PEERS / 2 &&
+        clm_net_poller_remove(poller, base_id + 1) == CLM_NET_ERROR_NOT_FOUND,
+        "remove registered sockets and report NOT_FOUND for absent ones");
+
+    int survivors_ok = removed_ok;
+    for (int index = 0; survivors_ok && index < PEERS; index += 2) {
+        survivors_ok = clm_net_poller_test_ping(sender_id, &addresses[index]) &&
+            clm_net_poller_wait(poller, events, 8, 1000, &count) ==
+                CLM_NET_SUCCESS && count == 1 &&
+            events[0].socket_id == base_id + (clm_id)index &&
+            clm_net_receive_from(base_id + (clm_id)index, sink, sizeof(sink),
+                &received, NULL) == CLM_NET_SUCCESS;
+    }
+    CLM_ASSERT(survivors_ok,
+        "keep every surviving socket reachable after other sockets are removed");
+
+    CLM_ASSERT(removed_ok && clm_net_poller_test_ping(sender_id,
+            &addresses[1]) &&
+        clm_net_poller_wait(poller, events, 8, 50, &count) ==
+            CLM_NET_TIMEOUT && count == 0 &&
+        clm_net_receive_from(base_id + 1, sink, sizeof(sink), &received,
+            NULL) == CLM_NET_SUCCESS,
+        "stay silent for a socket that was removed from the poller");
+
+    /* More ready sockets than output slots: nothing is lost across waits. */
+    int limited_ok = removed_ok;
+    for (int index = 0; limited_ok && index < 6; index += 2) {
+        limited_ok = clm_net_poller_test_ping(sender_id, &addresses[index]);
+    }
+    bool seen[3] = {false, false, false};
+    for (int attempt = 0; limited_ok && attempt < 6; ++attempt) {
+        limited_ok = clm_net_poller_wait(poller, events, 2, 1000, &count) ==
+            CLM_NET_SUCCESS && count >= 1 && count <= 2;
+        for (size_t slot = 0; limited_ok && slot < count; ++slot) {
+            clm_id index = events[slot].socket_id - base_id;
+            if (index == 0 || index == 2 || index == 4) {
+                seen[index / 2] = true;
+            }
+        }
+    }
+    CLM_ASSERT(limited_ok && seen[0] && seen[1] && seen[2],
+        "honor a small output capacity without starving any ready socket");
+    for (int index = 0; removed_ok && index < 6; index += 2) {
+        (void)clm_net_receive_from(base_id + (clm_id)index, sink, sizeof(sink),
+            &received, NULL);
+    }
+
+    /* Interest changes and user-data updates on a live registration. */
+    int modified = removed_ok &&
+        clm_net_poller_set(poller, base_id, CLM_NET_EVENT_WRITE, &count) ==
+            CLM_NET_SUCCESS &&
+        clm_net_poller_wait(poller, events, 8, 1000, &count) ==
+            CLM_NET_SUCCESS && count >= 1;
+    bool wrote = false;
+    for (size_t slot = 0; modified && slot < count; ++slot) {
+        wrote |= events[slot].socket_id == base_id &&
+            (events[slot].revents & CLM_NET_EVENT_WRITE) != 0 &&
+            events[slot].user_data == &count;
+    }
+    CLM_ASSERT(modified && wrote,
+        "switch a registration to WRITE interest and replace its user data");
+
+    /* An ID that was closed and recreated maps to a new native socket. */
+    clm_net_address recreated_address = {0};
+    int recreated = removed_ok &&
+        clm_net_poller_set(poller, base_id, CLM_NET_EVENT_READ, NULL) ==
+            CLM_NET_SUCCESS &&
+        clm_net_poller_remove(poller, base_id) == CLM_NET_SUCCESS &&
+        clm_net_poller_set(poller, base_id + 2, CLM_NET_EVENT_READ, NULL) ==
+            CLM_NET_SUCCESS &&
+        clm_net_socket_close(base_id + 2) == CLM_NET_SUCCESS &&
+        clm_net_poller_test_udp(base_id + 2, &recreated_address) &&
+        clm_net_poller_set(poller, base_id + 2, CLM_NET_EVENT_READ, NULL) ==
+            CLM_NET_SUCCESS &&
+        clm_net_poller_test_ping(sender_id, &recreated_address);
+    int recreated_seen = 0;
+    for (int attempt = 0; recreated && attempt < 3 && !recreated_seen;
+         ++attempt) {
+        if (clm_net_poller_wait(poller, events, 8, 1000, &count) ==
+                CLM_NET_SUCCESS) {
+            for (size_t slot = 0; slot < count; ++slot) {
+                recreated_seen |= events[slot].socket_id == base_id + 2 &&
+                    (events[slot].revents & CLM_NET_EVENT_READ) != 0;
+            }
+        }
+    }
+    CLM_ASSERT(recreated && recreated_seen,
+        "re-register a socket ID that was closed and recreated");
+
+    int closed_ok = 1;
+    for (int index = 0; index < PEERS; ++index) {
+        /* Unregistered, registered and already-closed sockets all close. */
+        clm_net_status status = clm_net_socket_close(base_id + (clm_id)index);
+        closed_ok &= status == CLM_NET_SUCCESS ||
+            status == CLM_NET_ERROR_NOT_FOUND;
+    }
+    closed_ok &= clm_net_socket_close(sender_id) == CLM_NET_SUCCESS;
+    CLM_ASSERT(closed_ok, "close sockets that are still registered");
+
+    clm_net_poller_destroy(poller);
+    clm_net_poller_destroy(NULL);
+    CLM_ASSERT(clm_net_finalize() == CLM_NET_SUCCESS,
+        "destroy the poller and finalize networking");
+
+    clm_test_summary(result.passed, result.failed);
+    return result.failed != 0;
+}

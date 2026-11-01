@@ -25,9 +25,13 @@ The application initializes server configuration, creates a server, adds routes 
 - Response helpers set status and headers, write byte/text bodies, redirect clients and render templates.
 - Related modules supply HTTP message parsing, optional compression, multipart handling and TLS sessions.
 
+## Async routes
+
+`clm_net_web_route_add_async` registers a resumable handler. On a plain (non-TLS) connection, `clm_net_web_request_read_body` and `clm_net_web_response_flush` never wait on the peer. They return `CLM_NET_WEB_AGAIN` instead, and the handler returns `CLM_NET_WEB_AGAIN` to release its worker. The reactor re-invokes the handler from the top once the socket is ready, so progress must be kept in the request context (`clm_net_web_context_set/get`), not in locals. Middleware runs once, and read/write timeouts apply per stall. A stalled read gets a 408. Ordinary routes keep the blocking behavior and the `max_streaming_connections` cap.
+
 ## Present protocol limits
 
-The 55-module snapshot provides an **HTTP/1.1 server** with synchronous handler dispatch to a worker pool. Active idle connections can occupy worker capacity. HTTP/2, QUIC/HTTP/3, complete asynchronous request/response streaming and production-grade reverse proxy behavior are future work, not promises of the current API.
+The server speaks **HTTP/1.1** with a reactor and a worker pool. Idle connections, slow request bodies, and slow response writes are parked and do not hold workers. Ordinary (synchronous) handlers that read or flush a body still block their worker, and async routes do not yet make TLS connections nonblocking. HTTP/2, QUIC/HTTP/3 and production-grade reverse proxy behavior are future work, not promises of the current API.
 
 ## Shared behavioral contract
 
@@ -39,7 +43,7 @@ The 55-module snapshot provides an **HTTP/1.1 server** with synchronous handler 
 
 ## Related CLM modules
 
-**Supporting modules:** [clm_async_pool](clm_async_pool.md), [clm_bytes](clm_bytes.md), [clm_compress](clm_compress.md), [clm_multipart](clm_multipart.md), [clm_stream](clm_stream.md), [clm_string_httpp](clm_string_httpp.md), [clm_template](clm_template.md), [clm_tls](clm_tls.md).
+**Supporting modules:** [clm_async_pool](clm_async_pool.md), [clm_bytes](clm_bytes.md), [clm_compress](clm_compress.md), [clm_multipart](clm_multipart.md), [clm_stream](clm_stream.md), [clm_http_utils](clm_http_utils.md) (HTTP/1.x parsing, serialization and chunked coding used for request and response wire handling), [clm_template](clm_template.md), [clm_tls](clm_tls.md).
 
 ## Example use cases
 

@@ -40,13 +40,7 @@
 
 #include "base.h"
 
-#include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #define CLM_ARENA_SUCCESS ((clm_int)0)
 #define CLM_ARENA_FAILURE ((clm_int)-1)
@@ -60,13 +54,13 @@ extern "C" {
 #define CLM_ARENA_DEFAULT_CAPACITY ((size_t)4096)
 
 typedef struct {
-	clm_id id;
-	size_t size;
-	size_t capacity;
-	uint64_t generation;
-	void* data;
-	void* _owner;
-	uint64_t _token;
+    clm_id id;
+    size_t size;
+    size_t capacity;
+    uint64_t generation;
+    void* data;
+    void* _owner;
+    uint64_t _token;
 } clm_arena_borrowed;
 
 /** Creates an empty arena. initial_capacity zero selects the default. */
@@ -81,7 +75,7 @@ clm_int clm_arena_destroy(clm_id id);
  * grow the arena unless it is borrowed.
  */
 clm_int clm_arena_allocate(
-	clm_id id, size_t size, size_t alignment, size_t* out_offset);
+    clm_id id, size_t size, size_t alignment, size_t* out_offset);
 
 /** Grows capacity to at least requested_capacity without changing used size. */
 clm_int clm_arena_reserve(clm_id id, size_t requested_capacity);
@@ -94,7 +88,7 @@ clm_int clm_arena_rewind(clm_id id, size_t offset);
 
 /** Reads the current used size and capacity. Outputs are unchanged on failure. */
 clm_int clm_arena_get_info(
-	clm_id id, size_t* out_size, size_t* out_capacity);
+    clm_id id, size_t* out_size, size_t* out_capacity);
 
 /** Borrows the arena's contiguous storage. Do not copy the lease object.
  * The pointer remains valid until clm_arena_return; arena mutations and destroy
@@ -103,8 +97,3 @@ clm_int clm_arena_borrow(clm_id id, clm_arena_borrowed* out_borrow);
 
 /** Releases a live lease and zeros it. A lease must be returned exactly once. */
 clm_int clm_arena_return(clm_arena_borrowed* borrowed);
-
-#ifdef __cplusplus
-}
-#endif
-

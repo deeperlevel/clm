@@ -1,21 +1,24 @@
-# CLM String Httpp
+# CLM HTTP Utils
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
 ## Purpose
 
-HTTP/1.x wire-message parsing and serialization independent of a particular HTTP server.
+HTTP/1.x utilities for message parsing, serialization, chunked transfer coding and header helpers, independent of a particular HTTP server. [clm_net_web](clm_net_web.md) uses it for request and response wire handling.
 
 ## Capabilities and operations
 
 - Parse request and response start lines, headers and body framing information.
 - Serialize messages and encode/decode chunked transfer bodies.
+- Validate header/method tokens, match tokens in list-valued headers (such as `Connection` or `Accept-Encoding`, honouring `q=0`), and read `Content-Length`.
+- Decide connection reuse (`keep_alive`) and `Expect: 100-continue` handling, parse chunk-size lines, and split a request target into path and query.
+- Provide reason phrases for status codes and format the HTTP `Date` header value.
 - Represent data as borrowed spans or caller-provided storage as documented.
 - Do not confuse HTTP message syntax with full server lifecycle, routing or HTTP/2/3 protocol handling.
 
 ## HTTP message framing
 
-`clm_string_httpp` handles the textual HTTP/1.x message representation, not the server socket lifecycle. Requests and responses have distinct start lines and header collections. The parser identifies framing such as no body, a declared body length, chunked transfer or connection-close-delimited content where applicable.
+`clm_http_utils` handles the textual HTTP/1.x message representation, not the server socket lifecycle. Requests and responses have distinct start lines and header collections. Its parsing functions identify framing such as no body, a declared body length, chunked transfer or connection-close-delimited content where applicable.
 
 The module also provides chunked body decoding and encoding and case-insensitive header comparisons. Parsing and serialization errors must be distinguishable from incomplete incoming data.
 

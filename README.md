@@ -4,17 +4,23 @@
 
 > **Don't start from scratch, bro.**
 
-CLM is a collection of focused, reusable programming modules designed **from the beginning for implementation in multiple programming languages**. It gives framework and library authors common capabilities—such as dependency injection, message dispatching, ID-based storage, and parsing—so they can concentrate on what their own software is supposed to do.
+CLM is a collection of focused, reusable programming modules designed **from the beginning for implementation in multiple programming languages**. It gives library, framework, game, and application authors common foundations—including memory management, collections, asynchronous work, networking, HTTP, parsing, and mathematics—so they can concentrate on what their own software is supposed to do.
 
-CLM is **not** a new standard library, a framework, a runtime, or an attempt to make programming languages identical. Pick the modules you need and leave the rest.
+CLM is **not** a new programming language, a monolithic framework, a mandatory runtime, or an attempt to make programming languages identical. Pick the modules you need and leave the rest.
+
+The current C implementation covers **56 modules**. Each module has its own [documentation](docs/); the module pages describe capability contracts, while language-specific source and headers define concrete APIs and implementation details. The module count describes the current C collection, **not completed ports across every target language**.
 
 ## Why "Cross Language"?
 
 Most libraries are created primarily for one programming language. Porting a framework to another language can therefore mean changing not only its syntax, but also the libraries, infrastructure, and programming patterns behind it.
 
-**Cross Language (CL)** is intentional: CLM modules are designed as reusable *capabilities* with understandable behavior across languages such as **C, C++, Go, D, FreePascal, Odin, and C#**, with room for community-supported implementations in other languages.
+**Cross Language (CL)** is intentional: CLM modules are designed as reusable *capabilities* with recognizable behavior across different programming languages.
 
-A developer familiar with a CLM module in one language should recognize the same concepts when using another implementation. The syntax and internals may differ; the concepts, responsibilities, and documented behavior should remain familiar.
+CLM's **six official implementation targets** are **C, C++, D, Odin, Rust, and Zig**. These are the languages targeted for full, first-party module coverage; this is a support direction, not a claim that all six ports are complete. The current C implementation is the active reference foundation.
+
+Other languages—including **C3, FreePascal, Python, Ruby, Go, C#, and Java**—can have community-supported implementations. To help contributors get started, CLM plans to seed selected languages with a dependency-complete foundational module set rather than requiring a port from nothing. A seed port is **not** the same as a complete official implementation.
+
+A developer familiar with a CLM module in one language should recognize the same concepts when using another implementation. The syntax and internals may differ; the contracts, responsibilities, and documented behavior should remain familiar.
 
 ### Portable concepts, native implementations
 
@@ -26,11 +32,11 @@ CLM avoids **requiring** advanced or language-specific features in its *shared d
 - Inheritance, decorators, annotations, or an object-oriented runtime.
 - A shared memory model or mandatory CLM-wide allocator.
 
-These features are **not forbidden internally**. An implementation can use the best native tools available—native maps and dictionaries, C++ STL containers, Go maps and slices, C structures and function pointers, or C# delegates—provided it preserves the module's documented contract.
+These features are **not forbidden internally**. An implementation can use the best native tools available—C structures and function pointers, C++ STL containers, Rust ownership and standard collections, Zig allocators, or the language's native concurrency facilities—provided it preserves the module's documented contract.
 
-For example, `clm_depend` uses explicit integer service IDs and registered factories rather than relying on constructor reflection. That model works with language-native callables and with ordinary function pointers in C.
+For example, `clm_container` provides explicit, ID-based service registration and resolution without requiring runtime constructor reflection. Language-specific implementations may use different internal collections and call mechanisms without changing that shared model.
 
-**Cross-language does not mean identical source code, identical APIs in every syntactic detail, or automatic binary interoperability.** It means designing modules that can be implemented and understood consistently across languages.
+**Cross-language does not mean identical source code, identical APIs in every syntactic detail, or automatic binary interoperability.** It means designing modules that can be implemented and understood consistently across languages. The C implementation can expose C-linkage headers to C++ consumers, but a **native C++ port** may also use the STL and other C++ facilities internally.
 
 ## Why "Modules"?
 
@@ -73,8 +79,8 @@ CLM is developed incrementally, based on actual use in frameworks and libraries.
 ### Core foundations
 
 - [clm_base](docs/clm_base.md) — Core CLM types, identifiers, constants, and shared conventions.
-- [clm_arena](docs/clm_arena.md) — ID-based growable memory arenas with scoped borrowing.
-- [clm_bpa](docs/clm_bpa.md) — Block Pool Allocation: global ID-addressed typed blocks and arrays, with pool-backed storage.
+- [clm_arena](docs/clm_arena.md) — ID-based growable bump arenas with stable offsets and explicit borrow/return leases.
+- [clm_bpa](docs/clm_bpa.md) — Block Pool Allocation: ID-addressed typed blocks and arrays, with arena-backed small-object slabs.
 - [clm_bytes](docs/clm_bytes.md) — Owned byte buffers, borrowed byte views, inspection and file-related byte helpers.
 - [clm_crypto](docs/clm_crypto.md) — Authenticated encryption, secure random material, and key-related cryptographic operations.
 - [clm_gen](docs/clm_gen.md) — Random value generation and hexadecimal helpers.
@@ -109,8 +115,8 @@ CLM is developed incrementally, based on actual use in frameworks and libraries.
 
 ### Networking and serving
 
-- [clm_net](docs/clm_net.md) — Cross-platform socket/network primitives and readiness waits.
-- [clm_net_web](docs/clm_net_web.md) — HTTP/1.1 server: routes, middleware, body handling, TLS, gzip, templates.
+- [clm_net](docs/clm_net.md) — Cross-platform socket/network primitives, readiness waiting, and polling.
+- [clm_net_web](docs/clm_net_web.md) — HTTP/1.1 server with reactor-assisted connection dispatch, routing, middleware, streaming helpers, TLS, gzip, and templates.
 - [clm_tls](docs/clm_tls.md) — TLS client/server sessions layered over sockets.
 
 ### Text, data formats and web utilities
@@ -120,7 +126,7 @@ CLM is developed incrementally, based on actual use in frameworks and libraries.
 - [clm_string_dsv](docs/clm_string_dsv.md) — Delimited-separated values parsing and writing.
 - [clm_string_env](docs/clm_string_env.md) — .env-format parsing and writing.
 - [clm_string_format](docs/clm_string_format.md) — Reusable parsing/formatting primitives used by structured text formats.
-- [clm_string_httpp](docs/clm_string_httpp.md) — HTTP/1.x message parsing, serialization and chunked-transfer helpers.
+- [clm_http_utils](docs/clm_http_utils.md) — HTTP/1.x utilities: message parsing, serialization, chunked-transfer coding and header helpers (tokens, Content-Length, keep-alive, Expect, reason phrases, Date) used by clm_net_web.
 - [clm_string_ini](docs/clm_string_ini.md) — INI-format parsing and writing.
 - [clm_string_json](docs/clm_string_json.md) — JSON parsing and writing.
 - [clm_string_toml](docs/clm_string_toml.md) — TOML parsing and writing.
@@ -130,23 +136,47 @@ CLM is developed incrementally, based on actual use in frameworks and libraries.
 - [clm_ua](docs/clm_ua.md) — User-agent identification, bot detection and device classification.
 - [clm_url](docs/clm_url.md) — URL/IRI parsing, inspection, component modification and normalization.
 
-**Status note:** This is a project scope and direction, **not a claim that every module or language port is finished**. JSON, YAML, CSV, mapping, and other modules can be developed as consumers require them. Earlier modules or filenames prefixed `cla_` are part of the project's history and should be renamed to `clm_` as they are migrated.
+**Status note:** The links above describe the **56-module C collection** and its language-neutral capability documentation. Features vary by implementation and snapshot; a documented module name does not imply that every language port is complete. Older `cla_` names belong to the project's history and are being migrated to `clm_`.
 
-### A practical composition
+## CLM in practice
 
-A framework such as **SPIder** can use:
+### HTTP services and small websites
+
+`clm_net_web` is an **HTTP programming library**, inspired by the role of Go's `net/http`: it is intended for service endpoints, Web APIs, and lightweight HTML/static content—not as an Nginx or Apache replacement.
+
+The current **HTTP/1.1** implementation includes:
+
+- An HTTP server with method/path routing, named path parameters, and middleware.
+- Request-scoped context and cancellation checks; TLS/HTTPS integration; optional gzip responses; redirects and template rendering.
+- **Reactor-assisted connection dispatch:** idle keep-alive connections park rather than continuously occupying worker execution.
+- Configurable connection limits and separate idle, read, and write timeouts.
+- Incremental **fixed-length request-body reading** via a body-reader API; buffered decoding remains available for chunked and other request bodies.
+- **Streaming HTTP/1.1 chunked responses** through explicit flush and subsequent writes, alongside the existing buffered response path.
+
+This does **not** yet imply incremental chunked *request* decoding, universally nonblocking handler I/O, a complete outbound HTTP client, WebSocket support, or native HTTP/2/HTTP/3. Newer HTTP versions are planned to share the **same `clm_net_web` application-facing handler model** and be enabled through configuration when implemented.
+
+### Example applications
+
+CLM has been exercised through small demonstration applications, including **CLM Hello** (console/data presentation), **CLM Tiny Town** (console simulation), **CLM Console Chat** (networked messaging), and **CLM Web** (a minimal HTTP server). Examples demonstrate module composition; they are not additional CLM modules.
+
+### A practical composition: SPIder
+
+SPIder can build its initial RESTful **SPI (SPIder Programming Interface)** endpoints with CLM's HTTP foundation:
 
 ```text
-SPIder
-  ├── clm_id          readable names → numeric IDs
-  ├── clm_container   registrations and indexed data
-  ├── clm_depend      service construction and lifetimes
-  ├── clm_dispatch    handler registration and dispatch
-  ├── clm_path        filesystem paths
-  └── clm_ua          User-Agent inspection
+SPIder — application/SPIs, validation, built-in service resolution
+  ├── clm_net_web      HTTP/1.1 transport, routes and middleware
+  ├── clm_string_json  JSON requests and responses
+  ├── clm_id           consistent numeric identifiers
+  ├── clm_container    ID-based registrations and resolution
+  ├── clm_async_pool   cooperative worker scheduling
+  ├── clm_path         filesystem path utilities
+  └── clm_ua           optional User-Agent inspection
 ```
 
-SPIder remains responsible for its own HTTP, routing, middleware, and application behavior. CLM owns the reusable modules SPIder would otherwise have to maintain itself. Another framework may choose a completely different subset.
+CLM owns the reusable HTTP and infrastructure capabilities; **SPIder owns the application-level SPI contracts, service orchestration, validation, and framework conventions**. SPIder's tailored built-in service registry need not depend on a separate, more extensive registration library. Other applications can use `clm_net_web` directly without adopting SPIder.
+
+A more specialized web server or proxy could also be built *using* lower-level CLM modules, without requiring `clm_net_web` itself to become a general-purpose Nginx replacement.
 
 ## API philosophy: functions first
 
@@ -170,43 +200,32 @@ The convenience interface delegates to the same implementation; it is not a sepa
 
 Similarly, a handler can be registered with dependency IDs and invoked with those dependencies as arguments, without reflection or OOP machinery. Platform-specific details, error handling, memory ownership, and asynchronous execution must be documented per language where they differ.
 
-## Distribution: include the source
+## Distribution: source-first, with compiled-library options
 
-**CLM is source-first.** Modules are generally intended to be **included directly in the consuming library, framework, or application**, rather than requiring a separately installed CLM runtime or a precompiled CLM library.
+**CLM is source-first**, but it does not require consumers to compile every implementation file themselves. Projects can include selected module sources **or link precompiled distributions** when appropriate. There is **no mandatory CLM-wide runtime**.
 
-The preferred distribution is a **small, self-contained source file** when that is practical. Where a language or platform requires multiple files—for example, platform-specific implementations or C header/source pairs—those files can be distributed together.
+### C implementation
 
-### Bundle only what you use
+The C modules use separate **public `.h` declaration files** and **`.c` implementation files**. Consumers include the public headers and either compile/link the required implementation sources or link precompiled **static libraries (`.a` / `.lib`)**. This avoids requiring `CLM_*_IMPLEMENTATION` single-header switches. Public C headers may use `extern "C"` guards so C++ applications can link the C implementation; a native C++ implementation is free to use its own language facilities.
 
-Suppose a project needs the following modules:
+### Use only what you need
 
-```text
-clm_id
-clm_container
-clm_dispatch
-clm_depend
-clm_console
-```
-
-Rather than shipping five independent CLM modules, the project can **bundle the selected sources into one application-local CLM unit**:
+For example, an application using `clm_id`, `clm_container`, and `clm_string_json` should include those modules **and their actual transitive dependencies**, not the entire collection.
 
 ```text
-my_framework/
-  ├── application source
-  └── CLM bundle    # selected modules bundled together
+my_application/
+  ├── app source
+  ├── selected CLM public headers
+  └── selected CLM sources or linked static libraries
 ```
 
-The application then imports or includes the bundled interfaces using its language's normal mechanisms. Bundling is a **build/distribution step**, not simply concatenating files in arbitrary order. A bundler should resolve inter-module dependencies and ordering, retain required symbols and licenses, and avoid duplicate definitions or initialization side effects. Module imports may need rewriting when sources are merged into one unit.
+Selective bundling may be provided as a build/distribution convenience; it must resolve dependencies, retain required symbols and third-party notices, and avoid duplicate definitions. Bundling is not arbitrary source concatenation.
 
-### Source-first principles
-
-- **No mandatory CLM binary runtime.** Include the implementations your project actually needs.
-- **No forced package-manager dependency** merely to access a small CLM module.
-- **Bundle selectively.** Exclude unused modules instead of distributing the full collection.
-- **Keep native dependencies minimal.** A module may use an established standard library or an explicitly documented optional third-party dependency, such as a YAML parsing library.
-- **Preserve visibility and auditability.** Application developers can inspect, debug, and adapt the included source in accordance with its license.
-
-The CLM source-distribution policy does not imply that *all underlying native or third-party dependencies* are source-only or never compiled. It describes how CLM's own modules are preferably delivered.
+- **No mandatory CLM binary runtime or package manager.** Use CLM in the manner that suits the consuming project.
+- **Keep native dependencies explicit.** A module may rely on native standard facilities or an appropriately licensed third-party implementation.
+- **Keep modules independently usable.** Do not introduce umbrella dependencies merely to simplify distribution.
+- **Preserve ownership rules.** Document allocation, borrowed views, cleanup, concurrency, and error semantics per implementation.
+- **Keep source inspectable.** CLM-authored code is dedicated to the public domain under **CC0 1.0 Universal**; vendored or third-party code retains its own licensing terms.
 
 ## Development approach
 
@@ -219,19 +238,25 @@ A cross-language module should begin with a **small behavioral contract**:
 5. Write conformance tests that exercise the same observable contract across implementations.
 6. Offer language-specific scaffolds so volunteers can implement a module without redesigning it.
 
-**Language support is inclusive, not uniform.** Core contributors can prioritize particular languages while community members contribute implementations for others, including languages with rich standard libraries such as Java and C#.
+**Language support is inclusive, not uniform.** The official language targets define the full-support goal; community languages may begin with complete-feature seed modules and expand through conformance-tested contributions. Mature language standard libraries are welcome as implementation backends rather than obstacles to portability.
 
 ## Scope: what CLM is not
 
 CLM does **not** aim to:
 
-- Replace native console and output facilities merely to make them look alike.
-- Rebuild existing dictionary, vector, map, or memory-management systems when a language already provides suitable facilities.
+- Replace native console or output facilities merely to make them look alike.
+- Rebuild native dictionary, vector, map, or memory-management mechanisms when they already satisfy the module's behavioral contract.
 - Standardize entire language standard libraries.
 - Hide important systems-language ownership and resource-lifetime rules.
 - Require every project to use every module.
 
 CLM **does** aim to provide practical features that library and framework developers would otherwise repeatedly implement on their own.
+
+## Development direction
+
+Current priorities include strengthening HTTP/1.1 interoperability and streaming behavior, an outbound HTTP client/transport, and later **HTTP/2 and HTTP/3 support under `clm_net_web`**. Protocol implementation details can remain separate internally while sharing one handler API. These are **plans**, not features already shipped.
+
+Longer-term module ideas include surfaces, rendering, declarative markup parsing, and renderer-drawn UI widgets (`clm_surface`, `clm_renderer`, `clm_string_tags`, `clm_widget`). They are not included in the 56-module list above.
 
 ## Guiding principle
 

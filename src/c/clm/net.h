@@ -607,3 +607,87 @@ clm_net_status clm_net_wait(
     uint32_t timeout_ms, 
     unsigned int* out_events
 );
+
+/* ==================== Persistent poller ====================
+ *
+ * clm_net_poll() re-describes the whole interest set on every call, so its cost
+ * is O(sockets) per wake-up and, on Windows, it is capped at FD_SETSIZE sockets.
+ * A poller keeps the interest set registered between waits:
+ *   Linux            epoll   - O(ready) per wait, no socket-count cap
+ *   BSD / macOS      kqueue  - O(ready) per wait, no socket-count cap
+ *   Windows / other  WSAPoll / poll over the registered set - no cap, O(n) wait
+ * (IOCP is completion-based, not readiness-based, so it cannot back this API.)
+ *
+ * Semantics are level-triggered on every backend: a socket that is still ready
+ * is reported again by the next wait.
+ *
+ * A poller is NOT thread-safe: use one from a single thread, or serialize calls.
+ * It does not own or pin sockets. Call clm_net_poller_remove() BEFORE closing a
+ * socket; a socket closed while registered is tolerated but may report an ERROR
+ * event until it is removed.
+ */
+
+/** Opaque persistent readiness set. */
+typedef struct clm_net_poller clm_net_poller;
+
+/** One ready socket returned by clm_net_poller_wait(). */
+typedef struct clm_net_poller_event {
+    clm_id socket_id;
+    void* user_data;       /* The pointer given to clm_net_poller_set(). */
+    unsigned int revents;  /* READ, WRITE, HANGUP and/or ERROR. */
+} clm_net_poller_event;
+
+/** Create an empty poller.
+ * @param out_poller Receives the poller; unchanged on failure.
+ * @return SUCCESS or error.
+ */
+clm_net_status clm_net_poller_create(clm_net_poller** out_poller);
+
+/** Destroy a poller. Registered sockets are not closed. NULL is ignored. */
+void clm_net_poller_destroy(clm_net_poller* poller);
+
+/** Name of the readiness backend in use: "epoll", "kqueue", or "poll". */
+const char* clm_net_poller_backend(void);
+
+/** Register a socket, or update the interest and user data of a registered one.
+ * Re-registering after the socket ID was closed and recreated is supported.
+ * @param poller Poller.
+ * @param socket_id Registered socket ID.
+ * @param events Nonzero READ and/or WRITE interest.
+ * @param user_data Opaque pointer returned in events for this socket.
+ * @return SUCCESS, NOT_FOUND for an unknown socket, INVALID_ARGUMENT, or error.
+ */
+clm_net_status clm_net_poller_set(
+    clm_net_poller* poller,
+    clm_id socket_id,
+    unsigned int events,
+    void* user_data
+);
+
+/** Stop watching a socket. Safe after the socket has already been closed.
+ * @return SUCCESS, or NOT_FOUND when the socket is not registered.
+ */
+clm_net_status clm_net_poller_remove(clm_net_poller* poller, clm_id socket_id);
+
+/** Number of sockets currently registered. */
+size_t clm_net_poller_count(const clm_net_poller* poller);
+
+/** Wait for registered sockets to become ready; performs no socket I/O.
+ * Returns at most capacity events. Excess ready sockets are reported by later
+ * waits. TIMEOUT sets out_count to zero, and so can a signal interruption on
+ * POSIX, so callers must recompute their deadline and loop. Waiting forever on
+ * an empty poller is INVALID_ARGUMENT because it could never return.
+ * @param poller Poller.
+ * @param out_events Caller array receiving ready sockets.
+ * @param capacity Length of out_events; must be nonzero.
+ * @param timeout_ms Milliseconds or CLM_NET_WAIT_FOREVER.
+ * @param out_count Number of events written; unchanged on other errors.
+ * @return SUCCESS (out_count > 0), TIMEOUT, or error.
+ */
+clm_net_status clm_net_poller_wait(
+    clm_net_poller* poller,
+    clm_net_poller_event* out_events,
+    size_t capacity,
+    uint32_t timeout_ms,
+    size_t* out_count
+);

@@ -5,7 +5,7 @@
 #include "../clm/file.h"
 #include "../clm/gen.h"
 #include "../clm/net.h"
-#include "../clm/string_httpp.h"
+#include "../clm/http_utils.h"
 
 /* Source that blocks on every other read and then yields at most three bytes. */
 typedef struct {
@@ -190,9 +190,9 @@ static int clm_stream_tests(void)
                "frame each write as one chunk and end with the zero chunk");
     char decoded[32];
     size_t decoded_length = 0;
-    CLM_ASSERT(clm_string_httpp_decode_chunked((const char*)clm_bytes_buffer_view(&out).data,
+    CLM_ASSERT(clm_http_utils_decode_chunked((const char*)clm_bytes_buffer_view(&out).data,
                        clm_bytes_buffer_length(&out), decoded, sizeof(decoded), &decoded_length, NULL) ==
-                       CLM_STRING_HTTPP_SUCCESS && decoded_length == 12 && memcmp(decoded, "hello world!", 12) == 0,
+                       CLM_HTTP_UTILS_SUCCESS && decoded_length == 12 && memcmp(decoded, "hello world!", 12) == 0,
                "decode the chunked output with the HTTP parser");
     clm_stream_sink_dispose(&chunked);
 
@@ -204,9 +204,9 @@ static int clm_stream_tests(void)
     clm_stream_sink_chunked(&chunked, &inner);
     CLM_ASSERT(clm_stream_pump_init(&pump, &source, &chunked, &five) == CLM_STREAM_SUCCESS &&
                    clm_stream_test_run_steps(&pump, &seen) == CLM_STREAM_END && slow.finished &&
-                   clm_string_httpp_decode_chunked((const char*)clm_bytes_buffer_view(&wire).data,
+                   clm_http_utils_decode_chunked((const char*)clm_bytes_buffer_view(&wire).data,
                        clm_bytes_buffer_length(&wire), decoded, 0, &decoded_length, NULL) ==
-                       CLM_STRING_HTTPP_BUFFER_TOO_SMALL && decoded_length == strlen(text),
+                       CLM_HTTP_UTILS_BUFFER_TOO_SMALL && decoded_length == strlen(text),
                "chunk correctly through an inner sink that accepts partial and blocked writes");
     clm_stream_pump_dispose(&pump);
     clm_stream_sink_dispose(&chunked);
