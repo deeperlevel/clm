@@ -1,93 +1,44 @@
 # CLM Async Pool
 
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
 ## Purpose
 
-`clm_async_pool` is an optional worker layer over [CLM Async](clm_async.md).
-It assigns tasks to a fixed set of long-lived workers. In the C design, each
-worker owns one `clm_async` scheduler and one operating-system thread. A worker
-runs its task steps sequentially; different workers may run steps concurrently.
+A multiworker execution layer built on cooperative task schedulers. Workers run independent schedulers and tasks remain assigned to their worker.
 
-The pool is not required for using `clm_async`: applications may instead drive
-one scheduler directly on their own thread. The pool does not turn a blocking
-callback into nonblocking I/O and cannot forcibly stop a hung callback.
+## Capabilities and operations
 
-## Native runtime rule
+- Configure worker count, per-worker task capacity, bounded pending queue and steps per cycle.
+- Choose rejection or FIFO queueing when workers cannot accept new tasks.
+- Spawn, wake, cancel, inspect, and release tasks; query worker admission state and pool statistics.
+- Worker busy/available reflects admission, not simply CPU activity; blocking task code still blocks its worker.
 
-In C and languages without an appropriate native runtime, implement the worker
-pool with worker threads and per-worker schedulers as specified below. In a
-language with native coroutines, `async`/`await`, goroutines, or executor/thread
-pool facilities, `clm_async_pool` should **encapsulate those facilities**. It
-should not create a competing async runtime. A binding may map pool creation,
-submission, wakeup, cancellation, and status reporting to its native APIs while
-preserving the observable CLM contract.
+## Worker pool behavior
 
-## Configuration
+Each worker owns a scheduler and can admit tasks until its configured task limit. A task assigned to one worker stays pinned there for its lifetime. A worker may be marked *busy* for admission while it continues executing previously assigned tasks.
 
-| Setting | Contract |
-| --- | --- |
-| `worker_count` | Positive, fixed number of workers for the pool lifetime. |
-| `max_tasks_per_worker` | Positive admission limit covering ready, running, waiting, and reserved incoming tasks; terminal records are excluded. |
-| `max_pending_tasks` | Capacity of the unassigned FIFO queue. Zero disables queueing. |
-| `steps_per_cycle` | Maximum task steps a worker runs before checking its cross-thread mailbox again. |
-| `overflow_policy` | Reject new submissions when no worker can accept them, or queue them up to the pending limit. |
+- A fixed worker count and per-worker capacity are established at pool creation.
+- When all workers cannot admit new work, the overflow policy either rejects the task or enqueues it in a bounded pending FIFO.
+- Steps-per-cycle limits how much cooperative work is run before mailbox operations are processed.
+- Task IDs, generation-safe wake tokens, task states, worker indices, admission state and pool-level statistics are available for observation.
+- Terminal task records may be retained until explicitly released, independently of running capacity.
 
-Configuration is fixed at pool creation; resizing is outside the initial
-contract.
+## Scaling boundary
 
-## Dispatch and worker state
+Workers execute callbacks. An ordinary blocking callback still occupies its worker, even when scheduled through the pool. For many active idle connections, event-driven I/O that yields until readiness is more scalable than blocking read loops in each worker.
 
-Workers have an **admission** state, not an indication of whether their thread
-is currently executing code. A worker is unavailable for new assignments when
-it has been manually disabled or has reached its task limit. Its existing
-ready, running, and waiting tasks continue normally.
+## Shared behavioral contract
 
-For new submissions, the dispatcher scans workers from a round-robin cursor,
-reserving a capacity slot atomically before enqueueing the task to that worker's
-mailbox. The cursor advances only after successful assignment. Existing
-pool-level pending tasks have FIFO priority and are assigned as workers become
-available. Once assigned, a task remains pinned to that worker for its
-lifetime; work stealing is not part of this contract.
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+- Workers execute cooperative schedulers; submitting synchronous work to a worker does not make that work nonblocking.
 
-If no worker can accept a task, the pool either rejects it with a busy status
-or queues it. A full bounded queue reports queue-full. Applications should
-choose limits and overload behavior appropriate to their service; an
-unbounded queue is not required or implied.
+## Related CLM modules
 
-## Threading and callbacks
+**Supporting modules:** [clm_async](clm_async.md).
 
-Pool control operations are thread-safe and nonblocking except destruction,
-which waits for workers to stop and join. A step callback is never concurrent
-with itself, but callbacks for tasks on different workers may run concurrently.
-Shared context and application data must therefore be synchronized by the
-application.
+## Example use cases
 
-Wakeups from I/O or other threads go through the pool's thread-safe mailbox to
-the owning worker; callers must not invoke that worker's scheduler directly
-from another thread. Generation-bearing task tokens prevent delayed wakeups
-from targeting reused task IDs.
-
-Cleanup runs exactly once and never concurrently with that task's step. Its
-executing thread is not fixed: cleanup may occur on a worker, the cancelling
-thread, or the thread destroying the pool. Cleanup callbacks must be safe for
-those contexts and must not destroy the pool from within a worker callback.
-Pool destruction stops admission, cancels unfinished work, waits for current
-steps to return, runs remaining cleanups, and joins workers. It must not be
-called from one of its own workers.
-
-## Blocking and failure isolation
-
-A callback that blocks without yielding stalls its worker. Other workers
-continue, but enough blocked workers can exhaust the pool. Cooperative
-cancellation cannot interrupt a callback that is currently running. A pool
-therefore provides bounded concurrency, not hard isolation; use process
-isolation when work must be forcibly terminated or protected from memory
-corruption.
-
-## Operations and implementation
-
-The C implementation in `clm/async_pool.h` covers pool creation/destruction,
-submission, wakeup, cancellation, state and worker inspection, statistics, and
-terminal task release. Define `CLM_ASYNC_IMPLEMENTATION` and
-`CLM_ASYNC_POOL_IMPLEMENTATION` in exactly one C translation unit. The C pool
-uses C11 threads, mutexes, and condition variables; platforms or language
-bindings without that facility may provide an equivalent native backend.
+Handle multiple independent cooperative tasks across worker schedulers without giving every waiting task a dedicated thread.

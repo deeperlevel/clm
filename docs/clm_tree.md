@@ -1,5 +1,20 @@
 # CLM Tree
 
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+ID-based hierarchical representation of objects, arrays and values.
+
+## Capabilities and operations
+
+- Create nodes, attach children and traverse nested structured data.
+- Use dictionary-like object members and ordered array elements.
+- Serialize or parse trees through JSON, YAML, TOML and other codecs.
+- Make ownership, deletion and cycle constraints explicit when sharing node IDs.
+
+## Detailed module contract
+
 ## 1. Purpose and scope
 
 `clm_tree` provides a hierarchy of dictionary-backed objects and ordered
@@ -124,8 +139,21 @@ constants and buffer sizes.
 
 ## 6. Implementation status
 
-The C functions are implemented in `clm/tree.h` on top of the heterogeneous
-The C functions are implemented in `clm/tree.h` on top of the heterogeneous
 `clm_dictionary` API. The implementation and tests cover nested objects and
 arrays, mixed leaf types, borrowed and copied values, null/boolean markers,
 recursive cleanup, and rejection of cycles or shared child containers.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_dictionary](clm_dictionary.md).
+
+## Example use cases
+
+Create nodes, attach children and traverse nested structured data.

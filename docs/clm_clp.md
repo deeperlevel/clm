@@ -1,4 +1,19 @@
-# CLM Command-Line Parser
+# CLM Clp
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+A command-line parser that turns option names, flags and values into a structured lookup representation.
+
+## Capabilities and operations
+
+- Parse supplied command-line tokens instead of assuming a particular process environment.
+- Recognize documented option forms and associate values with stable field identifiers.
+- Use the parsed result to configure an application, with validation performed by the application.
+- Keep CLI tokenization distinct from environment-file parsing.
+
+## Detailed module contract
 
 ## Purpose
 
@@ -72,7 +87,7 @@ return a failure status and leave no output dictionary behind. Auto-registered
 names created during that failed parse are removed where possible.
 
 The parser owns the dictionary it creates, but does not own the global ID
-registry beyond registrations it must roll back on failure. The C binding is
+registry beyond registrations it must roll back on failure. The reference binding is
 not thread-safe; callers must serialize parsing and ID-registry access.
 
 ## Cross-language contract
@@ -82,3 +97,18 @@ preserve the supported grammar, string-only values, registration behavior,
 last-value-wins rule, and failure rollback. A binding that receives native
 process arguments should pass an already-tokenized argument sequence rather
 than reimplementing the host shell's parsing rules.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_id](clm_id.md).
+
+## Example use cases
+
+Parse supplied command-line tokens instead of assuming a particular process environment.

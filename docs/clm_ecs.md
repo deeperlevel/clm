@@ -1,7 +1,29 @@
-## clm_ecs — language-neutral contract
+# CLM Ecs
 
-Component type registration, entity blueprint registration, instance creation, component attachment/removal/get, system registration, component-set queries and system invocation. A query matches entities containing all requested component types (supersets match). Creating an entity creates its declared component instances; removing/deleting an entity invokes registered destructors. This first C implementation is single-threaded, permits callbacks to inspect data, and **forbids altering ECS state while querying or invoking systems**. IDs identify entity instances separately from component/blueprint IDs.
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
-### Cross-language expectations
+## Purpose
 
-This document specifies observable behavior, not syntax or compiler bindings. Keep input order, output values, error cases, and data ownership consistent across CLM language ports. For C signatures, see `include/clm_ecs.h`.
+An entity-component-system registry with reusable blueprints, entity instances, components and systems.
+
+## Capabilities and operations
+
+- Register component types and entity blueprints; instantiate entities and add/remove components.
+- Query entities by required component sets and invoke registered systems.
+- Keep entity and component IDs consistent across the application.
+- A matching query returns entities that contain the required components, not necessarily an exact match.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md).
+
+## Example use cases
+
+Register component types and entity blueprints; instantiate entities and add/remove components.

@@ -1,4 +1,19 @@
-# CLM String TOML
+# CLM String Toml
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+TOML text parsing and serialization into CLM trees.
+
+## Capabilities and operations
+
+- Parse the documented subset of TOML tables, fields and values.
+- Serialize supported tree structures into TOML.
+- Provide file-based and text-based helpers.
+- Avoid claiming complete TOML specification support where the parser supports a subset.
+
+## Detailed module contract
 
 ## Purpose
 
@@ -42,3 +57,18 @@ Represent each table as an object, arrays as ordered array nodes, strings as
 strings, and supported numeric/boolean literals as typed scalar nodes. Resolve
 each table/key name using the application's field-ID registry. Do not infer
 support for TOML constructs outside the subset above.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_file](clm_file.md), [clm_string_format](clm_string_format.md).
+
+## Example use cases
+
+Parse the documented subset of TOML tables, fields and values.

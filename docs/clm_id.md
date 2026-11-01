@@ -1,4 +1,19 @@
-# CLM ID
+# CLM Id
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+A named-ID registry associating human-readable names with numeric CLM identifiers.
+
+## Capabilities and operations
+
+- Register, look up, update and remove name-to-ID mappings.
+- Use IDs to reference resources rather than embedding language-specific object references.
+- Name registration does not allocate, resolve or delete the referenced BPA resource.
+- Do not assume the registry is a dependency-injection container.
+
+## Detailed module contract
 
 ## Overview
 
@@ -241,7 +256,7 @@ This illustrates a separation of responsibilities:
 
 - `clm_id` resolves human-readable names into numeric identifiers.
 - `clm_container` stores typed values at numeric keys.
-- Modules such as `clm_depend` and SPIder may establish their own numeric registration conventions.
+- Modules such as `clm_container` and SPIder may establish their own numeric registration conventions.
 
 `clm_id` does not manage object lifetimes, dependency graphs, route matching, or container values.
 
@@ -268,7 +283,7 @@ A language-specific implementation may use hash maps, balanced trees, associativ
 6. Retain the matching mode when clearing entries.
 7. Keep the procedural operations available even if an optional object-oriented facade is provided.
 
-Memory allocation, string ownership, return conventions, and synchronization strategies remain implementation-specific. A C binding might use explicit buffers and status codes; a Go binding may return an ID and an error; a C++ binding may expose exceptions or result types.
+Memory allocation, string ownership, return conventions, and synchronization strategies remain implementation-specific. A reference binding might use explicit buffers and status codes; a Go binding may return an ID and an error; a C++ binding may expose exceptions or result types.
 
 ## Optional convenience facade
 
@@ -299,15 +314,10 @@ A conforming implementation should verify that:
 - [ ] `clear` removes mappings but preserves the matching mode.
 - [ ] The procedural API remains usable without OOP or reflection.
 
-## C reference implementation
+## Portable operation families
 
-The C binding is provided by `src/c/clm/id.h` and uses `clm_dictionary`/BPA for
-its shared process-local state. Define `CLM_ID_IMPLEMENTATION` in exactly one
-C source file, in addition to the one definition required by `clm/bpa.h`.
-`clm_id_clear` retains allocated registry storage; `clm_id_shutdown` releases
-the module's private dictionaries and scratch storage.
+These names describe CLM operations; each language binding may expose idiomatic signatures.
 
-The C procedural API is:
 
 | Function | Behavior |
 |---|---|
@@ -325,7 +335,7 @@ The C procedural API is:
 
 `clm_id_get` uses `CLM_ID_NOT_FOUND` (`UINT64_MAX`) as its missing-name
 sentinel; use `clm_id_try_get` if that value itself must be returned without
-ambiguity. The C binding accepts nonempty, NUL-terminated UTF-8 strings and
+ambiguity. The reference contract accepts nonempty UTF-8 names and
 rejects malformed UTF-8. It does not perform Unicode normalization.
 Case-insensitive mode folds ASCII letters only; non-ASCII bytes remain
 case-sensitive. It therefore does not provide the Unicode case-folding
@@ -349,3 +359,18 @@ CLM source is intended for reuse, modification, redistribution, and bundling. Re
 
 **Different languages. Shared technologies. No borders.**  
 *Don't start from scratch, bro.*
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_dictionary](clm_dictionary.md).
+
+## Example use cases
+
+Register, look up, update and remove name-to-ID mappings.

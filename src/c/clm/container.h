@@ -1,22 +1,33 @@
 #pragma once
 
 /*
-* =============================================================================
+ * =============================================================================
  * CLM — Cross Language Modules
- *
- * An initiative by deeperlevel, developed with community contributions.
+ * 
  * https://github.com/deeperlevel/clm
- * Contact: deeparchive@outlook.com
+ * Contact: [deeparchive@outlook.com](mailto:deeparchive@outlook.com)
  *
- * Public Domain — CC0 1.0 Universal
+ * A collection of reusable, composable foundational modules providing
+ * consistent capabilities and behavior across programming languages.
+ * Designed to eliminate repetitive groundwork while preserving the
+ * flexibility, independence, and native strengths of each language.
+ *
+ * Unless a file states otherwise, CLM-authored code is dedicated to the
+ * public domain under CC0 1.0 Universal.
  * https://creativecommons.org/publicdomain/zero/1.0/
  *
  * Free to use, modify, redistribute, and bundle for any purpose.
  * Attribution and retention of this notice are appreciated, not required.
  *
- * Provided AS IS, without warranty or liability.
+ * Third-party code under ext/ or vendor/ retains its original licenses,
+ * copyright notices, and disclaimers. CLM's CC0 dedication does not
+ * apply to such code. Refer to the accompanying vendor license files.
  *
- * Don't start from scratch, bro.
+ * CLM is provided AS IS, without warranty or liability.
+ * CLM maintainers and contributors make no warranties regarding
+ * third-party code and disclaim liability for its use to the extent
+ * permitted by applicable law. Original vendor terms remain applicable.
+ *
  * =============================================================================
  */
 
@@ -25,12 +36,14 @@
 
 #include <stdatomic.h>
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdlib.h>
 
 #define CLM_CONTAINER_LIFETIME_SINGLETON 0
 #define CLM_CONTAINER_LIFETIME_TRANSIENT 1
+/** One cached instance per active process-wide scope frame. */
 #define CLM_CONTAINER_LIFETIME_SCOPED 2
+/** One cached instance per active process-wide intern frame. */
+#define CLM_CONTAINER_LIFETIME_INTERN 3
 
 #define CLM_CONTAINER_REGISTRATION_SUCCESS 0
 #define CLM_CONTAINER_REGISTRATION_FAILURE -1
@@ -80,235 +93,110 @@ typedef struct clm_container_internal_service {
 extern clm_container_internal_service* clm_container_internal_services;
 extern atomic_flag clm_container_internal_lock;
 
-#ifdef CLM_CONTAINER_IMPLEMENTATION
-clm_container_internal_service* clm_container_internal_services = NULL;
-atomic_flag clm_container_internal_lock = ATOMIC_FLAG_INIT;
-#endif
 
-static inline void clm_container_internal_acquire(void)
-{
-	while (atomic_flag_test_and_set_explicit(&clm_container_internal_lock,
-		memory_order_acquire)) { }
-}
+void clm_container_internal_acquire(void);
 
-static inline void clm_container_internal_release(void)
-{
-	atomic_flag_clear_explicit(&clm_container_internal_lock,
-		memory_order_release);
-}
+void clm_container_internal_release(void);
 
-static inline clm_container_internal_service* clm_container_internal_find(
-	const clm_id service_id)
-{
-	for (clm_container_internal_service* service =
-		clm_container_internal_services; service != NULL; service = service->next)
-		if (service->id == service_id)
-			return service;
-	return NULL;
-}
+clm_container_internal_service* clm_container_internal_find(const clm_id service_id);
 
-static inline bool clm_container_internal_instance_valid(const clm_id instance_id)
-{
-	const clm_bpa_block_node* block = clm_bpa_find_block(instance_id);
-	return block != NULL && block->type == CLM_BPA_TYPE_STRUCT;
-}
+bool clm_container_internal_instance_valid(const clm_id instance_id);
 
 /** Registers a service after validating that every dependency is registered.
  * dependencies is used only for validation and is not retained or injected.
- * SINGLETON invokes the constructor immediately. TRANSIENT invokes it on
- * each resolve. SCOPED is reserved and returns UNSUPPORTED_LIFETIME.
- * The container owns a singleton BPA block and deletes it on unregister.
- * Transient instance blocks are owned by the resolve caller and must be deleted
- * with clm_bpa_delete() when no longer needed.
+ * SINGLETON invokes the constructor immediately. TRANSIENT invokes it on each
+ * resolve. SCOPED and INTERN are constructed at their matching begin call and
+ * remain cached until the matching end call. Register scoped services only
+ * while their frame is inactive. The container owns singleton and frame
+ * instances; transient instance blocks are owned by the resolve caller and
+ * must be deleted with clm_bpa_delete() when no longer needed.
+ * @param service_id CLM ID identifying the service.
+ * @param dependencies Input data or buffer; not modified.
+ * @param dependency_count Input parameter described above.
+ * @param constructor Input parameter described above.
+ * @param lifetime Input parameter described above.
+ * @param context_id CLM ID identifying the context.
+ * @return Operation status or value described in the summary above.
  */
-static inline clm_int clm_container_register(
+clm_int clm_container_register(
 	const clm_id service_id,
 	const clm_id* dependencies,
 	const size_t dependency_count,
 	const clm_container_constructor_fn constructor,
 	const clm_int lifetime,
-	const clm_id context_id)
-{
-	if (constructor == NULL || (dependency_count != 0 && dependencies == NULL))
-		return CLM_CONTAINER_STATUS_INVALID_ARGUMENT;
-	if (lifetime != CLM_CONTAINER_LIFETIME_SINGLETON &&
-		lifetime != CLM_CONTAINER_LIFETIME_TRANSIENT)
-		return CLM_CONTAINER_STATUS_UNSUPPORTED_LIFETIME;
-	clm_container_internal_acquire();
-	if (clm_container_internal_find(service_id) != NULL) {
-		clm_container_internal_release();
-		return CLM_CONTAINER_STATUS_ALREADY_REGISTERED;
-	}
-	for (size_t index = 0; index < dependency_count; ++index)
-		if (clm_container_internal_find(dependencies[index]) == NULL) {
-			clm_container_internal_release();
-			return CLM_CONTAINER_STATUS_MISSING_DEPENDENCY;
-		}
-	clm_container_internal_service* service =
-		(clm_container_internal_service*)calloc(1, sizeof(*service));
-	if (service == NULL) {
-		clm_container_internal_release();
-		return CLM_CONTAINER_STATUS_FAILURE;
-	}
-	service->id = service_id;
-	service->context_id = context_id;
-	service->constructor = constructor;
-	service->lifetime = lifetime;
-	service->constructing = lifetime == CLM_CONTAINER_LIFETIME_SINGLETON;
-	service->next = clm_container_internal_services;
-	clm_container_internal_services = service;
-	clm_container_internal_release();
-	if (lifetime == CLM_CONTAINER_LIFETIME_TRANSIENT)
-		return CLM_CONTAINER_REGISTRATION_SUCCESS;
-	clm_id instance_id = 0;
-	const clm_int construct_status = constructor(service_id, context_id,
-		&instance_id);
-	const bool valid_instance = construct_status == CLM_CONTAINER_STATUS_SUCCESS &&
-		clm_container_internal_instance_valid(instance_id);
-	clm_container_internal_acquire();
-	service = clm_container_internal_find(service_id);
-	if (service != NULL) {
-		service->constructing = false;
-		if (valid_instance) {
-			service->singleton_instance_id = instance_id;
-			service->has_singleton_instance = true;
-		} else {
-			clm_container_internal_service** link =
-				&clm_container_internal_services;
-			while (*link != NULL && *link != service)
-				link = &(*link)->next;
-			if (*link == service)
-				*link = service->next;
-		}
-	}
-	clm_container_internal_release();
-	if (!valid_instance) {
-		free(service);
-		return CLM_CONTAINER_STATUS_CONSTRUCTOR_FAILURE;
-	}
-	return CLM_CONTAINER_REGISTRATION_SUCCESS;
-}
+	const clm_id context_id
+);
 
 /** Resolves a service to a BPA STRUCT instance ID.
  * SINGLETON returns the eagerly constructed shared instance. TRANSIENT calls
  * the constructor on every resolve; the caller owns and deletes that block.
  * The constructor runs without the registry lock and may resolve dependencies.
  * Recursive resolution of a singleton while it is constructing returns BUSY.
+ * @param service_id CLM ID identifying the service.
+ * @param out_instance_id Receives the instance id.
+ * @return Operation status or value described in the summary above.
  */
-static inline clm_int clm_container_resolve(
+clm_int clm_container_resolve(
 	const clm_id service_id,
-	clm_id* out_instance_id)
-{
-	if (out_instance_id == NULL)
-		return CLM_CONTAINER_STATUS_INVALID_ARGUMENT;
-	clm_container_internal_acquire();
-	clm_container_internal_service* service =
-		clm_container_internal_find(service_id);
-	if (service == NULL) {
-		clm_container_internal_release();
-		return CLM_CONTAINER_STATUS_NOT_REGISTERED;
-	}
-	if (service->lifetime == CLM_CONTAINER_LIFETIME_SINGLETON) {
-		if (service->constructing) {
-			clm_container_internal_release();
-			return CLM_CONTAINER_STATUS_BUSY;
-		}
-		const clm_id instance_id = service->singleton_instance_id;
-		const bool has_instance = service->has_singleton_instance;
-		clm_container_internal_release();
-		if (!has_instance || !clm_container_internal_instance_valid(instance_id))
-			return CLM_CONTAINER_STATUS_CONSTRUCTOR_FAILURE;
-		*out_instance_id = instance_id;
-		return CLM_CONTAINER_STATUS_SUCCESS;
-	}
-	++service->active_calls;
-	const clm_container_constructor_fn constructor = service->constructor;
-	const clm_id context_id = service->context_id;
-	clm_container_internal_release();
-	clm_id instance_id = 0;
-	const clm_int construct_status = constructor(service_id, context_id,
-		&instance_id);
-	const bool valid_instance = construct_status == CLM_CONTAINER_STATUS_SUCCESS &&
-		clm_container_internal_instance_valid(instance_id);
-	clm_container_internal_acquire();
-	service = clm_container_internal_find(service_id);
-	if (service != NULL && service->active_calls != 0)
-		--service->active_calls;
-	clm_container_internal_release();
-	if (!valid_instance) {
-		return CLM_CONTAINER_STATUS_CONSTRUCTOR_FAILURE;
-	}
-	*out_instance_id = instance_id;
-	return CLM_CONTAINER_STATUS_SUCCESS;
-}
+	clm_id* out_instance_id
+);
 
 /** Runs function after verifying every declared dependency is registered.
  * The IDs are validation-only; function resolves anything it needs itself.
+ * @param dependencies Input data or buffer; not modified.
+ * @param dependency_count Input parameter described above.
+ * @param function Input parameter described above.
+ * @param context_id CLM ID identifying the context.
+ * @return Operation status or value described in the summary above.
  */
-static inline clm_int clm_container_invoke(
+clm_int clm_container_invoke(
 	const clm_id* dependencies,
 	const size_t dependency_count,
 	const clm_container_invoke_fn function,
-	const clm_id context_id)
-{
-	if (function == NULL || (dependency_count != 0 && dependencies == NULL))
-		return CLM_CONTAINER_STATUS_INVALID_ARGUMENT;
-	clm_container_internal_acquire();
-	size_t held = 0;
-	for (; held < dependency_count; ++held) {
-		clm_container_internal_service* service =
-			clm_container_internal_find(dependencies[held]);
-		if (service == NULL) {
-			for (size_t rollback = 0; rollback < held; ++rollback) {
-				service = clm_container_internal_find(dependencies[rollback]);
-				if (service != NULL && service->active_calls != 0)
-					--service->active_calls;
-			}
-			clm_container_internal_release();
-			return CLM_CONTAINER_STATUS_MISSING_DEPENDENCY;
-		}
-		++service->active_calls;
-	}
-	clm_container_internal_release();
-	const clm_int result = function(context_id);
-	clm_container_internal_acquire();
-	for (size_t index = 0; index < dependency_count; ++index) {
-		clm_container_internal_service* service =
-			clm_container_internal_find(dependencies[index]);
-		if (service != NULL && service->active_calls != 0)
-			--service->active_calls;
-	}
-	clm_container_internal_release();
-	return result;
-}
+	const clm_id context_id
+);
 
 /** Removes a service registration.
  * A service currently constructing or resolving cannot be unregistered.
  * The container deletes an owned singleton BPA block; transient blocks remain
  * caller-owned. The caller must ensure no users retain a singleton ID.
+ * @param service_id CLM ID identifying the service.
+ * @return Operation status or value described in the summary above.
  */
-static inline clm_int clm_container_unregister(const clm_id service_id)
-{
-	clm_container_internal_acquire();
-	clm_container_internal_service** link = &clm_container_internal_services;
-	while (*link != NULL && (*link)->id != service_id)
-		link = &(*link)->next;
-	clm_container_internal_service* service = *link;
-	if (service == NULL) {
-		clm_container_internal_release();
-		return CLM_CONTAINER_STATUS_NOT_REGISTERED;
-	}
-	if (service->constructing || service->active_calls != 0) {
-		clm_container_internal_release();
-		return CLM_CONTAINER_STATUS_BUSY;
-	}
-	if (service->has_singleton_instance &&
-		clm_bpa_delete(service->singleton_instance_id) != CLM_BPA_SUCCESS) {
-		clm_container_internal_release();
-		return CLM_CONTAINER_STATUS_FAILURE;
-	}
-	*link = service->next;
-	clm_container_internal_release();
-	free(service);
-	return CLM_CONTAINER_UNREGISTER_SUCCESS;
-}
+clm_int clm_container_unregister(const clm_id service_id);
+
+/** Starts the process-wide scope frame and constructs registered SCOPED services.
+ * Repeated or overlapping frame transitions return CLM_CONTAINER_STATUS_BUSY.
+ * Constructor failure rolls back instances created by this call.
+ * @return SUCCESS, FAILURE, CONSTRUCTOR_FAILURE, or BUSY.
+ */
+clm_int clm_container_begin_scope();
+
+/** Destroys this scope's SCOPED instances and ends the frame.
+ * It returns BUSY while a declared dependency invocation is active.
+ * @return SUCCESS, INVALID_ARGUMENT if no scope is active, BUSY, or FAILURE.
+ */
+clm_int clm_container_end_scope();
+
+/** Reports whether a process-wide scope frame is active.
+ * @return 1 if active; otherwise 0.
+ */
+clm_int clm_container_is_scope();
+
+/** Starts the process-wide intern frame and constructs registered INTERN services.
+ * Repeated or overlapping frame transitions return CLM_CONTAINER_STATUS_BUSY.
+ * Constructor failure rolls back instances created by this call.
+ * @return SUCCESS, FAILURE, CONSTRUCTOR_FAILURE, or BUSY.
+ */
+clm_int clm_container_begin_intern();
+
+/** Destroys this intern frame's INTERN instances and ends the frame.
+ * It returns BUSY while a declared dependency invocation is active.
+ * @return SUCCESS, INVALID_ARGUMENT if no intern frame is active, BUSY, or FAILURE.
+ */
+clm_int clm_container_end_intern();
+
+/** Reports whether a process-wide intern frame is active.
+ * @return 1 if active; otherwise 0.
+ */
+clm_int clm_container_is_intern();

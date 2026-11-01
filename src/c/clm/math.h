@@ -3,20 +3,31 @@
 /*
  * =============================================================================
  * CLM — Cross Language Modules
- *
- * An initiative by deeperlevel, developed with community contributions.
+ * 
  * https://github.com/deeperlevel/clm
- * Contact: deeparchive@outlook.com
+ * Contact: [deeparchive@outlook.com](mailto:deeparchive@outlook.com)
  *
- * Public Domain — CC0 1.0 Universal
+ * A collection of reusable, composable foundational modules providing
+ * consistent capabilities and behavior across programming languages.
+ * Designed to eliminate repetitive groundwork while preserving the
+ * flexibility, independence, and native strengths of each language.
+ *
+ * Unless a file states otherwise, CLM-authored code is dedicated to the
+ * public domain under CC0 1.0 Universal.
  * https://creativecommons.org/publicdomain/zero/1.0/
  *
  * Free to use, modify, redistribute, and bundle for any purpose.
  * Attribution and retention of this notice are appreciated, not required.
  *
- * Provided AS IS, without warranty or liability.
+ * Third-party code under ext/ or vendor/ retains its original licenses,
+ * copyright notices, and disclaimers. CLM's CC0 dedication does not
+ * apply to such code. Refer to the accompanying vendor license files.
  *
- * Don't start from scratch, bro.
+ * CLM is provided AS IS, without warranty or liability.
+ * CLM maintainers and contributors make no warranties regarding
+ * third-party code and disclaim liability for its use to the extent
+ * permitted by applicable law. Original vendor terms remain applicable.
+ *
  * =============================================================================
  */
 
@@ -25,144 +36,182 @@
 #define CLM_MATH_TAU (2.0 * CLM_MATH_PI)
 #define CLM_MATH_E 2.718281828459045235360287471352662498
 
-/** Clamps value into [low, high]; rejects nonfinite inputs and reversed bounds. */
-static inline clm_math_status clm_math_clamp(double value, double low,
-                                             double high, double *out);
-
-/** Interpolates linearly; t is not clamped to [0,1]. */
-static inline double clm_math_lerp(double a, double b, double t);
-
-/** Returns the unbounded interpolation factor; equal endpoints are a domain error. */
-static inline clm_math_status clm_math_inverse_lerp(double a, double b,
-                                                    double value, double *out);
-
-/** Computes clamped cubic smoothstep over [a,b]. */
-static inline clm_math_status clm_math_smoothstep(double a, double b,
-                                                  double value, double *out);
-
-/** Converts radians to degrees. */
-static inline double clm_math_degrees(double radians);
-
-/** Converts degrees to radians. */
-static inline double clm_math_radians(double degrees);
-
-/** Standard trigonometric functions; inputs and outputs use radians. */
-static inline double clm_math_sin(double x);
-static inline double clm_math_cos(double x);
-static inline double clm_math_tan(double x);
-
-/** Inverse sine and cosine; results are in radians. */
-static inline double clm_math_asin(double x);
-static inline double clm_math_acos(double x);
-
-/** Returns the angle in radians whose tangent is y/x, preserving the quadrant. */
-static inline double clm_math_atan2(double y, double x);
-
-/** Square root and power wrappers using the C math library domain behavior. */
-static inline double clm_math_sqrt(double x);
-static inline double clm_math_pow(double x, double y);
-
-/** Computes logarithm(value) in the requested base; value/base must be positive
- * and base must not equal one.
+/** Clamps value into [low, high].
+ * @param value Finite value to clamp.
+ * @param low Finite lower bound; must not exceed high.
+ * @param high Finite upper bound.
+ * @param[out] out Receives the clamped value.
+ * @return MATH_ERROR_VALUE for a null output or nonfinite input,
+ * MATH_ERROR_DOMAIN for reversed bounds, or MATH_SUCCESS.
  */
-static inline clm_math_status clm_math_log(double value, double base,
-                                           double *out);
+clm_math_status clm_math_clamp(
+  const double value,
+  const double low,
+  const double high,
+  double *out
+);
 
-/** Exponential and integral rounding helpers. */
-static inline double clm_math_exp(double x);
-static inline double clm_math_floor(double x);
-static inline double clm_math_ceil(double x);
-
-/** Absolute value and sign (-1, 0, or 1). */
-static inline double clm_math_abs(double x);
-static inline int clm_math_sign(double x);
-
-/** Wraps value into [low, high); low must be less than high. */
-static inline clm_math_status clm_math_wrap(double value, double low,
-                                            double high, double *out);
-
-/** Compares values using max(absolute_tolerance, relative_tolerance * scale).
- * Negative tolerances and NaN inputs return false.
+/** Linearly interpolates from a to b without clamping t.
+ * @param a Start value.
+ * @param b End value.
+ * @param t Interpolation factor; values outside [0, 1] extrapolate.
+ * @return a + (b - a) * t.
  */
-static inline bool clm_math_approximately(double a, double b,
-                                          double absolute_tolerance,
-                                          double relative_tolerance);
+double clm_math_lerp(
+  const double a,
+  const double b,
+  const double t
+);
 
-/* Inline implementation — no separate .c file required. */
-#include <math.h>
-static inline clm_math_status clm_math_clamp(double v, double lo, double hi,
-                                             double *o) {
-  if (!o || !isfinite(v) || !isfinite(lo) || !isfinite(hi))
-    return MATH_ERROR_VALUE;
-  if (lo > hi)
-    return MATH_ERROR_DOMAIN;
-  *o = fmax(lo, fmin(v, hi));
-  return MATH_SUCCESS;
-}
-static inline double clm_math_lerp(double a, double b, double t) {
-  return a + (b - a) * t;
-}
-static inline clm_math_status clm_math_inverse_lerp(double a, double b,
-                                                    double v, double *o) {
-  if (!o || !isfinite(a) || !isfinite(b) || !isfinite(v))
-    return MATH_ERROR_VALUE;
-  if (a == b)
-    return MATH_ERROR_DOMAIN;
-  *o = (v - a) / (b - a);
-  return MATH_SUCCESS;
-}
-static inline clm_math_status clm_math_smoothstep(double a, double b, double v,
-                                                  double *o) {
-  double t;
-  clm_math_status s = clm_math_inverse_lerp(a, b, v, &t);
-  if (s)
-    return s;
-  t = fmax(0, fmin(1, t));
-  *o = t * t * (3 - 2 * t);
-  return MATH_SUCCESS;
-}
-static inline double clm_math_degrees(double a) {
-  return a * 180. / CLM_MATH_PI;
-}
-static inline double clm_math_radians(double a) {
-  return a * CLM_MATH_PI / 180.;
-}
-static inline double clm_math_sin(double x) { return sin(x); }
-static inline double clm_math_cos(double x) { return cos(x); }
-static inline double clm_math_tan(double x) { return tan(x); }
-static inline double clm_math_asin(double x) { return asin(x); }
-static inline double clm_math_acos(double x) { return acos(x); }
-static inline double clm_math_atan2(double y, double x) { return atan2(y, x); }
-static inline double clm_math_sqrt(double x) { return sqrt(x); }
-static inline double clm_math_pow(double x, double y) { return pow(x, y); }
-static inline clm_math_status clm_math_log(double v, double base, double *o) {
-  if (!o || !isfinite(v) || !isfinite(base))
-    return MATH_ERROR_VALUE;
-  if (v <= 0 || base <= 0 || base == 1)
-    return MATH_ERROR_DOMAIN;
-  *o = log(v) / log(base);
-  return MATH_SUCCESS;
-}
-static inline double clm_math_exp(double x) { return exp(x); }
-static inline double clm_math_floor(double x) { return floor(x); }
-static inline double clm_math_ceil(double x) { return ceil(x); }
-static inline double clm_math_abs(double x) { return fabs(x); }
-static inline int clm_math_sign(double x) { return (x > 0) - (x < 0); }
-static inline clm_math_status clm_math_wrap(double v, double lo, double hi,
-                                            double *o) {
-  if (!o || !isfinite(v) || !isfinite(lo) || !isfinite(hi))
-    return MATH_ERROR_VALUE;
-  if (lo >= hi)
-    return MATH_ERROR_DOMAIN;
-  double w = fmod(v - lo, hi - lo);
-  if (w < 0)
-    w += hi - lo;
-  *o = lo + w;
-  return MATH_SUCCESS;
-}
-static inline bool clm_math_approximately(double a, double b, double at,
-                                          double rt) {
-  if (at < 0 || rt < 0 || isnan(a) || isnan(b))
-    return false;
-  return a == b || fabs(a - b) <= fmax(at, rt * fmax(fabs(a), fabs(b)));
-}
+/** Computes the unbounded interpolation factor for value between a and b.
+ * @param a Start endpoint.
+ * @param b End endpoint; must differ from a.
+ * @param value Value whose interpolation factor is requested.
+ * @param[out] out Receives (value - a) / (b - a).
+ * @return MATH_ERROR_VALUE for a null output or nonfinite input,
+ * MATH_ERROR_DOMAIN for equal endpoints, or MATH_SUCCESS.
+ */
+clm_math_status clm_math_inverse_lerp(
+  const double a,
+  const double b,
+  const double value,
+  double *out
+);
+
+/** Computes cubic smoothstep, clamping the normalized value into [0, 1].
+ * @param a Start endpoint.
+ * @param b End endpoint; must differ from a.
+ * @param value Value to map between the endpoints.
+ * @param[out] out Receives the smoothstep result.
+ * @return MATH_ERROR_VALUE for a null output or nonfinite input,
+ * MATH_ERROR_DOMAIN for equal endpoints, or MATH_SUCCESS.
+ */
+clm_math_status clm_math_smoothstep(
+  const double a,
+  const double b,
+  const double value,
+  double *out
+);
+
+/** Converts radians to degrees.
+ * @param radians Angle in radians.
+ * @return The angle in degrees.
+ */
+double clm_math_degrees(double radians);
+
+/** Converts degrees to radians.
+ * @param degrees Angle in degrees.
+ * @return The angle in radians.
+ */
+double clm_math_radians(double degrees);
+
+/** Computes the sine of an angle in radians. 
+ * @param radians Angle in radians.
+ * @return Sine of the input angle, in radians.
+ */
+double clm_math_sin(double radians);
+
+/** Computes the cosine of an angle in radians. 
+ * @param radians Angle in radians.
+ * @return Cosine of the input angle, in radians.
+ */
+double clm_math_cos(double radians);
+
+/** Computes the tangent of an angle in radians. 
+ * @param radians Angle in radians.
+ * @return Tangent of the input angle, in radians.
+ */
+double clm_math_tan(double radians);
+
+/** Computes the inverse sine; the result is in radians. 
+ * @param value Value to process.
+ * @return Inverse sine of the input value, in radians.
+ */
+double clm_math_asin(double value);
+
+/** Computes the inverse cosine; the result is in radians. 
+ * @param value Value to process.
+ * @return Inverse cosine of the input value, in radians.
+ */
+double clm_math_acos(double value);
+
+/** Computes the angle in radians for the coordinates y and x.
+ * @return An angle in [-pi, pi], preserving the input quadrant.
+ * @param y Input value or coordinate.
+ * @param x Input value or coordinate.
+ */
+double clm_math_atan2(double y, double x);
+
+/** Computes the square root using the C math library domain behavior. 
+ * @param value Value to process.
+ * @return Square root of the input value.
+ */
+double clm_math_sqrt(double value);
+
+/** Raises x to the power y using the C math library domain behavior. 
+ * @param x Input value or coordinate.
+ * @param y Input value or coordinate.
+ * @return Input value raised to the specified power.
+ */
+double clm_math_pow(double x, double y);
+
+/** Computes a logarithm in the requested base.
+ * @param value Positive value whose logarithm is requested.
+ * @param base Positive base other than one.
+ * @param[out] out Receives log(value) / log(base).
+ * @return MATH_ERROR_VALUE for a null output or nonfinite input,
+ * MATH_ERROR_DOMAIN for an invalid value or base, or MATH_SUCCESS.
+ */
+clm_math_status clm_math_log(double value, double base, double *out);
+
+/** Computes e raised to x using the C math library. 
+ * @param x Input value or coordinate.
+ * @return Exponential of the input value.
+ */
+double clm_math_exp(double x);
+
+/** Rounds x toward negative infinity. 
+ * @param x Input value or coordinate.
+ * @return Input rounded toward negative infinity.
+ */
+double clm_math_floor(double x);
+
+/** Rounds x toward positive infinity. 
+ * @param x Input value or coordinate.
+ * @return Input rounded toward positive infinity.
+ */
+double clm_math_ceil(double x);
+
+/** Returns the absolute value of x. 
+ * @param x Input value or coordinate.
+ * @return The absolute value of x.
+ */
+double clm_math_abs(double x);
+
+/** Returns -1 for negative x, 0 for zero, and 1 for positive x. 
+ * @param x Input value or coordinate.
+ * @return -1 for negative x, 0 for zero, and 1 for positive x.
+ */
+int clm_math_sign(double x);
+
+/** Wraps value into the half-open interval [low, high).
+ * @param value Finite value to wrap.
+ * @param low Finite inclusive lower bound.
+ * @param high Finite exclusive upper bound; must exceed low.
+ * @param[out] out Receives the wrapped value.
+ * @return MATH_ERROR_VALUE for a null output or nonfinite input,
+ * MATH_ERROR_DOMAIN for invalid bounds, or MATH_SUCCESS.
+ */
+clm_math_status clm_math_wrap(double value, double low, double high,
+                              double *out);
+
+/** Compares two values using the larger of absolute and relative tolerances.
+ * @param a First value.
+ * @param b Second value.
+ * @param absolute_tolerance Nonnegative absolute tolerance.
+ * @param relative_tolerance Nonnegative tolerance scaled by max(|a|, |b|).
+ * @return Whether the values match within tolerance; false for negative
+ * tolerances or NaN values.
+ */
+bool clm_math_approximately(double a, double b, double absolute_tolerance,
+                            double relative_tolerance);

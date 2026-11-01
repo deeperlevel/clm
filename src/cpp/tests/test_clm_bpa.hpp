@@ -1,431 +1,417 @@
-#pragma once
+﻿#pragma once
 
 #include "test.hpp"
 #include "../clm/bpa.hpp"
 
-#include <cstring>
+static int clm_bpa_tests_passed = 0;
+static int clm_bpa_tests_failed = 0;
 
-static int clm_bpa_test_compare(const void* left, const void* right)
+static int clm_bpa_compare_ints(const void* left, const void* right)
 {
-    clm_int lhs = 0;
-    clm_int rhs = 0;
-    std::memcpy(&lhs, left, sizeof(lhs));
-    std::memcpy(&rhs, right, sizeof(rhs));
-    return (lhs > rhs) - (lhs < rhs);
+    clm_int left_value;
+    clm_int right_value;
+    memcpy(&left_value, left, sizeof(left_value));
+    memcpy(&right_value, right, sizeof(right_value));
+    return (left_value > right_value) - (left_value < right_value);
 }
 
-static int test_clm_bpa()
+static clm_int clm_bpa_read_int(const clm_uint* value)
 {
-    clm_test_result result{};
-    using namespace clm::bpa;
+    clm_int result;
+    memcpy(&result, value, sizeof(result));
+    return result;
+}
 
-    clm_int value = 0;
-    clm_int values[] = {4, 1, 3, 2};
-    clm_uint count = 0;
-    clm_uint capacity = 0;
-    clm_int first = 0;
-    clm_int last = 0;
-    std::size_t active_before = 0;
-    std::size_t reserved_before = 0;
-    std::size_t active_after = 0;
-    std::size_t reserved_after = 0;
-    char text[16] = {};
-    constexpr clm_id block_id = UINT64_C(0xB001);
-    constexpr clm_id array_id = UINT64_C(0xA001);
-    constexpr clm_id slice_id = UINT64_C(0xA002);
-    constexpr clm_id string_id = UINT64_C(0xB002);
-    constexpr clm_id struct_id = UINT64_C(0xB003);
-    constexpr clm_id string_array_id = UINT64_C(0xA003);
-
+static int clm_bpa_tests(void)
+{
+    clm_test_result result = {0};
     clm_test_begin("CLM - Block Pool Allocation (BPA)");
+    clm_int value;
+    clm_uint index;
+    clm_int struct_value[2] = {123, 456};
+    clm_int struct_result[2] = {0, 0};
+    clm_uint count;
+    clm_uint capacity;
+    clm_uint length;
+    clm_uint output[8] = {0};
+    clm_byte sealed;
+    clm_int values[] = {4, 1, 3, 2};
+    clm_int drawn[5] = {0};
+    clm_uint draw_count = 0;
+    clm_uint i;
+    clm_id wide_id = UINT64_C(0x100000001);
+    const char greeting[] = "hello";
+    const char replacement[] = "world!";
+    const char expected_replaced[] = "world! updated";
+    const char empty[] = "";
+    clm_uint greeting_buffer[2] = {0};
+    clm_uint replacement_buffer[2] = {0};
+    clm_uint empty_buffer[1] = {0};
+    clm_uint text_buffer[8] = {0};
+    char manipulated_text[32];
+    char* text = (char*)text_buffer;
 
-    CLM_ASSERT(pool_stats(sizeof(clm_int), &active_before,
-                                  &reserved_before) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(!block_exists(block_id));
-    CLM_ASSERT(create(block_id, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(pool_stats(sizeof(clm_int), &active_after,
-                                  &reserved_after) == CLM_BPA_SUCCESS &&
-               active_after == active_before + 1 &&
-               reserved_after >= active_after);
-    CLM_ASSERT(block_exists(block_id));
-    CLM_ASSERT(set(block_id, &values[0], sizeof(values[0])) ==
-               CLM_BPA_SET_SUCCESS);
-    CLM_ASSERT(get(block_id, &value, sizeof(value)) ==
-                   CLM_BPA_GET_SUCCESS &&
-               value == 4);
-    CLM_ASSERT(get(block_id, &value, sizeof(clm_byte)) ==
-               CLM_BPA_FAILURE);
-    CLM_ASSERT(ref_block(block_id) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(unref_block(block_id) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(block_exists(block_id));
-    CLM_ASSERT(unref_block(block_id) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(!block_exists(block_id));
+    memcpy(greeting_buffer, greeting, sizeof(greeting));
+    memcpy(replacement_buffer, replacement, sizeof(replacement));
+    memcpy(empty_buffer, empty, sizeof(empty));
 
-    CLM_ASSERT(create(string_id, CLM_BPA_TYPE_STRING) ==
-               CLM_BPA_SUCCESS);
-    CLM_ASSERT(set_string(string_id, "hello", sizeof("hello")) == 5);
-    CLM_ASSERT(get_string(string_id, text, sizeof(text)) == 5);
-    CLM_ASSERT(std::strcmp(text, "hello") == 0);
-    CLM_ASSERT(get_string(string_id, text, 5) == CLM_BPA_FAILURE);
-    CLM_ASSERT(replace(string_id, "world!", sizeof("world!")) == 6);
-    CLM_ASSERT(get_string(string_id, text, sizeof(text)) == 6 &&
-               std::strcmp(text, "world!") == 0);
-    CLM_ASSERT(erase_block(string_id) == CLM_BPA_SUCCESS);
-
-    CLM_ASSERT(create_sized(struct_id, CLM_BPA_TYPE_STRUCT,
-                                    sizeof(values)) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(set(struct_id, values, sizeof(values)) ==
-               CLM_BPA_SET_SUCCESS);
-    clm_int structure[4] = {};
-    CLM_ASSERT(get(struct_id, structure, sizeof(structure)) ==
-                   CLM_BPA_GET_SUCCESS &&
-               structure[0] == 4 && structure[1] == 1 &&
-               structure[2] == 3 && structure[3] == 2);
-    CLM_ASSERT(erase_block(struct_id) == CLM_BPA_SUCCESS);
-
-    CLM_ASSERT(create(array_id, CLM_BPA_TYPE_INT, 0, 0) ==
-               CLM_BPA_SUCCESS);
-    for (int & v : values)
-        CLM_ASSERT(append_raw(array_id, &v, sizeof(v)) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(get_count_to(array_id, &count) == CLM_BPA_GET_SUCCESS &&
-               count == 4);
-    CLM_ASSERT(get_capacity_to(array_id, &capacity) ==
-                   CLM_BPA_GET_SUCCESS &&
-               capacity >= count);
-    CLM_ASSERT(get_first_raw(array_id, &first, sizeof(first)) ==
-                   CLM_BPA_GET_SUCCESS &&
-               first == 4);
-    CLM_ASSERT(get_last_raw(array_id, &last, sizeof(last)) ==
-                   CLM_BPA_GET_SUCCESS &&
-               last == 2);
-    CLM_ASSERT(sort_with(array_id, clm_bpa_test_compare) ==
-               CLM_BPA_SUCCESS);
-    CLM_ASSERT(get_raw(array_id, 0, &first, sizeof(first)) ==
-                   CLM_BPA_GET_SUCCESS &&
-               first == 1);
-    clm_int selected[2] = {};
-    const void* borrowed_data = nullptr;
-    std::size_t borrowed_size = 0;
-    CLM_ASSERT(slice_to(array_id, 1, 2, selected, sizeof(selected)) ==
-                   CLM_BPA_SUCCESS &&
-               selected[0] == 2 && selected[1] == 3);
-    CLM_ASSERT(slice_borrow(array_id, 1, 2, &borrowed_data,
-                                     &borrowed_size) == CLM_BPA_SUCCESS &&
-               borrowed_data != nullptr && borrowed_size == sizeof(selected));
-    clm_bpaa_array_node* borrowed_array = nullptr;
-    CLM_ASSERT(advanced_borrow(array_id, &borrowed_array) ==
-                   CLM_BPA_SUCCESS &&
-               advanced_data(borrowed_array) != nullptr);
-    CLM_ASSERT(advanced_get_raw(borrowed_array, 0, &first,
-                                         sizeof(first)) == CLM_BPA_GET_SUCCESS &&
-               first == 1);
-    CLM_ASSERT(advanced_release(&borrowed_array) == CLM_BPA_SUCCESS &&
-               borrowed_array == nullptr);
-    CLM_ASSERT(draw_at_raw(array_id, 1, &last, sizeof(last)) ==
-               CLM_BPA_GET_SUCCESS);
-    CLM_ASSERT(shuffle(array_id) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(draw_raw(array_id, &last, sizeof(last)) ==
-               CLM_BPA_GET_SUCCESS);
+    CLM_ASSERT(!clm_bpa_is_existing(1), "!clm_bpa_is_existing(1)");
+    CLM_ASSERT(!clm_bpaa_is_existing(10), "!clm_bpaa_is_existing(10)");
+    CLM_ASSERT(clm_bpa_create(1, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS, "clm_bpa_create(1, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpa_is_existing(1), "clm_bpa_is_existing(1)");
+    CLM_ASSERT(!clm_bpaa_is_existing(1), "!clm_bpaa_is_existing(1)");
     value = 9;
-    CLM_ASSERT(insert_raw(array_id, 1, &value, sizeof(value)) ==
-               CLM_BPA_SUCCESS);
-    CLM_ASSERT(get_raw(array_id, 1, &first, sizeof(first)) ==
-                   CLM_BPA_GET_SUCCESS &&
-               first == 9);
-    CLM_ASSERT(set_raw(array_id, 1, &values[0], sizeof(values[0])) ==
-               CLM_BPA_SET_SUCCESS);
-    CLM_ASSERT(remove(array_id, 1) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(move_last(array_id) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(get_current_index_to(array_id, &count) ==
-                   CLM_BPA_GET_SUCCESS &&
-               count == 3);
-    CLM_ASSERT(seal(array_id) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(append_raw(array_id, &value, sizeof(value)) ==
-               CLM_BPA_FAILURE);
-    CLM_ASSERT(unseal(array_id) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(slice(array_id, 1, 2, slice_id) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(get_count_to(slice_id, &count) == CLM_BPA_GET_SUCCESS &&
-               count == 2);
-    CLM_ASSERT(erase_array(slice_id) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(erase_array(array_id) == CLM_BPA_SUCCESS);
+    CLM_ASSERT(clm_bpa_replace(1, &value, sizeof(value)) == CLM_BPA_SET_SUCCESS, "clm_bpa_replace(1, &value, sizeof(value)) == CLM_BPA_SET_SUCCESS");
+    CLM_ASSERT(clm_bpa_get(1, &value, sizeof(value)) == CLM_BPA_GET_SUCCESS && value == 9, "clm_bpa_get(1, &value, sizeof(value)) == CLM_BPA_GET_SUCCESS && value == 9");
+    CLM_ASSERT(clm_bpa_create(1, CLM_BPA_TYPE_INT) == CLM_BPA_FAILURE, "clm_bpa_create(1, CLM_BPA_TYPE_INT) == CLM_BPA_FAILURE");
+    CLM_ASSERT(clm_bpa_set(1, (clm_uint*)&values[0], sizeof(values[0])) == CLM_BPA_SET_SUCCESS, "clm_bpa_set(1, (clm_uint*)&values[0], sizeof(values[0])) == CLM_BPA_SET_SUCCESS");
+    CLM_ASSERT(clm_bpa_get(1, (clm_uint*)&value, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpa_get(1, (clm_uint*)&value, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+    CLM_ASSERT(value == 4, "value == 4");
+    CLM_ASSERT(clm_bpa_get(1, (clm_uint*)&value, 1) == CLM_BPA_FAILURE, "clm_bpa_get(1, (clm_uint*)&value, 1) == CLM_BPA_FAILURE");
+    CLM_ASSERT(clm_bpa_ref(1) == CLM_BPA_SUCCESS, "clm_bpa_ref(1) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpa_unref(1) == CLM_BPA_SUCCESS, "clm_bpa_unref(1) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpa_get(1, (clm_uint*)&value, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpa_get(1, (clm_uint*)&value, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+    CLM_ASSERT(clm_bpa_unref(1) == CLM_BPA_SUCCESS, "clm_bpa_unref(1) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpa_get(1, (clm_uint*)&value, sizeof(value)) == CLM_BPA_FAILURE, "clm_bpa_get(1, (clm_uint*)&value, sizeof(value)) == CLM_BPA_FAILURE");
+    CLM_ASSERT(!clm_bpa_is_existing(1), "!clm_bpa_is_existing(1)");
+    CLM_ASSERT(clm_bpa_create_sized(2, CLM_BPA_TYPE_STRUCT, sizeof(struct_value)) == CLM_BPA_SUCCESS, "clm_bpa_create_sized(2, CLM_BPA_TYPE_STRUCT, sizeof(struct_value)) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpa_set(2, (clm_uint*)struct_value, sizeof(struct_value)) == CLM_BPA_SET_SUCCESS, "clm_bpa_set(2, (clm_uint*)struct_value, sizeof(struct_value)) == CLM_BPA_SET_SUCCESS");
+    CLM_ASSERT(clm_bpa_get(2, (clm_uint*)struct_result, sizeof(struct_result)) == CLM_BPA_GET_SUCCESS, "clm_bpa_get(2, (clm_uint*)struct_result, sizeof(struct_result)) == CLM_BPA_GET_SUCCESS");
+    CLM_ASSERT(struct_result[0] == 123 && struct_result[1] == 456, "struct_result[0] == 123 && struct_result[1] == 456");
+    CLM_ASSERT(clm_bpa_delete(2) == CLM_BPA_SUCCESS, "clm_bpa_delete(2) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpa_create(3, CLM_BPA_TYPE_STRING) == CLM_BPA_SUCCESS, "clm_bpa_create(3, CLM_BPA_TYPE_STRING) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpa_set_string(3, greeting_buffer, sizeof(greeting)) == 5, "clm_bpa_set_string(3, greeting_buffer, sizeof(greeting)) == 5");
+    CLM_ASSERT(clm_bpa_get_string(3, text_buffer, sizeof(text_buffer)) == 5, "clm_bpa_get_string(3, text_buffer, sizeof(text_buffer)) == 5");
+    CLM_ASSERT(strcmp(text, greeting) == 0, "strcmp(text, greeting) == 0");
+    CLM_ASSERT(clm_bpa_get_string(3, text_buffer, 5) == CLM_BPA_FAILURE, "clm_bpa_get_string(3, text_buffer, 5) == CLM_BPA_FAILURE");
+    CLM_ASSERT(clm_bpa_set_string(3, replacement_buffer, sizeof(replacement)) == 6, "clm_bpa_set_string(3, replacement_buffer, sizeof(replacement)) == 6");
+    CLM_ASSERT(clm_bpa_get_string(3, text_buffer, sizeof(text_buffer)) == 6, "clm_bpa_get_string(3, text_buffer, sizeof(text_buffer)) == 6");
+    CLM_ASSERT(strcmp(text, replacement) == 0, "strcmp(text, replacement) == 0");
+    memcpy(manipulated_text, text, strlen(text) + 1);
+    memcpy(manipulated_text + strlen(manipulated_text), " updated", sizeof(" updated"));
+    CLM_ASSERT(clm_bpa_replace(3, manipulated_text, (clm_uint)(strlen(manipulated_text) + 1)) ==
+                   (int)strlen(expected_replaced),
+               "clm_bpa_replace(3, manipulated_text, strlen(manipulated_text) + 1) == strlen(expected_replaced)");
+    CLM_ASSERT(clm_bpa_get_string(3, text_buffer, sizeof(text_buffer)) ==
+                   (int)strlen(expected_replaced) && strcmp(text, expected_replaced) == 0,
+               "clm_bpa_get_string(3, text_buffer, sizeof(text_buffer)) == strlen(expected_replaced) && strcmp(text, expected_replaced) == 0");
+    CLM_ASSERT(clm_bpa_replace(999, manipulated_text, (clm_uint)(strlen(manipulated_text) + 1)) ==
+                   CLM_BPA_FAILURE,
+               "clm_bpa_replace(999, manipulated_text, strlen(manipulated_text) + 1) == CLM_BPA_FAILURE");
+    CLM_ASSERT(clm_bpa_delete(3) == CLM_BPA_SUCCESS, "clm_bpa_delete(3) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpa_create(4, CLM_BPA_TYPE_STRUCT) == CLM_BPA_FAILURE, "clm_bpa_create(4, CLM_BPA_TYPE_STRUCT) == CLM_BPA_FAILURE");
 
-    CLM_ASSERT(create(string_array_id, CLM_BPA_TYPE_STRING, 0, 0) ==
-               CLM_BPA_SUCCESS);
-    CLM_ASSERT(append_string_raw(string_array_id, "one", sizeof("one")) ==
-               CLM_BPA_SUCCESS);
-    CLM_ASSERT(append_string_raw(string_array_id, "two", sizeof("two")) ==
-               CLM_BPA_SUCCESS);
-    CLM_ASSERT(get_string_raw(string_array_id, 1, text, sizeof(text)) == 3 &&
-               std::strcmp(text, "two") == 0);
-    CLM_ASSERT(set_string_raw(string_array_id, 0, "updated",
-                                       sizeof("updated")) == 7);
-    CLM_ASSERT(remove_first(string_array_id) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(move_first(string_array_id) == CLM_BPA_SUCCESS);
-    CLM_ASSERT(get_string_raw(string_array_id, 0, text, sizeof(text)) == 3 &&
-               std::strcmp(text, "two") == 0);
-    CLM_ASSERT(erase_array(string_array_id) == CLM_BPA_SUCCESS);
+    CLM_ASSERT(clm_bpaa_create(10, CLM_BPA_TYPE_INT, 1, 0) == CLM_BPA_SUCCESS, "clm_bpaa_create(10, CLM_BPA_TYPE_INT, 1, 0) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_is_existing(10), "clm_bpaa_is_existing(10)");
+    CLM_ASSERT(!clm_bpa_is_existing(10), "!clm_bpa_is_existing(10)");
+    for (i = 0; i < sizeof(values) / sizeof(values[0]); ++i)
+        CLM_ASSERT(clm_bpaa_append_raw(10, (clm_uint*)&values[i], sizeof(values[i])) == CLM_BPA_SUCCESS, "clm_bpaa_append_raw(10, (clm_uint*)&values[i], sizeof(values[i])) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_get_count_to(10, &count) == CLM_BPA_GET_SUCCESS && count == 4, "clm_bpaa_get_count_to(10, &count) == CLM_BPA_GET_SUCCESS && count == 4");
+    CLM_ASSERT(clm_bpaa_get_capacity_to(10, &capacity) == CLM_BPA_GET_SUCCESS && capacity >= 4, "clm_bpaa_get_capacity_to(10, &capacity) == CLM_BPA_GET_SUCCESS && capacity >= 4");
+    CLM_ASSERT(clm_bpaa_get_first_raw(10, output, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpaa_get_first_raw(10, output, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+    CLM_ASSERT(clm_bpa_read_int(output) == 4, "clm_bpa_read_int(output) == 4");
+    CLM_ASSERT(clm_bpaa_get_last_raw(10, output, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpaa_get_last_raw(10, output, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+    CLM_ASSERT(clm_bpa_read_int(output) == 2, "clm_bpa_read_int(output) == 2");
+    CLM_ASSERT(clm_bpaa_get_raw(10, -1, output, sizeof(value)) == CLM_BPA_FAILURE, "clm_bpaa_get_raw(10, -1, output, sizeof(value)) == CLM_BPA_FAILURE");
+    CLM_ASSERT(clm_bpaa_get_raw(10, 4, output, sizeof(value)) == CLM_BPA_FAILURE, "clm_bpaa_get_raw(10, 4, output, sizeof(value)) == CLM_BPA_FAILURE");
+    CLM_ASSERT(clm_bpaa_insert_raw(10, 1, (clm_uint*)&values[1], sizeof(value)) == CLM_BPA_SUCCESS, "clm_bpaa_insert_raw(10, 1, (clm_uint*)&values[1], sizeof(value)) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_get_raw(10, 1, output, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpaa_get_raw(10, 1, output, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+    CLM_ASSERT(clm_bpa_read_int(output) == 1, "clm_bpa_read_int(output) == 1");
+    CLM_ASSERT(clm_bpaa_set_raw(10, 1, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_SET_SUCCESS, "clm_bpaa_set_raw(10, 1, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_SET_SUCCESS");
+    CLM_ASSERT(clm_bpaa_move_to(10, 2) == CLM_BPA_SUCCESS, "clm_bpaa_move_to(10, 2) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_get_current_index_to(10, &index) == CLM_BPA_GET_SUCCESS && index == 2, "clm_bpaa_get_current_index_to(10, &index) == CLM_BPA_GET_SUCCESS && index == 2");
+    CLM_ASSERT(clm_bpaa_get_current_raw(10, output, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpaa_get_current_raw(10, output, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+    CLM_ASSERT(clm_bpaa_move_previous(10) == CLM_BPA_SUCCESS, "clm_bpaa_move_previous(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_move_next(10) == CLM_BPA_SUCCESS, "clm_bpaa_move_next(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_move_last(10) == CLM_BPA_SUCCESS, "clm_bpaa_move_last(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_move_next(10) == CLM_BPA_FAILURE, "clm_bpaa_move_next(10) == CLM_BPA_FAILURE");
+    CLM_ASSERT(clm_bpaa_reset(10) == CLM_BPA_SUCCESS, "clm_bpaa_reset(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_extend(10, 2) == CLM_BPA_SUCCESS, "clm_bpaa_extend(10, 2) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_get_capacity_to(10, &capacity) == CLM_BPA_GET_SUCCESS, "clm_bpaa_get_capacity_to(10, &capacity) == CLM_BPA_GET_SUCCESS");
+    CLM_ASSERT(clm_bpaa_shrink(10, capacity - 1) == CLM_BPA_SUCCESS, "clm_bpaa_shrink(10, capacity - 1) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_reverse(10) == CLM_BPA_SUCCESS, "clm_bpaa_reverse(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_sort_with(10, clm_bpa_compare_ints) == CLM_BPA_SUCCESS, "clm_bpaa_sort_with(10, clm_bpa_compare_ints) == CLM_BPA_SUCCESS");
+    for (i = 1; i < 5; ++i) {
+        clm_int current;
+        CLM_ASSERT(clm_bpaa_get_raw(10, (clm_int)i, output, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpaa_get_raw(10, (clm_int)i, output, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+        current = clm_bpa_read_int(output);
+        CLM_ASSERT(clm_bpaa_get_raw(10, (clm_int)i - 1, output, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpaa_get_raw(10, (clm_int)i - 1, output, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+        CLM_ASSERT(current >= clm_bpa_read_int(output), "current >= clm_bpa_read_int(output)");
+    }
+    CLM_ASSERT(clm_bpaa_shift_left(10, 1, 1) == CLM_BPA_SUCCESS, "clm_bpaa_shift_left(10, 1, 1) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_shift_right(10, 1, 1) == CLM_BPA_SUCCESS, "clm_bpaa_shift_right(10, 1, 1) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_swap(10, 0, 1) == CLM_BPA_SUCCESS, "clm_bpaa_swap(10, 0, 1) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_copy(10, 0, 1) == CLM_BPA_SUCCESS, "clm_bpaa_copy(10, 0, 1) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm::bpa::sort(10, nullptr) == CLM_BPA_FAILURE, "clm::bpa::sort(10, nullptr) == CLM_BPA_FAILURE");
+    CLM_ASSERT(clm_bpaa_shuffle(10) == CLM_BPA_SUCCESS, "clm_bpaa_shuffle(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_draw_at_raw(10, 2, output, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpaa_draw_at_raw(10, 2, output, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+    drawn[0] = clm_bpa_read_int(output);
+    for (i = 1; i < 5; ++i) {
+        CLM_ASSERT(clm_bpaa_draw_raw(10, output, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpaa_draw_raw(10, output, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+        drawn[i] = clm_bpa_read_int(output);
+    }
+    CLM_ASSERT(clm_bpaa_draw_raw(10, output, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpaa_draw_raw(10, output, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+    for (i = 1; i <= 4; ++i) {
+        clm_uint j;
+        clm_uint occurrences = 0;
+        for (j = 0; j < 5; ++j)
+            if (drawn[j] == (clm_int)i)
+                ++occurrences;
+        CLM_ASSERT(occurrences == (i == 1 ? 0u : (i == 2 || i == 4 ? 2u : 1u)), "occurrences == (i == 1 ? 0u : (i == 2 || i == 4 ? 2u : 1u))");
+        draw_count += occurrences;
+    }
+    CLM_ASSERT(draw_count == 5, "draw_count == 5");
+    CLM_ASSERT(clm_bpaa_is_sealed_to(10, &sealed) == CLM_BPA_GET_SUCCESS && sealed == 0, "clm_bpaa_is_sealed_to(10, &sealed) == CLM_BPA_GET_SUCCESS && sealed == 0");
+    CLM_ASSERT(clm_bpaa_seal(10) == CLM_BPA_SUCCESS, "clm_bpaa_seal(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_is_sealed_to(10, &sealed) == CLM_BPA_GET_SUCCESS && sealed == 1, "clm_bpaa_is_sealed_to(10, &sealed) == CLM_BPA_GET_SUCCESS && sealed == 1");
+    CLM_ASSERT(clm_bpaa_append_raw(10, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_SUCCESS, "clm_bpaa_append_raw(10, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_get_count_to(10, &count) == CLM_BPA_GET_SUCCESS, "clm_bpaa_get_count_to(10, &count) == CLM_BPA_GET_SUCCESS");
+    CLM_ASSERT(clm_bpaa_get_capacity_to(10, &capacity) == CLM_BPA_GET_SUCCESS, "clm_bpaa_get_capacity_to(10, &capacity) == CLM_BPA_GET_SUCCESS");
+    while (count < capacity) {
+        CLM_ASSERT(clm_bpaa_append_raw(10, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_SUCCESS, "clm_bpaa_append_raw(10, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_SUCCESS");
+        ++count;
+    }
+    CLM_ASSERT(clm_bpaa_append_raw(10, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_FAILURE, "clm_bpaa_append_raw(10, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_FAILURE");
+    CLM_ASSERT(clm_bpaa_clear(10) == CLM_BPA_SUCCESS, "clm_bpaa_clear(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_append_raw(10, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_SUCCESS, "clm_bpaa_append_raw(10, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_remove_first(10) == CLM_BPA_SUCCESS, "clm_bpaa_remove_first(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_clear(10) == CLM_BPA_SUCCESS, "clm_bpaa_clear(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_unseal(10) == CLM_BPA_SUCCESS, "clm_bpaa_unseal(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_extend(10, 1) == CLM_BPA_SUCCESS, "clm_bpaa_extend(10, 1) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_get_count_to(10, &count) == CLM_BPA_GET_SUCCESS && count == 0, "clm_bpaa_get_count_to(10, &count) == CLM_BPA_GET_SUCCESS && count == 0");
+    CLM_ASSERT(clm_bpaa_clear(10) == CLM_BPA_SUCCESS, "clm_bpaa_clear(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_draw_raw(10, output, sizeof(value)) == CLM_BPA_FAILURE, "clm_bpaa_draw_raw(10, output, sizeof(value)) == CLM_BPA_FAILURE");
+    CLM_ASSERT(clm::bpa::ref_array(10) == CLM_BPA_SUCCESS, "clm::bpa::ref_array(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm::bpa::unref_array(10) == CLM_BPA_SUCCESS, "clm::bpa::unref_array(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm::bpa::unref_array(10) == CLM_BPA_SUCCESS, "clm::bpa::unref_array(10) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(!clm_bpaa_is_existing(10), "!clm_bpaa_is_existing(10)");
+    CLM_ASSERT(clm_bpaa_get_count_to(10, &count) == CLM_BPA_FAILURE, "clm_bpaa_get_count_to(10, &count) == CLM_BPA_FAILURE");
+
+    CLM_ASSERT(clm_bpaa_create(11, CLM_BPA_TYPE_STRING, 0, 1) == CLM_BPA_SUCCESS, "clm_bpaa_create(11, CLM_BPA_TYPE_STRING, 0, 1) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_append_raw(11, greeting_buffer, sizeof(greeting)) == CLM_BPA_SUCCESS, "clm_bpaa_append_raw(11, greeting_buffer, sizeof(greeting)) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_append_raw(11, empty_buffer, sizeof(empty)) == CLM_BPA_SUCCESS, "clm_bpaa_append_raw(11, empty_buffer, sizeof(empty)) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_get_string_raw(11, 0, text_buffer, sizeof(text_buffer)) == 5, "clm_bpaa_get_string_raw(11, 0, text_buffer, sizeof(text_buffer)) == 5");
+    CLM_ASSERT(strcmp(text, greeting) == 0, "strcmp(text, greeting) == 0");
+    CLM_ASSERT(clm_bpaa_set_string_raw(11, 1, replacement_buffer, sizeof(replacement)) == 6, "clm_bpaa_set_string_raw(11, 1, replacement_buffer, sizeof(replacement)) == 6");
+    CLM_ASSERT(clm::bpa::move_first(11) == CLM_BPA_SUCCESS, "clm::bpa::move_first(11) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm::bpa::get_length_to(11, &length) == CLM_BPA_GET_SUCCESS && length == 5, "clm::bpa::get_length_to(11, &length) == CLM_BPA_GET_SUCCESS && length == 5");
+    CLM_ASSERT(clm_bpaa_remove(11, 0) == CLM_BPA_SUCCESS, "clm_bpaa_remove(11, 0) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_get_string_raw(11, 0, text_buffer, sizeof(text_buffer)) == 6, "clm_bpaa_get_string_raw(11, 0, text_buffer, sizeof(text_buffer)) == 6");
+    CLM_ASSERT(strcmp(text, replacement) == 0, "strcmp(text, replacement) == 0");
+    CLM_ASSERT(clm_bpaa_clear(11) == CLM_BPA_SUCCESS, "clm_bpaa_clear(11) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm::bpa::erase_array(11) == CLM_BPA_SUCCESS, "clm::bpa::erase_array(11) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(!clm_bpaa_is_existing(11), "!clm_bpaa_is_existing(11)");
+
+    CLM_ASSERT(clm::bpa::create_sized(12, CLM_BPA_TYPE_STRUCT, 1, sizeof(value), 0) ==
+               CLM_BPA_SUCCESS, "clm_bpaa_create_sized(12, CLM_BPA_TYPE_STRUCT, 1, sizeof(value), 0) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_append_raw(12, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_SUCCESS, "clm_bpaa_append_raw(12, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_get_raw(12, 0, output, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpaa_get_raw(12, 0, output, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+    CLM_ASSERT(clm_bpa_read_int(output) == 4, "clm_bpa_read_int(output) == 4");
+    CLM_ASSERT(clm::bpa::erase_array(12) == CLM_BPA_SUCCESS, "clm::bpa::erase_array(12) == CLM_BPA_SUCCESS");
 
     {
-        constexpr clm_id block_id = UINT64_C(0xB004);
-        constexpr clm_id array_id = UINT64_C(0xA004);
-        constexpr clm_id copied_block_id = UINT64_C(0xB005);
-        clm_int initial = 17;
-        clm_int replacement = 19;
-        clm_int observed = 0;
+        const clm_id source_id = 13;
+        const clm_id copied_id = 14;
+        const clm_id string_array_id = 15;
+        const clm_id string_copy_id = 16;
+        const clm_id string_value_id = 17;
+        const clm_id empty_copy_id = 19;
+        clm_int copied_values[2] = {0, 0};
+        const void* borrowed = NULL;
+        size_t borrowed_size = 0;
+        clm_int borrowed_first = 0;
+        clm_int borrowed_second = 0;
 
-        CLM_ASSERT(create(block_id, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(create(block_id, CLM_BPA_TYPE_INT) == CLM_BPA_FAILURE);
-        CLM_ASSERT(replace(block_id, &initial, sizeof(initial)) ==
-                   CLM_BPA_SET_SUCCESS);
-        CLM_ASSERT(get(block_id, &observed, sizeof(observed)) ==
-                       CLM_BPA_GET_SUCCESS &&
-                   observed == initial);
-        CLM_ASSERT(replace(block_id, &replacement, sizeof(replacement)) ==
-                   CLM_BPA_SET_SUCCESS);
-        CLM_ASSERT(replace(UINT64_C(0xB099), &replacement,
-                           sizeof(replacement)) == CLM_BPA_FAILURE);
-        CLM_ASSERT(create( UINT64_C(0xB006), CLM_BPA_TYPE_STRUCT) ==
-                   CLM_BPA_FAILURE);
-
-        CLM_ASSERT(create_sized(array_id, CLM_BPA_TYPE_INT, 1,
-                                sizeof(initial), 0) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(append(array_id, block_id, sizeof(initial)) ==
-                   CLM_BPA_SUCCESS);
-        CLM_ASSERT(set(array_id, 0, block_id, sizeof(initial)) ==
-                   CLM_BPA_SET_SUCCESS);
-        CLM_ASSERT(insert(array_id, 0, block_id, sizeof(initial)) ==
-                   CLM_BPA_SUCCESS);
-        CLM_ASSERT(get(array_id, 1, copied_block_id, sizeof(initial)) ==
-                   CLM_BPA_GET_SUCCESS);
-        CLM_ASSERT(get(copied_block_id, &observed, sizeof(observed)) ==
-                       CLM_BPA_GET_SUCCESS &&
-                   observed == replacement);
-        CLM_ASSERT(get_raw(array_id, -1, &observed, sizeof(observed)) ==
-                   CLM_BPA_FAILURE);
-        CLM_ASSERT(get_raw(array_id, 2, &observed, sizeof(observed)) ==
-                   CLM_BPA_FAILURE);
-        CLM_ASSERT(set_raw(array_id, 0, &replacement,
-                           sizeof(replacement) - 1) == CLM_BPA_FAILURE);
-        CLM_ASSERT(clear(array_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(get_count_to(array_id, &count) == CLM_BPA_GET_SUCCESS &&
-                   count == 0);
-        CLM_ASSERT(draw_raw(array_id, &observed, sizeof(observed)) ==
-                   CLM_BPA_FAILURE);
-        CLM_ASSERT(extend(array_id, 1) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(remove(array_id, 0) == CLM_BPA_FAILURE);
-        CLM_ASSERT(erase_block(copied_block_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(erase_array(array_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(erase_block(block_id) == CLM_BPA_SUCCESS);
+        CLM_ASSERT(clm_bpaa_create(source_id, CLM_BPA_TYPE_INT, 0, 0) == CLM_BPA_SUCCESS, "create source array for slicing");
+        for (i = 0; i < 4; ++i)
+            CLM_ASSERT(clm_bpaa_append_raw(source_id, &values[i], sizeof(values[i])) == CLM_BPA_SUCCESS, "append item to slice source");
+        CLM_ASSERT(clm::bpa::slice(source_id, 1, 2, copied_id) == CLM_BPA_SUCCESS, "copy BPAA element range into a new array");
+        CLM_ASSERT(clm_bpaa_get_count_to(copied_id, &count) == CLM_BPA_GET_SUCCESS && count == 2, "copied BPAA slice has expected count");
+        CLM_ASSERT(clm_bpaa_get_raw(copied_id, 0, &copied_values[0], sizeof(copied_values[0])) == CLM_BPA_GET_SUCCESS &&
+                   clm_bpaa_get_raw(copied_id, 1, &copied_values[1], sizeof(copied_values[1])) == CLM_BPA_GET_SUCCESS &&
+                   copied_values[0] == 1 && copied_values[1] == 3, "copied BPAA slice preserves selected values");
+        CLM_ASSERT(clm::bpa::slice_to(source_id, 1, 2, copied_values, sizeof(copied_values)) == CLM_BPA_SUCCESS &&
+                   copied_values[0] == 1 && copied_values[1] == 3, "copy BPAA slice into caller buffer");
+        CLM_ASSERT(clm::bpa::slice(source_id, 4, 0, empty_copy_id) == CLM_BPA_SUCCESS &&
+                   clm_bpaa_get_count_to(empty_copy_id, &count) == CLM_BPA_GET_SUCCESS && count == 0,
+                   "empty BPAA copy slice at end creates an empty array");
+        CLM_ASSERT(clm::bpa::erase_array(empty_copy_id) == CLM_BPA_SUCCESS, "delete empty BPAA copy slice");
+        CLM_ASSERT(clm::bpa::slice_borrow(source_id, 1, 2, &borrowed, &borrowed_size) == CLM_BPA_SUCCESS &&
+                   borrowed != NULL && borrowed_size == sizeof(copied_values), "borrow contiguous BPAA slice");
+        memcpy(&borrowed_first, borrowed, sizeof(borrowed_first));
+        memcpy(&borrowed_second, (const unsigned char*)borrowed + sizeof(borrowed_first), sizeof(borrowed_second));
+        CLM_ASSERT(borrowed_first == 1 && borrowed_second == 3, "borrowed BPAA slice addresses expected values");
+        CLM_ASSERT(clm::bpa::slice_borrow(source_id, 4, 0, &borrowed, &borrowed_size) == CLM_BPA_SUCCESS &&
+                   borrowed == NULL && borrowed_size == 0, "empty BPAA borrowed slice at end succeeds");
+        CLM_ASSERT(clm::bpa::slice_to(source_id, 4, 0, nullptr, 0) == CLM_BPA_SUCCESS, "empty BPAA copied slice accepts null output");
+        CLM_ASSERT(clm::bpa::slice(source_id, 3, 2, 18) == CLM_BPA_FAILURE, "BPAA copy slice rejects out-of-range request");
+        CLM_ASSERT(clm::bpa::slice_to(source_id, -1, 1, copied_values, sizeof(copied_values)) == CLM_BPA_FAILURE, "BPAA buffer slice rejects negative start");
+        CLM_ASSERT(clm_bpaa_create(string_array_id, CLM_BPA_TYPE_STRING, 0, 0) == CLM_BPA_SUCCESS, "create string array for slice rejection");
+        CLM_ASSERT(clm::bpa::slice_borrow(string_array_id, 0, 0, &borrowed, &borrowed_size) == CLM_BPA_FAILURE, "BPAA borrowed raw slice rejects string arrays");
+        CLM_ASSERT(clm_bpa_create(string_value_id, CLM_BPA_TYPE_STRING) == CLM_BPA_SUCCESS &&
+                   clm_bpa_set_string(string_value_id, "hello", sizeof("hello")) == 5, "create BPA string for deep-copy slice test");
+        CLM_ASSERT(clm_bpaa_append_string(string_array_id, string_value_id) == CLM_BPA_SUCCESS, "append string into BPAA source");
+        CLM_ASSERT(clm::bpa::slice(string_array_id, 0, 1, string_copy_id) == CLM_BPA_SUCCESS, "deep-copy string BPAA slice");
+        CLM_ASSERT(clm_bpaa_set_string_raw(string_array_id, 0, "changed", sizeof("changed")) == 7, "mutate string BPAA source after slicing");
+        CLM_ASSERT(clm_bpaa_get_string_raw(string_copy_id, 0, text_buffer, sizeof(text_buffer)) == 5 &&
+                   strcmp(text, "hello") == 0, "string BPAA slice owns an independent copy");
+        CLM_ASSERT(clm::bpa::erase_array(string_copy_id) == CLM_BPA_SUCCESS, "delete copied string BPAA slice");
+        CLM_ASSERT(clm_bpa_delete(string_value_id) == CLM_BPA_SUCCESS, "delete source BPA string for slice test");
+        CLM_ASSERT(clm::bpa::erase_array(string_array_id) == CLM_BPA_SUCCESS, "delete string array used for slice rejection");
+        CLM_ASSERT(clm::bpa::erase_array(copied_id) == CLM_BPA_SUCCESS, "delete copied BPAA slice");
+        CLM_ASSERT(clm::bpa::erase_array(source_id) == CLM_BPA_SUCCESS, "delete BPAA slice source");
     }
 
+    CLM_ASSERT(clm_bpaa_create(wide_id, CLM_BPA_TYPE_INT, 0, 0) == CLM_BPA_SUCCESS, "clm_bpaa_create(wide_id, CLM_BPA_TYPE_INT, 0, 0) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_append_raw(wide_id, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_SUCCESS, "clm_bpaa_append_raw(wide_id, (clm_uint*)&values[0], sizeof(value)) == CLM_BPA_SUCCESS");
+    CLM_ASSERT(clm_bpaa_get_raw(wide_id, 0, output, sizeof(value)) == CLM_BPA_GET_SUCCESS, "clm_bpaa_get_raw(wide_id, 0, output, sizeof(value)) == CLM_BPA_GET_SUCCESS");
+    CLM_ASSERT(clm_bpa_read_int(output) == 4, "clm_bpa_read_int(output) == 4");
+    CLM_ASSERT(clm_bpaa_delete(wide_id) == CLM_BPA_SUCCESS, "clm_bpaa_delete(wide_id) == CLM_BPA_SUCCESS");
+
+    for (i = 0; i < 64; ++i)
+        CLM_ASSERT(clm_bpa_create(UINT64_C(1000) + i, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS, "clm_bpa_create(UINT64_C(1000) + i, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS");
+    for (i = 0; i < 64; i += 2)
+        CLM_ASSERT(clm_bpa_delete(UINT64_C(1000) + i) == CLM_BPA_SUCCESS, "clm_bpa_delete(UINT64_C(1000) + i) == CLM_BPA_SUCCESS");
+    for (i = 1; i < 64; i += 2)
+        CLM_ASSERT(clm_bpa_unref(UINT64_C(1000) + i) == CLM_BPA_SUCCESS, "clm_bpa_unref(UINT64_C(1000) + i) == CLM_BPA_SUCCESS");
+    for (i = 0; i < 32; ++i)
+        CLM_ASSERT(clm_bpa_create(UINT64_C(2000) + i, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS, "clm_bpa_create(UINT64_C(2000) + i, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS");
+    for (i = 0; i < 32; ++i)
+        CLM_ASSERT(clm_bpa_delete(UINT64_C(2000) + i) == CLM_BPA_SUCCESS, "clm_bpa_delete(UINT64_C(2000) + i) == CLM_BPA_SUCCESS");
+
+    for (i = 0; i < 32; ++i)
+        CLM_ASSERT(clm_bpaa_create(UINT64_C(3000) + i, CLM_BPA_TYPE_INT, 0, 0) ==
+                   CLM_BPA_SUCCESS, "clm_bpaa_create(UINT64_C(3000) + i, CLM_BPA_TYPE_INT, 0, 0) == CLM_BPA_SUCCESS");
+    for (i = 0; i < 32; i += 2)
+        CLM_ASSERT(clm_bpaa_delete(UINT64_C(3000) + i) == CLM_BPA_SUCCESS, "clm_bpaa_delete(UINT64_C(3000) + i) == CLM_BPA_SUCCESS");
+    for (i = 0; i < 16; ++i)
+        CLM_ASSERT(clm_bpaa_create(UINT64_C(4000) + i, CLM_BPA_TYPE_INT, 0, 0) ==
+                   CLM_BPA_SUCCESS, "clm_bpaa_create(UINT64_C(4000) + i, CLM_BPA_TYPE_INT, 0, 0) == CLM_BPA_SUCCESS");
+    for (i = 1; i < 32; i += 2)
+        CLM_ASSERT(clm_bpaa_delete(UINT64_C(3000) + i) == CLM_BPA_SUCCESS, "clm_bpaa_delete(UINT64_C(3000) + i) == CLM_BPA_SUCCESS");
+    for (i = 0; i < 16; ++i)
+        CLM_ASSERT(clm_bpaa_delete(UINT64_C(4000) + i) == CLM_BPA_SUCCESS, "clm_bpaa_delete(UINT64_C(4000) + i) == CLM_BPA_SUCCESS");
+
+
+    /* Pool reuse and bounded pooled allocation */
     {
-        constexpr clm_id source_id = UINT64_C(0xB007);
-        constexpr clm_id array_id = UINT64_C(0xA005);
-        constexpr clm_id copied_id = UINT64_C(0xB008);
-        constexpr clm_id empty_id = UINT64_C(0xA006);
-        constexpr clm_id string_array_id = UINT64_C(0xA007);
-        constexpr clm_id string_slice_id = UINT64_C(0xA008);
-        constexpr clm_id string_source_array_id = UINT64_C(0xA011);
-        const char hello[] = "hello";
-        const char world[] = "world!";
-        const char empty[] = "";
-        char output[16] = {};
-        clm_int items[] = {4, 1, 3};
-        clm_int observed[2] = {};
-        clm_uint string_length = 0;
-        const void* borrowed = nullptr;
-        std::size_t borrowed_size = 0;
+        size_t active_before, reserved_before, active_after, reserved_after;
+        clm_int initial = 777, observed = 0;
+        clm_int another = 888;
+        clm_id block_id = UINT64_C(50001);
+        clm_id arr_id = UINT64_C(50002);
+        clm_id text_id = UINT64_C(50003);
+        clm_id text_array_id = UINT64_C(50004);
+        size_t pool_capacity_after_delete;
+        CLM_ASSERT(clm_bpa_pool_stats(sizeof(clm_int), &active_before, &reserved_before) == CLM_BPA_SUCCESS, "clm_bpa_pool_stats(sizeof(clm_int), &active_before, &reserved_before) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpa_create(50001, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS, "clm_bpa_create(50001, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpa_set(block_id, &initial, sizeof(initial)) == CLM_BPA_SET_SUCCESS, "clm_bpa_set(block_id, &initial, sizeof(initial)) == CLM_BPA_SET_SUCCESS");
+        CLM_ASSERT(clm_bpa_pool_stats(sizeof(clm_int), &active_after, &reserved_after) == CLM_BPA_SUCCESS, "clm_bpa_pool_stats(sizeof(clm_int), &active_after, &reserved_after) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(active_after == active_before + 1 && reserved_after >= active_after, "active_after == active_before + 1 && reserved_after >= active_after");
+        CLM_ASSERT(clm_bpaa_create_sized(arr_id, CLM_BPA_TYPE_STRUCT, 0, sizeof(clm_int), 0) == CLM_BPA_SUCCESS, "clm_bpaa_create_sized(arr_id, CLM_BPA_TYPE_STRUCT, 0, sizeof(clm_int), 0) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm::bpa::append(arr_id, block_id, sizeof(initial)) == CLM_BPA_SUCCESS, "clm::bpa::append(arr_id, block_id, sizeof(initial)) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm::bpa::append(arr_id, block_id, sizeof(initial) + 1) == CLM_BPA_FAILURE, "clm::bpa::append(arr_id, block_id, sizeof(initial) + 1) == CLM_BPA_FAILURE");
+        CLM_ASSERT(clm::bpa::get(arr_id, 0, block_id, sizeof(initial)) == CLM_BPA_GET_SUCCESS, "clm::bpa::get(arr_id, 0, block_id, sizeof(initial)) == CLM_BPA_GET_SUCCESS");
+        CLM_ASSERT(clm_bpa_get(block_id, &observed, sizeof(observed)) == CLM_BPA_GET_SUCCESS && observed == 777, "clm_bpa_get(block_id, &observed, sizeof(observed)) == CLM_BPA_GET_SUCCESS && observed == 777");
+        CLM_ASSERT(clm_bpa_set(block_id, &another, sizeof(another)) == CLM_BPA_SET_SUCCESS, "clm_bpa_set(block_id, &another, sizeof(another)) == CLM_BPA_SET_SUCCESS");
+        CLM_ASSERT(clm::bpa::set(arr_id, 0, block_id, sizeof(initial)) == CLM_BPA_SET_SUCCESS, "clm::bpa::set(arr_id, 0, block_id, sizeof(initial)) == CLM_BPA_SET_SUCCESS");
+        CLM_ASSERT(clm::bpa::insert(arr_id, 0, block_id, sizeof(initial)) == CLM_BPA_SUCCESS, "clm::bpa::insert(arr_id, 0, block_id, sizeof(initial)) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm::bpa::get(arr_id, 1, block_id, sizeof(initial)) == CLM_BPA_GET_SUCCESS, "clm::bpa::get(arr_id, 1, block_id, sizeof(initial)) == CLM_BPA_GET_SUCCESS");
+        CLM_ASSERT(clm_bpa_get(block_id, &observed, sizeof(observed)) == CLM_BPA_GET_SUCCESS && observed == 888, "clm_bpa_get(block_id, &observed, sizeof(observed)) == CLM_BPA_GET_SUCCESS && observed == 888");
+        CLM_ASSERT(clm::bpa::draw_at(arr_id, 0, block_id, sizeof(initial)) == CLM_BPA_GET_SUCCESS, "clm::bpa::draw_at(arr_id, 0, block_id, sizeof(initial)) == CLM_BPA_GET_SUCCESS");
+        CLM_ASSERT(clm::bpa::draw(arr_id, block_id, sizeof(initial)) == CLM_BPA_GET_SUCCESS, "clm::bpa::draw(arr_id, block_id, sizeof(initial)) == CLM_BPA_GET_SUCCESS");
+        CLM_ASSERT(clm::bpa::get(arr_id, 0, UINT64_C(919191), sizeof(initial)) == CLM_BPA_FAILURE, "clm::bpa::get(arr_id, 0, UINT64_C(919191), sizeof(initial)) == CLM_BPA_FAILURE");
+        CLM_ASSERT(clm_bpaa_delete(arr_id) == CLM_BPA_SUCCESS, "clm_bpaa_delete(arr_id) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpa_delete(block_id) == CLM_BPA_SUCCESS, "clm_bpa_delete(block_id) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpa_pool_stats(sizeof(clm_int), &active_after, &pool_capacity_after_delete) == CLM_BPA_SUCCESS, "clm_bpa_pool_stats(sizeof(clm_int), &active_after, &pool_capacity_after_delete) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(active_after == active_before && pool_capacity_after_delete == reserved_after, "active_after == active_before && pool_capacity_after_delete == reserved_after");
+        CLM_ASSERT(clm_bpa_create(50001, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS, "clm_bpa_create(50001, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpa_get(block_id, &observed, sizeof(observed)) == CLM_BPA_GET_SUCCESS && observed == 0, "clm_bpa_get(block_id, &observed, sizeof(observed)) == CLM_BPA_GET_SUCCESS && observed == 0");
+        CLM_ASSERT(clm_bpa_delete(block_id) == CLM_BPA_SUCCESS, "clm_bpa_delete(block_id) == CLM_BPA_SUCCESS");
 
-        CLM_ASSERT(create(array_id, CLM_BPA_TYPE_INT, 0, 0) ==
-                   CLM_BPA_SUCCESS);
-        for (clm_int item : items)
-            CLM_ASSERT(append_raw(array_id, &item, sizeof(item)) ==
-                       CLM_BPA_SUCCESS);
-        CLM_ASSERT(slice(array_id, 1, 2, copied_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(slice_to(array_id, 1, 2, observed, sizeof(observed)) ==
-                       CLM_BPA_SUCCESS &&
-                   observed[0] == 1 && observed[1] == 3);
-        CLM_ASSERT(slice(array_id, 3, 0, empty_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(get_count_to(empty_id, &count) == CLM_BPA_GET_SUCCESS &&
-                   count == 0);
-        CLM_ASSERT(slice_to(array_id, 3, 0, nullptr, 0) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(slice_borrow(array_id, 3, 0, &borrowed, &borrowed_size) ==
-                       CLM_BPA_SUCCESS &&
-                   borrowed == nullptr && borrowed_size == 0);
-        CLM_ASSERT(slice(array_id, 2, 2, UINT64_C(0xA099)) ==
-                   CLM_BPA_FAILURE);
-        CLM_ASSERT(erase_array(empty_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(erase_array(copied_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(erase_array(array_id) == CLM_BPA_SUCCESS);
-
-        CLM_ASSERT(create(source_id, CLM_BPA_TYPE_STRING) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(set_string(source_id, hello, sizeof(hello)) == 5);
-        CLM_ASSERT(create(string_array_id, CLM_BPA_TYPE_STRING, 0, 1) ==
-                   CLM_BPA_SUCCESS);
-        CLM_ASSERT(append_string(string_array_id, source_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(set_string(source_id, world, sizeof(world)) == 6);
-        CLM_ASSERT(get_string(string_array_id, 0, copied_id, sizeof(output)) ==
-                   CLM_BPA_SUCCESS);
-        CLM_ASSERT(get_string(copied_id, output, sizeof(output)) == 5 &&
-                   std::strcmp(output, hello) == 0);
-        CLM_ASSERT(set_string(string_array_id, 0, source_id, sizeof(world)) ==
-                   6);
-        CLM_ASSERT(get_string_raw(string_array_id, 0, output, sizeof(output)) ==
-                       6 &&
-                   std::strcmp(output, world) == 0);
-        CLM_ASSERT(append_string_raw(string_array_id, empty, sizeof(empty)) ==
-                   CLM_BPA_SUCCESS);
-        CLM_ASSERT(move_to(string_array_id, 1) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(get_length_to(string_array_id, &string_length) ==
-                       CLM_BPA_GET_SUCCESS &&
-                   string_length == 0);
-        CLM_ASSERT(remove(string_array_id, 0) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(get_string_raw(string_array_id, 0, output, sizeof(output)) ==
-                       0 &&
-                   std::strcmp(output, "") == 0);
-        CLM_ASSERT(create(string_source_array_id, CLM_BPA_TYPE_STRING, 0, 0) ==
-                   CLM_BPA_SUCCESS);
-        CLM_ASSERT(append_string_raw(string_source_array_id, hello, sizeof(hello)) ==
-                   CLM_BPA_SUCCESS);
-        CLM_ASSERT(slice(string_source_array_id, 0, 1, string_slice_id) ==
-                   CLM_BPA_SUCCESS);
-        CLM_ASSERT(set_string_raw(string_source_array_id, 0, world, sizeof(world)) ==
-                   6);
-        CLM_ASSERT(get_string_raw(string_slice_id, 0, output, sizeof(output)) ==
-                       5 &&
-                   std::strcmp(output, hello) == 0);
-        CLM_ASSERT(slice_borrow(string_source_array_id, 0, 1, &borrowed,
-                                &borrowed_size) == CLM_BPA_FAILURE);
-        CLM_ASSERT(erase_array(string_slice_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(erase_array(string_source_array_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(erase_array(string_array_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(erase_block(copied_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(erase_block(source_id) == CLM_BPA_SUCCESS);
+        /* AVO-style string block transfers, including preallocated destination. */
+        CLM_ASSERT(clm_bpa_create(text_id, CLM_BPA_TYPE_STRING) == CLM_BPA_SUCCESS, "clm_bpa_create(text_id, CLM_BPA_TYPE_STRING) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpa_set_string(text_id, greeting, sizeof(greeting)) == 5, "clm_bpa_set_string(text_id, greeting, sizeof(greeting)) == 5");
+        CLM_ASSERT(clm_bpaa_create(text_array_id, CLM_BPA_TYPE_STRING, 0, 1) == CLM_BPA_SUCCESS, "clm_bpaa_create(text_array_id, CLM_BPA_TYPE_STRING, 0, 1) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpaa_append_string(text_array_id, text_id) == CLM_BPA_SUCCESS, "clm_bpaa_append_string(text_array_id, text_id) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpa_set_string(text_id, replacement, sizeof(replacement)) == 6, "clm_bpa_set_string(text_id, replacement, sizeof(replacement)) == 6");
+        CLM_ASSERT(clm::bpa::get_string(text_array_id, 0, text_id, sizeof(text_buffer)) == CLM_BPA_GET_SUCCESS, "clm::bpa::get_string(text_array_id, 0, text_id, sizeof(text_buffer)) == CLM_BPA_GET_SUCCESS");
+        CLM_ASSERT(clm_bpa_get_string(text_id, text, sizeof(text_buffer)) == 5 && strcmp(text, greeting) == 0, "clm_bpa_get_string(text_id, text, sizeof(text_buffer)) == 5 && strcmp(text, greeting) == 0");
+        CLM_ASSERT(clm::bpa::set_string(text_array_id, 0, text_id, sizeof(text_buffer)) == CLM_BPA_SET_SUCCESS, "clm::bpa::set_string(text_array_id, 0, text_id, sizeof(text_buffer)) == CLM_BPA_SET_SUCCESS");
+        CLM_ASSERT(clm_bpaa_delete(text_array_id) == CLM_BPA_SUCCESS, "clm_bpaa_delete(text_array_id) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpa_delete(text_id) == CLM_BPA_SUCCESS, "clm_bpa_delete(text_id) == CLM_BPA_SUCCESS");
     }
-
+    /* A BPAA element can come from an internal aliased source. */
     {
-        constexpr clm_id id = UINT64_C(0xA009);
-        clm_bpaa_array_node* borrowed = nullptr;
-        clm_int first = 2;
-        clm_int second = 4;
+        clm_id id = UINT64_C(51000);
+        void* borrowed = NULL;
+        size_t borrowed_size = 0;
+        clm_int x = 17, y = 19, check = 0;
+        CLM_ASSERT(clm_bpaa_create(id, CLM_BPA_TYPE_INT, 1, 0) == CLM_BPA_SUCCESS, "clm_bpaa_create(id, CLM_BPA_TYPE_INT, 1, 0) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpaa_append_raw(id, &x, sizeof(x)) == CLM_BPA_SUCCESS, "clm_bpaa_append_raw(id, &x, sizeof(x)) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpaa_get_raw(id, 0, &check, sizeof(check)) == CLM_BPA_GET_SUCCESS && check == 17, "clm_bpaa_get_raw(id, 0, &check, sizeof(check)) == CLM_BPA_GET_SUCCESS && check == 17");
+        CLM_ASSERT(clm_bpaa_append_raw(id, &y, sizeof(y)) == CLM_BPA_SUCCESS, "clm_bpaa_append_raw(id, &y, sizeof(y)) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpaa_get_raw(id, 1, &check, sizeof(check)) == CLM_BPA_GET_SUCCESS && check == 19, "clm_bpaa_get_raw(id, 1, &check, sizeof(check)) == CLM_BPA_GET_SUCCESS && check == 19");
+        /* Insert from the array's own payload while growth may relocate it. */
+        CLM_ASSERT(clm_bpaa_insert_raw(id, 0, clm_bpaa_find_array(id)->blocks.data() + sizeof(clm_int), sizeof(clm_int)) == CLM_BPA_SUCCESS, "clm_bpaa_insert_raw(id, 0, clm_bpaa_find_array(id)->blocks.data() + sizeof(clm_int), sizeof(clm_int)) == CLM_BPA_SUCCESS");
+        CLM_ASSERT(clm_bpaa_get_raw(id, 0, &check, sizeof(check)) == CLM_BPA_GET_SUCCESS && check == 19, "clm_bpaa_get_raw(id, 0, &check, sizeof(check)) == CLM_BPA_GET_SUCCESS && check == 19");
+        CLM_ASSERT(clm_bpaa_get_raw(id, 2, &check, sizeof(check)) == CLM_BPA_GET_SUCCESS && check == 19, "clm_bpaa_get_raw(id, 2, &check, sizeof(check)) == CLM_BPA_GET_SUCCESS && check == 19");
+        CLM_ASSERT(clm_bpaa_delete(id) == CLM_BPA_SUCCESS, "clm_bpaa_delete(id) == CLM_BPA_SUCCESS");
+        (void)borrowed;
+        (void)borrowed_size;
+    }
+    {
+        const clm_id id = UINT64_C(52000);
+        clm_bpaa_array_node* array = NULL;
+        clm_int initial[] = {2, 4};
         clm_int third = 6;
         clm_int observed = 0;
-        clm_int* data = nullptr;
+        clm_int* data;
 
-        CLM_ASSERT(create(id, CLM_BPA_TYPE_INT, 1, 0) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(append_raw(id, &first, sizeof(first)) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(advanced_borrow(id, &borrowed) == CLM_BPA_SUCCESS &&
-                   borrowed != nullptr);
-        CLM_ASSERT(borrowed->count == 1 && borrowed->capacity == 1 &&
-                   borrowed->block_size == sizeof(clm_int));
-        data = static_cast<clm_int*>(advanced_data(borrowed));
-        CLM_ASSERT(data != nullptr);
+        CLM_ASSERT(clm_bpaa_create(id, CLM_BPA_TYPE_INT, 1, 0) == CLM_BPA_SUCCESS, "create fixed-width array for advanced borrow");
+        CLM_ASSERT(clm_bpaa_append_raw(id, &initial[0], sizeof(initial[0])) == CLM_BPA_SUCCESS, "append initial advanced-array item");
+        CLM_ASSERT(clm_bpaa_advanced_borrow(id, &array) == CLM_BPA_SUCCESS && array != NULL, "borrow array metadata");
+        CLM_ASSERT(array->count == 1 && array->capacity == 1 && array->block_size == sizeof(clm_int), "borrow exposes array metadata");
+        CLM_ASSERT(clm_bpaa_advanced_data(array) != NULL, "borrow exposes fixed-width payload");
+        data = (clm_int*)clm_bpaa_advanced_data(array);
         data[0] = 3;
-        CLM_ASSERT(advanced_get_raw(borrowed, 0, &observed, sizeof(observed)) ==
-                       CLM_BPA_GET_SUCCESS &&
-                   observed == 3);
-        CLM_ASSERT(advanced_set_raw(borrowed, 0, &second, sizeof(second)) ==
-                   CLM_BPA_SET_SUCCESS);
-        CLM_ASSERT(advanced_extend(borrowed, 1) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(advanced_append_raw(borrowed, &third, sizeof(third)) ==
-                   CLM_BPA_SUCCESS);
-        CLM_ASSERT(advanced_insert_raw(borrowed, 1, &first, sizeof(first)) ==
-                   CLM_BPA_SUCCESS);
-        CLM_ASSERT(borrowed->count == 3 &&
-                   advanced_get_raw(borrowed, 1, &observed,
-                                    sizeof(observed)) == CLM_BPA_GET_SUCCESS &&
-                   observed == first);
-        CLM_ASSERT(advanced_remove(borrowed, 0) == CLM_BPA_SUCCESS &&
-                   borrowed->count == 2);
-        CLM_ASSERT(advanced_shrink(
-                       borrowed, borrowed->capacity - borrowed->count) ==
-                       CLM_BPA_SUCCESS &&
-                   borrowed->capacity == borrowed->count);
-        CLM_ASSERT(advanced_clear(borrowed) == CLM_BPA_SUCCESS &&
-                   borrowed->count == 0);
-        CLM_ASSERT(unref_array(id) == CLM_BPA_SUCCESS && array_exists(id));
-        CLM_ASSERT(advanced_release(&borrowed) == CLM_BPA_SUCCESS &&
-                   borrowed == nullptr);
-        CLM_ASSERT(!array_exists(id));
-        CLM_ASSERT(advanced_release(&borrowed) == CLM_BPA_FAILURE);
-        CLM_ASSERT(create(id, CLM_BPA_TYPE_STRING, 0, 0) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(advanced_borrow(id, &borrowed) == CLM_BPA_SUCCESS &&
-                   borrowed != nullptr);
-        CLM_ASSERT(advanced_data(borrowed) == nullptr);
-        CLM_ASSERT(advanced_get_raw(borrowed, 0, &observed, sizeof(observed)) ==
-                   CLM_BPA_FAILURE);
-        CLM_ASSERT(advanced_release(&borrowed) == CLM_BPA_SUCCESS &&
-                   borrowed == nullptr);
-        CLM_ASSERT(erase_array(id) == CLM_BPA_SUCCESS);
+        CLM_ASSERT(clm_bpaa_advanced_get_raw(array, 0, &observed, sizeof(observed)) == CLM_BPA_GET_SUCCESS && observed == 3, "direct payload updates are visible through advanced API");
+        CLM_ASSERT(clm_bpaa_advanced_set_raw(array, 0, &initial[1], sizeof(initial[1])) == CLM_BPA_SET_SUCCESS, "advanced set avoids ID lookup");
+        CLM_ASSERT(clm_bpaa_advanced_extend(array, 1) == CLM_BPA_SUCCESS, "advanced extend reserves capacity");
+        CLM_ASSERT(clm_bpaa_advanced_append_raw(array, &third, sizeof(third)) == CLM_BPA_SUCCESS, "advanced append uses borrowed metadata");
+        CLM_ASSERT(clm_bpaa_advanced_insert_raw(array, 1, &initial[0], sizeof(initial[0])) == CLM_BPA_SUCCESS, "advanced insert uses borrowed metadata");
+        CLM_ASSERT(array->count == 3 && clm_bpaa_advanced_get_raw(array, 1, &observed, sizeof(observed)) == CLM_BPA_GET_SUCCESS && observed == 2, "advanced insert preserves expected item order");
+        CLM_ASSERT(clm_bpaa_advanced_remove(array, 0) == CLM_BPA_SUCCESS && array->count == 2, "advanced remove updates array metadata");
+        CLM_ASSERT(clm_bpaa_advanced_shrink(array, array->count) == CLM_BPA_SUCCESS && array->capacity == array->count, "advanced shrink releases unused capacity");
+        CLM_ASSERT(clm_bpaa_advanced_clear(array) == CLM_BPA_SUCCESS && array->count == 0, "advanced clear preserves borrowed array");
+        CLM_ASSERT(clm_bpaa_unref(id) == CLM_BPA_SUCCESS && clm_bpaa_is_existing(id), "borrow retains array against ordinary unref");
+        CLM_ASSERT(clm_bpaa_advanced_release(&array) == CLM_BPA_SUCCESS && array == NULL, "release advanced borrow and null pointer");
+        CLM_ASSERT(!clm_bpaa_is_existing(id), "releasing final reference destroys advanced-borrowed array");
+        CLM_ASSERT(clm_bpaa_advanced_release(&array) == CLM_BPA_FAILURE, "advanced release rejects already released pointer");
     }
-
     {
-        constexpr clm_id block_id = UINT64_C(0xB009);
-        constexpr clm_id array_id = UINT64_C(0xA010);
-        std::size_t active_before = 0;
-        std::size_t capacity_before = 0;
-        std::size_t active_after = 0;
-        std::size_t capacity_after = 0;
-        clm_int value = 777;
-        clm_int observed = 0;
-
-        CLM_ASSERT(pool_stats(sizeof(clm_int), &active_before,
-                              &capacity_before) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(create(block_id, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(set(block_id, &value, sizeof(value)) == CLM_BPA_SET_SUCCESS);
-        CLM_ASSERT(pool_stats(sizeof(clm_int), &active_after,
-                              &capacity_after) == CLM_BPA_SUCCESS &&
-                   active_after == active_before + 1);
-        CLM_ASSERT(create_sized(array_id, CLM_BPA_TYPE_INT, 0,
-                                sizeof(value), 0) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(append(array_id, block_id, sizeof(value)) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(erase_array(array_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(erase_block(block_id) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(pool_stats(sizeof(clm_int), &active_after,
-                              &capacity_before) == CLM_BPA_SUCCESS &&
-                   active_after == active_before);
-        CLM_ASSERT(create(block_id, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS);
-        CLM_ASSERT(get(block_id, &observed, sizeof(observed)) ==
-                       CLM_BPA_GET_SUCCESS &&
-                   observed == 0);
-        CLM_ASSERT(erase_block(block_id) == CLM_BPA_SUCCESS);
+        const clm_id id = UINT64_C(52001);
+        clm_bpaa_array_node* array = NULL;
+        clm_int item = 0;
+        CLM_ASSERT(clm_bpaa_advanced_borrow(id, &array) == CLM_BPA_FAILURE && array == NULL, "advanced borrow rejects missing array");
+        CLM_ASSERT(clm_bpaa_create(id, CLM_BPA_TYPE_STRING, 0, 0) == CLM_BPA_SUCCESS, "create string array for advanced borrow");
+        CLM_ASSERT(clm_bpaa_advanced_borrow(id, &array) == CLM_BPA_SUCCESS, "borrow string-array metadata");
+        CLM_ASSERT(clm_bpaa_advanced_data(array) == NULL, "advanced fixed-width data accessor rejects string array");
+        CLM_ASSERT(clm_bpaa_advanced_get_raw(array, 0, &item, sizeof(item)) == CLM_BPA_FAILURE, "advanced fixed-width operations reject string arrays");
+        CLM_ASSERT(clm_bpaa_advanced_release(&array) == CLM_BPA_SUCCESS, "release string-array borrow");
+        CLM_ASSERT(clm_bpaa_delete(id) == CLM_BPA_SUCCESS, "delete string array after releasing borrow");
     }
+    CLM_ASSERT(clm_bpa_pool_cleanup() == CLM_BPA_SUCCESS, "clm_bpa_pool_cleanup() == CLM_BPA_SUCCESS");
 
-    for (clm_uint i = 0; i < 32; ++i)
-        CLM_ASSERT(create(UINT64_C(0x10000) + i, CLM_BPA_TYPE_INT) ==
-                   CLM_BPA_SUCCESS);
-    for (clm_uint i = 0; i < 32; i += 2)
-        CLM_ASSERT(erase_block(UINT64_C(0x10000) + i) == CLM_BPA_SUCCESS);
-    for (clm_uint i = 1; i < 32; i += 2)
-        CLM_ASSERT(unref_block(UINT64_C(0x10000) + i) == CLM_BPA_SUCCESS);
-    for (clm_uint i = 0; i < 16; ++i)
-        CLM_ASSERT(create(UINT64_C(0x11000) + i, CLM_BPA_TYPE_INT) ==
-                   CLM_BPA_SUCCESS);
-    for (clm_uint i = 0; i < 16; ++i)
-        CLM_ASSERT(erase_block(UINT64_C(0x11000) + i) == CLM_BPA_SUCCESS);
-
-    for (clm_uint i = 0; i < 16; ++i)
-        CLM_ASSERT(create(UINT64_C(0x12000) + i, CLM_BPA_TYPE_INT, 0, 0) ==
-                   CLM_BPA_SUCCESS);
-    for (clm_uint i = 0; i < 16; i += 2)
-        CLM_ASSERT(erase_array(UINT64_C(0x12000) + i) == CLM_BPA_SUCCESS);
-    for (clm_uint i = 0; i < 8; ++i)
-        CLM_ASSERT(create(UINT64_C(0x13000) + i, CLM_BPA_TYPE_INT, 0, 0) ==
-                   CLM_BPA_SUCCESS);
-    for (clm_uint i = 1; i < 16; i += 2)
-        CLM_ASSERT(erase_array(UINT64_C(0x12000) + i) == CLM_BPA_SUCCESS);
-    for (clm_uint i = 0; i < 8; ++i)
-        CLM_ASSERT(erase_array(UINT64_C(0x13000) + i) == CLM_BPA_SUCCESS);
-
-    CLM_ASSERT(create(UINT64_C(0x14000), CLM_BPA_TYPE_STRING, 0, 0) == CLM_BPA_SUCCESS &&
-               append_string_raw(UINT64_C(0x14000), "z", 2) == CLM_BPA_SUCCESS &&
-               append_string_raw(UINT64_C(0x14000), "a", 2) == CLM_BPA_SUCCESS &&
-               shuffle(UINT64_C(0x14000)) == CLM_BPA_SUCCESS &&
-               erase_array(UINT64_C(0x14000)) == CLM_BPA_SUCCESS,
-               "shuffle supports string arrays as well as numeric arrays");
-    CLM_ASSERT(pool_cleanup() == CLM_BPA_SUCCESS);
-    CLM_ASSERT(shutdown() == CLM_BPA_SUCCESS);
-
+    clm_bpa_tests_passed = result.passed;
+    clm_bpa_tests_failed = result.failed;
     clm_test_summary(result.passed, result.failed);
-    return result.failed;
+    return result.failed == 0 ? 0 : 1;
 }
+
+
+static int test_clm_bpa(void)
+{
+    return clm_bpa_tests();
+}
+

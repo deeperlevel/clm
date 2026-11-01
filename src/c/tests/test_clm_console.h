@@ -2,6 +2,15 @@
 
 #include "test.h"
 #include "../clm/console.h"
+#include "../clm/string_json.h"
+#include "../clm/string_yaml.h"
+#include "../clm/tree.h"
+#include <math.h>
+#if defined(_WIN32)
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 
 static FILE* clm_console_test_tmpfile(void)
 {
@@ -23,6 +32,56 @@ static int clm_console_test_stream_equals(FILE* stream, const char* expected)
            ferror(stream) == 0;
 }
 
+static int clm_console_test_capture_tree(
+    clm_console_status (*write_tree)(clm_id), clm_id id, const char* expected)
+{
+    FILE* output = clm_console_test_tmpfile();
+    if (output == NULL || fflush(stdout) != 0) {
+        if (output != NULL)
+            fclose(output);
+        return 0;
+    }
+#if defined(_WIN32)
+    const int destination = _fileno(stdout);
+    const int saved = _dup(destination);
+    const int redirected = saved >= 0 ? _dup2(_fileno(output), destination) : -1;
+#else
+    const int destination = fileno(stdout);
+    const int saved = dup(destination);
+    const int redirected = saved >= 0 ? dup2(fileno(output), destination) : -1;
+#endif
+    int success = 0;
+    if (redirected >= 0) {
+        const clm_console_status status = write_tree(id);
+        success = fflush(stdout) == 0 && status == CLM_CONSOLE_SUCCESS;
+    }
+    if (saved >= 0) {
+#if defined(_WIN32)
+        if (_dup2(saved, destination) < 0)
+            success = 0;
+        _close(saved);
+#else
+        if (dup2(saved, destination) < 0)
+            success = 0;
+        close(saved);
+#endif
+    }
+    rewind(output);
+    success = success && clm_console_test_stream_equals(output, expected);
+    fclose(output);
+    return success;
+}
+
+static clm_stringtify_status clm_console_test_tree_interceptor(
+    clm_id id, const clm_stringtify_options* options,
+    clm_stringtify_writer* writer, void* user)
+{
+    (void)id;
+    (void)options;
+    ++*(int*)user;
+    return clm_stringtify_writer_append_cstr(writer, "intercepted");
+}
+
 static int clm_console_tests(void)
 {
     clm_test_result result = {0};
@@ -34,11 +93,52 @@ static int clm_console_tests(void)
     CLM_ASSERT(clm_console_restore() == CLM_CONSOLE_SUCCESS, "clm_console_restore() == CLM_CONSOLE_SUCCESS");
     CLM_ASSERT(clm_console_flush() == CLM_CONSOLE_SUCCESS, "clm_console_flush() == CLM_CONSOLE_SUCCESS");
     CLM_ASSERT(clm_console_write(NULL) == CLM_CONSOLE_INVALID_ARGUMENT, "clm_console_write(NULL) == CLM_CONSOLE_INVALID_ARGUMENT");
+    CLM_ASSERT(clm_console_error(NULL) == CLM_CONSOLE_INVALID_ARGUMENT &&
+                   clm_console_error_format(NULL) == CLM_CONSOLE_INVALID_ARGUMENT,
+               "stderr writers reject NULL arguments");
+    CLM_ASSERT(clm_console_error("console error test") == CLM_CONSOLE_SUCCESS &&
+                   clm_console_error_format(":%d %s", 42, "ok") == CLM_CONSOLE_SUCCESS,
+               "write plain and formatted diagnostics to stderr");
     CLM_ASSERT(clm_console_write_line(NULL) == CLM_CONSOLE_INVALID_ARGUMENT, "clm_console_write_line(NULL) == CLM_CONSOLE_INVALID_ARGUMENT");
     CLM_ASSERT(clm_console_write_character(NULL) == CLM_CONSOLE_INVALID_ARGUMENT, "clm_console_write_character(NULL) == CLM_CONSOLE_INVALID_ARGUMENT");
     CLM_ASSERT(clm_console_write_effect(NULL, 0.0) == CLM_CONSOLE_INVALID_ARGUMENT, "clm_console_write_effect(NULL, 0.0) == CLM_CONSOLE_INVALID_ARGUMENT");
     CLM_ASSERT(clm_console_wait(-1.0) == CLM_CONSOLE_INVALID_ARGUMENT, "clm_console_wait(-1.0) == CLM_CONSOLE_INVALID_ARGUMENT");
     CLM_ASSERT(clm_console_wait(NAN) == CLM_CONSOLE_INVALID_ARGUMENT, "clm_console_wait(NAN) == CLM_CONSOLE_INVALID_ARGUMENT");
+
+    CLM_ASSERT(clm_console_write_tree_as_yaml(0) == CLM_CONSOLE_INVALID_ARGUMENT &&
+                   clm_console_write_tree_as_json(0) == CLM_CONSOLE_INVALID_ARGUMENT,
+               "format writers reject missing tree IDs");
+    const clm_id source_id = 0x434F4E530001;
+    const clm_id root_id = 0x434F4E530002;
+    const clm_id yaml_id = 0x434F4E530003;
+    const int parsed = clm_test_parse_text(source_id,
+        "[1,\"a\\\"[,]{}\",{},[],[true,null]]", root_id, clm_string_json_loads) ==
+        CLM_FORMAT_DESERIALIZE_SUCCESS;
+    CLM_ASSERT(parsed, "create a console format test tree");
+    if (parsed) {
+        int intercepted = 0;
+        clm_console_intercept_object_writes(clm_console_test_tree_interceptor, &intercepted);
+        CLM_ASSERT(clm_console_test_capture_tree(clm_console_write_tree_as_json, root_id,
+                       "[\n  1,\n  \"a\\\"[,]{}\",\n  {},\n  [],\n  [\n    true,\n    null\n  ]\n]"),
+                   "JSON interceptor preserves escapes and indents nested containers");
+        const int serialized = clm_string_new(yaml_id, "") &&
+            clm_string_yaml_dumps(root_id, yaml_id) == CLM_FORMAT_SERIALIZE_SUCCESS;
+        CLM_ASSERT(serialized, "serialize expected YAML output");
+        if (serialized) {
+            CLM_ASSERT(clm_console_test_capture_tree(clm_console_write_tree_as_yaml,
+                           root_id, (const char*)clm_bpa_find_block(yaml_id)->data),
+                       "YAML interceptor writes the YAML serializer output");
+        }
+        CLM_ASSERT(intercepted == 0 && clm_tree_array_count(root_id) == 5,
+                   "format interceptors bypass global interception and preserve the tree");
+        CLM_ASSERT(clm_console_test_capture_tree(clm_console_write_tree, root_id, "intercepted") &&
+                       intercepted == 2,
+                   "format writes leave the global interceptor and user context unchanged");
+        clm_console_do_not_intercept_object_writes();
+        (void)clm_string_delete(yaml_id);
+        CLM_ASSERT(clm_tree_delete(root_id) == CLM_BPA_SUCCESS,
+                   "release console format test tree");
+    }
 
     CLM_ASSERT(output != NULL, "output != NULL");
     if (output != NULL) {

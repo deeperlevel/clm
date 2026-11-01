@@ -1,7 +1,21 @@
-# CLM Hash — Language-Neutral Module Contract
+# CLM Hash
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+Computes supported message digests and provides hash formatting/conversion utilities.
+
+## Capabilities and operations
+
+- Hash binary data and text using declared supported algorithms.
+- Use digest metadata and hexadecimal encoders for portable interchange.
+- Do not treat ordinary fast hashes as password hashes or message-authentication substitutes.
+- Compare byte sequences with security-appropriate methods when required.
+
+## Detailed module contract
 
 **Module:** `clm_hash`  
-**C header:** `clm/hash.h`  
 **Scope:** Hash-algorithm metadata, byte/text adapters, and digest formatting.
 
 ## 1. Purpose and current status
@@ -11,15 +25,7 @@ separates the digest (binary bytes) from its optional lowercase hexadecimal
 representation, and offers adapters for caller-owned buffers and CLM string
 IDs.
 
-The C implementation uses **freehash** for digest computation:
-<https://github.com/ghaberek/freehash>. Its source is included from
-`clm/ext/freehash.c` and the selected algorithms are enabled by
-`clm/ext/freehash.h`. The CLM layer maps its algorithm descriptors to the
-stable `CLM_HASH_ALGORITHM_*` identifiers and returns binary or lowercase-hex
-results through the same public operations.
-
-The identifiers are CLM-level values, not freehash registry indices. Each C
-identifier maps directly to its corresponding freehash descriptor.
+Algorithms are selected using CLM-level identifiers, not backend-specific indices. Digest operations return binary bytes or lowercase hexadecimal as requested.
 
 ## 2. Data and text model
 
@@ -30,8 +36,7 @@ within the specified length is included, including zero-valued bytes.
 
 CLM strings contain validated UTF-8. A CLM-string adapter hashes the string's
 UTF-8 bytes, not its character count and not a converted external encoding.
-String-oriented C adapters validate UTF-8. The byte-oriented C-string adapter
-does not validate encoding and treats the bytes up to the first NUL as-is.
+Text-oriented adapters validate UTF-8 when required; raw byte adapters preserve the exact input bytes.
 
 Binary digest output is distinct from its printable representation:
 
@@ -60,13 +65,13 @@ Binary digest output is distinct from its printable representation:
 | `CLM_HASH_ALGORITHM_SHA3_384` | SHA3-384 | 48 bytes |
 | `CLM_HASH_ALGORITHM_SHA3_512` | SHA3-512 | 64 bytes |
 
-The C implementation maps every listed algorithm to its freehash descriptor.
+The reference implementation maps every listed algorithm to its freehash descriptor.
 Unknown identifiers have no digest size and are reported as unsupported by
 digest operations.
 
 ## 4. Operations
 
-The C API expresses the operations below as inline functions; other language
+The module API expresses the operations below as inline functions; other language
 ports may use native functions or methods while preserving the same observable
 behavior.
 
@@ -77,16 +82,16 @@ behavior.
 | Algorithm-name lookup | Algorithm identifier and an existing CLM string ID | Display name stored in that string |
 | Hex encoding | Arbitrary bytes | Lowercase hexadecimal text in a caller-owned buffer |
 | `bytes` | Arbitrary bytes and explicit length | Binary digest in a caller-owned buffer |
-| `bytes_as` | NUL-terminated C string, interpreted as bytes | Binary digest in a caller-owned buffer |
+| `bytes_as` | NUL-terminated null-terminated text, interpreted as bytes | Binary digest in a caller-owned buffer |
 | `bytes_from` | CLM string ID | Binary digest in a caller-owned buffer |
 | `bytes_to` | Arbitrary bytes and explicit length | Hex digest stored in an existing CLM string |
-| `string_as` | NUL-terminated UTF-8 C string | Hex digest in a caller-owned character buffer |
-| `string_to` | NUL-terminated UTF-8 C string | Hex digest stored in an existing CLM string |
+| `string_as` | NUL-terminated UTF-8 null-terminated text | Hex digest in a caller-owned character buffer |
+| `string_to` | NUL-terminated UTF-8 null-terminated text | Hex digest stored in an existing CLM string |
 | `string_from` | Source and destination CLM string IDs | Hex digest stored in the destination string |
 
 The suffix conventions are:
 
-- **`_as`**: accept a C string directly.
+- **`_as`**: accept a null-terminated text directly.
 - **`_from`**: read input from a CLM string ID.
 - **`_to`**: write the hexadecimal result to a CLM string ID.
 
@@ -111,11 +116,11 @@ checks capacity before writing and leaves the output unchanged on failure.
 | `CLM_HASH_ERROR_NO_MEMORY` | Reserved for backend allocation failures |
 
 Digest operations validate input, algorithm, and output capacity before
-requesting computation. The C implementation computes into temporary storage
+requesting computation. The reference implementation computes into temporary storage
 and copies the digest to caller output only on success. String-output adapters
 validate the destination before hashing and replace its content only after
 successful computation and formatting. Backend errors map to
-`CLM_HASH_ERROR_BACKEND`; freehash allocation failures map to
+`CLM_HASH_ERROR_BACKEND`; backend allocation failures map to
 `CLM_HASH_ERROR_NO_MEMORY`.
 
 Hex encoding takes an arbitrary input byte count. Its output capacity must be
@@ -124,17 +129,12 @@ before any output is written.
 
 ## 6. Integration and dependencies
 
-The C header depends on `clm_base` for shared types and on `clm_string` for
+The module depends on `clm_base` for shared types and on `clm_string` for
 string-ID adapters and UTF-8 validation. Applications using CLM string IDs
 must initialize the string/BPA implementation according to those modules'
 normal requirements.
 
-`clm/hash.h` includes the freehash declarations, and the C build must compile
-and link `clm/ext/freehash.c`. Hash descriptors are selected directly by CLM's
-algorithm mapping; callers do not need to register freehash algorithms in its
-global descriptor table. The vendored freehash files are available under the
-upstream project's public-domain/unlicense terms; see
-`clm/ext/freehash.license.md` for the included license notice.
+Algorithm registration with a third-party backend is an implementation detail; CLM consumers use the documented CLM algorithm selectors.
 
 ## 7. Security guidance
 
@@ -145,3 +145,18 @@ digest alone does not provide authenticity, secrecy, or password-hardening.
 Use a vetted keyed construction for authentication and a dedicated password
 hashing scheme for password storage. Algorithm choice and backend
 availability must be evaluated by the application for its security needs.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_string](clm_string.md).
+
+## Example use cases
+
+Hash binary data and text using declared supported algorithms.

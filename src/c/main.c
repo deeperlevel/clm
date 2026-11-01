@@ -18,25 +18,11 @@
  * =============================================================================
  */
 
-#define CLM_BPA_IMPLEMENTATION
-#define CLM_STRING_IMPLEMENTATION
-#define CLM_ID_IMPLEMENTATION
-#define CLM_FILE_IMPLEMENTATION
-#define CLM_ASYNC_IMPLEMENTATION
-#define CLM_ASYNC_POOL_IMPLEMENTATION
-#define CLM_CONTAINER_IMPLEMENTATION
-#define CLM_CHANNEL_IMPLEMENTATION
-#define CLM_DISPATCH_IMPLEMENTATION
-#define CLM_ECS_IMPLEMENTATION
-#define CLM_MANAGED_IMPLEMENTATION
-#define CLM_MATH_CORE_IMPLEMENTATION
-#define CLM_NET_IMPLEMENTATION
-#define CLM_CRYPTO_IMPLEMENTATION
-
 #include "clm/net.h"
 #include "tests/test.h"
 #include "tests/test_clm_base.h"
 #include "tests/test_clm_bpa.h"
+#include "tests/test_clm_arena.h"
 #include "tests/test_clm_hash.h"
 #include "tests/test_clm_crypto.h"
 #include "tests/test_clm_console.h"
@@ -50,6 +36,8 @@
 #include "tests/test_clm_string_toml.h"
 #include "tests/test_clm_string_json.h"
 #include "tests/test_clm_string_yaml.h"
+#include "tests/test_clm_string_httpp.h"
+#include "tests/test_clm_bytes.h"
 #include "tests/test_clm_gen.h"
 #include "tests/test_clm_id.h"
 #include "tests/test_clm_string.h"
@@ -68,6 +56,12 @@
 #include "tests/test_clm_ua.h"
 #include "tests/test_clm_math.h"
 #include "tests/test_clm_net.h"
+#include "tests/test_clm_stream.h"
+#include "tests/test_clm_template.h"
+#include "tests/test_clm_compress.h"
+#include "tests/test_clm_multipart.h"
+#include "tests/test_clm_tls.h"
+#include "tests/test_clm_net_web.h"
 
 int main(void)
 {
@@ -78,6 +72,7 @@ int main(void)
 
     clm_base_tests();
     clm_bpa_tests();
+    clm_arena_tests();
     clm_hash_tests();
     clm_crypto_tests();
     clm_console_tests();
@@ -90,6 +85,8 @@ int main(void)
     clm_string_toml_tests();
     clm_string_json_tests();
     clm_string_yaml_tests();
+    clm_string_httpp_tests();
+    clm_bytes_tests();
     clm_gen_tests();
     clm_id_tests();
     clm_string_dsv_tests();
@@ -109,6 +106,12 @@ int main(void)
     clm_ua_tests();
     clm_math_tests();
     clm_net_tests();
+    clm_stream_tests();
+    clm_template_tests();
+    clm_compress_tests();
+    clm_multipart_tests();
+    clm_tls_tests();
+    clm_net_web_tests();
     clm_overall_test_summary("CLM Tests Summary");
 
     const int files_closed = clm_file_shutdown();

@@ -1,16 +1,31 @@
-# CLM - Console
+# CLM Console
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+Console text input/output, formatted object display and optional terminal styling.
+
+## Capabilities and operations
+
+- Write text and CLM objects; object rendering uses clm_stringtify.
+- Read console input and provide typical terminal controls, colors and presentation helpers.
+- Treat ANSI support and terminal features as capabilities that may vary by platform.
+- Do not assume arbitrary console output is the same as structured serialization.
+
+## Detailed module contract
 
 ## 1. Purpose and scope
 
 CLM Console provides a small shared interface for standard-stream text input/output and common ANSI terminal controls. It supplements language standard libraries with consistent, optional helpers; it does not replace them.
 
-The public operations describe observable behavior, while implementations may use their language's standard I/O facilities and terminal-specific output sequences. The current C implementation uses the C standard library and ANSI escape sequences only; it does not call operating-system APIs.
+The public operations describe observable behavior, while implementations may use their language's standard I/O facilities and terminal-specific output sequences. A reference implementation may use ordinary standard-stream facilities and ANSI escape sequences.
 
 The API does not promise that terminal-control sequences are supported by the active host. Redirected output may contain the literal escape sequences.
 
 ## 2. Result model
 
-The C reference uses `clm_console_status`:
+Representative results include `clm_console_status`:
 
 | Result | Value | Meaning |
 |---|---:|---|
@@ -19,8 +34,6 @@ The C reference uses `clm_console_status`:
 | `CLM_CONSOLE_INVALID_ARGUMENT` | `-2` | Null pointer, invalid value, malformed character, or invalid confirmation response |
 
 Other language bindings may use their native result type, but should preserve the distinction between invalid arguments and operational failures where possible.
-
-The D binding exposes the same operations with `ConsoleStatus` and `std.stdio.File` for stream-targeted forms. Input values are returned through `out` parameters rather than C pointers/shared buffers. D formatted output follows `std.format` syntax (for example, `clm_console_write_format("Count: {}", count)`) instead of C `printf` specifiers.
 
 ## 3. Text output
 
@@ -34,11 +47,11 @@ The D binding exposes the same operations with `ConsoleStatus` and `std.stdio.Fi
 | `clm_console_write_color(text, color)` | Writes color sequence, text, then reset sequence. |
 | `clm_console_write_effect(text, delay_seconds)` | Writes text one byte at a time, waiting between bytes; does not append a newline. |
 
-The C formatted functions follow the C `printf` format rules. They format into dynamically allocated storage before writing, so a format/allocation failure writes no formatted text. A later stream write failure may still leave partial output. Other language ports should use their native formatting conventions and document them.
+Formatted output may follow a binding-specific format grammar. They format into dynamically allocated storage before writing, so a format/allocation failure writes no formatted text. A later stream write failure may still leave partial output. Other language ports should use their native formatting conventions and document them.
 
-The color argument is an ANSI SGR sequence, commonly one of the `CONSOLE_COLOR_*` constants. The supplied C constants include regular and bold foreground colors, background colors, and reset. Color output always writes the reset sequence after the text when preceding writes succeed. It does not detect terminal attachment or suppress ANSI codes when redirected.
+The color argument is an ANSI SGR sequence, commonly one of the `CONSOLE_COLOR_*` constants. The reference constants include regular and bold foreground colors, background colors, and reset. Color output always writes the reset sequence after the text when preceding writes succeed. It does not detect terminal attachment or suppress ANSI codes when redirected.
 
-`write_character` validates a single UTF-8 encoded scalar, rejecting malformed or multi-character inputs. `write_effect` iterates bytes, so a multi-byte UTF-8 character may be emitted in multiple delayed steps. Its timing uses the standard C clock and a busy wait in the C implementation; this is for presentation only, not precise timing.
+`write_character` validates a single UTF-8 encoded scalar, rejecting malformed or multi-character inputs. `write_effect` iterates bytes, so a multi-byte UTF-8 character may be emitted in multiple delayed steps. The reference timing is presentation-oriented; this is for presentation only, not precise timing.
 
 ## 4. Text input
 
@@ -50,7 +63,7 @@ The color argument is an ANSI SGR sequence, commonly one of the `CONSOLE_COLOR_*
 | `clm_console_read_key(out_text)` | Alias of `read_character`; it does not provide raw, nonblocking, or special-key input. |
 | `clm_console_confirm(prompt, out_value)` | Writes an optional prompt followed by ` [y/n]: ` and parses one response. |
 
-The C line-input buffer holds at most 4095 input bytes plus the terminator. CRLF and LF terminators are removed. Overlong lines fail, are drained through the next newline, and clear the output buffer. The returned line and character pointers refer to static shared storage and are overwritten by the next corresponding read.
+The reference binding may impose a fixed line-input limit. CRLF and LF terminators are removed. Overlong lines fail, are drained through the next newline, and clear the output buffer. The returned line and character pointers refer to static shared storage and are overwritten by the next corresponding read.
 
 Character/key input uses standard buffered input; in an interactive terminal the user may need to press Enter. It reads a byte, not a decoded Unicode character or terminal key event.
 
@@ -66,15 +79,15 @@ Confirmation trims leading/trailing whitespace and accepts `y`, `yes`, `n`, or `
 | `clm_console_hide_cursor()` | Emits the ANSI hide-cursor sequence. |
 | `clm_console_flush()` | Flushes standard output. |
 
-The C implementation also provides stream-targeted forms ending in `_to` for output/control operations (and input functions ending in `_from`). They accept C `FILE*` streams and are implementation conveniences, not required pointer-based signatures for other languages.
+The reference implementation also provides stream-targeted forms ending in `_to` for output/control operations (and input functions ending in `_from`). They accept C `FILE*` streams and are implementation conveniences, not required pointer-based signatures for other languages.
 
-`clm_console_init()` and `clm_console_restore()` are successful no-ops in the standard-C implementation. There is no state to initialize or restore because it does not change terminal modes. Implementations with stateful native features should describe and restore that state explicitly.
+`clm_console_init()` and `clm_console_restore()` are successful no-ops in the standard-reference implementation. There is no state to initialize or restore because it does not change terminal modes. Implementations with stateful native features should describe and restore that state explicitly.
 
 ANSI control support depends on the terminal. The API does not query whether output is attached to a terminal and cannot confirm that a terminal acted on a request.
 
 ## 6. Portability limits and unsupported features
 
-The shared C implementation intentionally omits operations that standard C I/O and ANSI output cannot reliably provide:
+The shared reference implementation intentionally omits operations that standard C I/O and ANSI output cannot reliably provide:
 
 - Setting a window or terminal title.
 - Querying or changing window dimensions.
@@ -99,7 +112,7 @@ if clm_console_confirm("Continue?", answer) == SUCCESS and answer:
     run_next_step()
 ```
 
-In C, format strings use `printf` conversion specifiers, and all status-returning operations should be checked when output or input failure matters.
+Formatting syntax varies by language binding; and all status-returning operations should be checked when output or input failure matters.
 
 ## 8. Suggested conformance checks
 
@@ -112,3 +125,18 @@ In C, format strings use `printf` conversion specifiers, and all status-returnin
 - ANSI output sequences and cursor-coordinate conversion.
 - Invalid coordinates, delays, and output-stream failures.
 - Behavior under redirected streams and terminals without ANSI support.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_string_format](clm_string_format.md), [clm_stringtify](clm_stringtify.md), [clm_tree](clm_tree.md).
+
+## Example use cases
+
+Write text and CLM objects; object rendering uses clm_stringtify.

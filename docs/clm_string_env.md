@@ -1,4 +1,19 @@
-# CLM String ENV
+# CLM String Env
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+Reads and writes environment-file-style key/value text into CLM structured data.
+
+## Capabilities and operations
+
+- Parse line-based key/value assignments and common quoting/comment conventions.
+- Serialize the supported subset back to environment-style text.
+- Expose file and text-based entry points.
+- File parsing is not equivalent to automatically changing the host process environment.
+
+## Detailed module contract
 
 ## Purpose
 
@@ -40,3 +55,18 @@ and write UTF-8. Operations return CLM success/failure statuses.
 The result is a root object of UTF-8 string values keyed by registered numeric
 IDs. Keep environment values as text; this codec never performs shell
 expansion, interpolation, type inference, or process-environment updates.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_file](clm_file.md), [clm_string_format](clm_string_format.md).
+
+## Example use cases
+
+Parse line-based key/value assignments and common quoting/comment conventions.

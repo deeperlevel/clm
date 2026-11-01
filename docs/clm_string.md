@@ -1,4 +1,19 @@
-# CLM - String
+# CLM String
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+Managed UTF-8/text-oriented string blocks and arrays with editing and encoding utilities.
+
+## Capabilities and operations
+
+- Create, assign, slice, compare, search and modify text resources.
+- Manage arrays of strings through ID-addressed storage.
+- Respect encoding and Unicode boundary behavior explicitly.
+- Do not use text-oriented operations for arbitrary binary payloads; use clm_bytes instead.
+
+## Detailed module contract
 
 ## 1. Purpose and scope
 
@@ -8,12 +23,9 @@ The API is procedural and source-first. Applications may use a language's native
 
 ## 2. Encoding configuration
 
-`clm_string` stores validated Unicode text as **UTF-8 internally** in C. Ordinary string indexing and length calculations count Unicode code points, not bytes or grapheme clusters. The module's preferred *external byte encoding* is runtime configurable and defaults to UTF-8; it does not alter existing stored Unicode strings.
+`clm_string` stores validated Unicode text as **UTF-8** in the reference behavior. Ordinary string indexing and length calculations count Unicode code points, not bytes or grapheme clusters. The module's preferred *external byte encoding* is runtime configurable and defaults to UTF-8; it does not alter existing stored Unicode strings.
 
-```c
-clm_string_set_default_encoding(CLM_STRING_ENCODING_UTF8);
-clm_byte encoding = clm_string_get_default_encoding();
-```
+> Binding-specific code sample omitted; refer to the language implementation for executable examples.
 
 Currently supported explicit external encodings are **UTF-8**, **Latin-1 (ISO-8859-1)**, and **UTF-16LE**. They are not arbitrary operating-system ANSI code pages. `clm_string_new(id, text)` accepts UTF-8 C-string input regardless of the runtime default. Each new string records the current default as its preferred *byte-export encoding*; existing strings retain their preference when the default changes.
 
@@ -28,7 +40,7 @@ string.change_encoding(id, encoding) → status
 
 ## 3. Results and error behavior
 
-The C reference uses BPA results:
+The shared result model includes:
 
 | Result | Meaning |
 |---|---|
@@ -66,7 +78,7 @@ Creation rejects null text, duplicate IDs, invalid UTF-8, and allocation failure
 
 Indices are zero-based and always count Unicode code points; they are independent of the preferred byte-export encoding. Search and replacement text must be valid UTF-8. An empty search is invalid for replacement; an empty replacement is allowed. A valid empty `search` passed to `contains` matches any existing string.
 
-The C implementation performs byte-sequence matching. Because both the stored text and UTF-8 search/replacement strings are validated, a valid multi-byte search sequence matches on its encoding boundaries. Replacement is global, left-to-right, and non-overlapping.
+The reference implementation performs byte-sequence matching. Because both the stored text and UTF-8 search/replacement strings are validated, a valid multi-byte search sequence matches on its encoding boundaries. Replacement is global, left-to-right, and non-overlapping.
 
 `clm_string_replace_from(id, search, replacement)` is an alias of `clm_string_replace`.
 
@@ -152,7 +164,7 @@ String arrays also use validated UTF-8 internal text and Unicode code-point inde
 | Operation | Behavior |
 |---|---|
 | `clm_string_array_sort(array_id)` | Sorts lexicographically by encoded bytes and resets cursor/deck state. |
-| `clm_string_array_shuffle(array_id)` | Shuffles items using the C library random generator; resets cursor and deck. |
+| `clm_string_array_shuffle(array_id)` | Shuffles items using a host pseudorandom generator; resets cursor and deck. |
 | `clm_string_array_move_first/previous/next/last(array_id)` | Moves the BPAA shared cursor, subject to normal bounds. |
 | `clm_string_array_move_to(array_id, index)` | Moves the cursor to an existing item. |
 | `clm_string_array_get_current(array_id, destination_string_id)` | Copies the item at the current cursor into an existing BPA string block. |
@@ -205,3 +217,18 @@ The examples use conceptual operation names; individual language bindings may us
 - Deck draws without replacement per cycle, reset/shuffle behavior, and count preservation.
 - Slicing preserves Unicode code-point boundaries and source export-encoding preference; zero-length, invalid ranges, duplicate destination IDs, and independent ownership.
 - Allocation failure leaves the prior block/item value unchanged.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_bpa](clm_bpa.md).
+
+## Example use cases
+
+Create, assign, slice, compare, search and modify text resources.

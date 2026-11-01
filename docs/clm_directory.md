@@ -1,17 +1,30 @@
 # CLM Directory
 
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+Filesystem directory creation, traversal, querying, copying and removal.
+
+## Capabilities and operations
+
+- Inspect existence, type, emptiness and entries; create directories and directory trees.
+- Traverse paths and perform supported rename, copy and deletion operations.
+- Use platform path conventions through clm_path rather than embedding separators.
+- Handle permissions, symlinks, races and platform limitations as filesystem-specific outcomes.
+
+## Detailed module contract
+
 ## Status and Scope
 
-This is a **language-neutral reference** for 82 directory operations, now provided
-by the C binding. Portable concepts do not require a particular native handle
+This is a **language-neutral reference** for the directory operation families in the current CLM snapshot. Portable concepts do not require a particular native handle
 representation. Binding-specific behavior and platform limits are recorded below;
 remaining cross-platform design questions are not promises of identical native
 capabilities on all operating systems.
 
-The current regression suite exercises Windows. POSIX code is implemented but
-requires separate runtime validation.
+Platform-specific behavior and test coverage should be verified separately for each language binding.
 
-### Current C Binding Contract
+### Portable behavior
 
 - Directory operations reuse native file/path metadata and UTF-8 conversion.
   Existing output strings/arrays require the proper type; scalar outputs are
@@ -74,7 +87,7 @@ test results, or evidence that the operations are implemented.
 
 A **path ID** identifies text containing a filesystem path. A path ID is not a
 directory handle, does not create an entry, and does not prove that one exists.
-The current C binding uses existing UTF-8 BPA strings. Other bindings must make
+The current reference binding uses existing UTF-8 BPA strings. Other bindings must make
 their equivalent ownership, encoding, and lifetime rules explicit without being
 required to copy C types, pointer conventions, or memory layouts.
 
@@ -104,7 +117,7 @@ lifetime details must be finalized per binding before implementation.
 | Unsupported | The requested capability or attribute has no supported native meaning. |
 | Stopped | Callback enumeration was deliberately stopped by the caller. |
 
-The C constants are `CLM_DIRECTORY_OPERATION_SUCCESS`,
+Representative status identifiers are `CLM_DIRECTORY_OPERATION_SUCCESS`,
 `CLM_DIRECTORY_OPERATION_FAILURE`, `CLM_DIRECTORY_OPERATION_UNSUPPORTED`, and
 `CLM_DIRECTORY_OPERATION_STOPPED`, currently encoded as 0, -1, -2, and 1.
 Other bindings may use explicit result types or exceptions while preserving the
@@ -149,7 +162,7 @@ already existing directory but not an existing non-directory.
 
 Moving across filesystems fails instead of silently turning into copy/delete.
 Copying into the source subtree must be rejected; lexical string checks alone are
-not sufficient to enforce that safely. The C copy engine rejects links/special
+not sufficient to enforce that safely. The reference copy behavior rejects links/special
 entries as unsupported rather than recreating or traversing their targets.
 Type conflicts are errors, not permission to
 replace a directory with a file or vice versa.
@@ -268,7 +281,7 @@ hidden entries included. Explicit options contain:
 | `max_depth` | Immediate children have depth 1; zero permits unlimited depth when recursive. |
 | `pattern` | Optional name filter; absent means match all; glob grammar remains undecided. |
 
-The C flag names are `CLM_DIRECTORY_ENUM_RECURSIVE`,
+Representative flag names are `CLM_DIRECTORY_ENUM_RECURSIVE`,
 `CLM_DIRECTORY_ENUM_INCLUDE_HIDDEN`, `CLM_DIRECTORY_ENUM_FOLLOW_SYMLINKS`, and
 `CLM_DIRECTORY_ENUM_STAY_ON_FILESYSTEM`. Entry kinds are selected by
 `CLM_DIRECTORY_ENTRY_FILE`, `CLM_DIRECTORY_ENTRY_DIRECTORY`,
@@ -280,7 +293,7 @@ retaining it. `context` is caller-owned state, not module-owned memory.
 
 Callback results are continue, stop, or error, named
 `CLM_DIRECTORY_VISIT_CONTINUE`, `CLM_DIRECTORY_VISIT_STOP`, and
-`CLM_DIRECTORY_VISIT_ERROR` in C. Deliberate stop produces the distinct stopped
+`CLM_DIRECTORY_VISIT_ERROR`. Deliberate stop produces the distinct stopped
 operation result. Callbacks already delivered and their side effects cannot be
 rolled back. No ordering, stable snapshot, or thread-safety guarantee is implied.
 Following links requires cycle detection and enforcement of depth/mount policies.
@@ -317,7 +330,7 @@ or overflowing scans must not publish incomplete totals. Mount boundaries and
 unreadable-descendant behavior still need explicit rules.
 
 Creation time is birth time, never Unix metadata-change time. Timestamps use native
-binding precision; the current C binding uses `time_t` and does not promise
+binding precision; the current reference binding uses `time_t` and does not promise
 nanoseconds. Access times may be deferred or disabled by filesystem policies.
 Timestamp setters use `CLM_DIRECTORY_TIME_CREATION`,
 `CLM_DIRECTORY_TIME_MODIFICATION`, and `CLM_DIRECTORY_TIME_ACCESS`; unselected
@@ -376,7 +389,7 @@ attributes do not alter ACLs or establish effective access permissions.
 
 ## Validation Plan
 
-The C regression suite covers isolated creation, recursive trees, hidden entries,
+The reference regression suite covers isolated creation, recursive trees, hidden entries,
 counts, array/buffer adapters, exact size reporting, callback filtering and stop,
 depth limits, tree copy/clear/move, source-subtree rejection, working-directory
 restoration, metadata support masks, exclusive temporary children, no-follow
@@ -392,3 +405,18 @@ callback cancellation, unsupported metadata, overflow, and temporary cleanup.
 Fixtures must be isolated and restore working-directory state. The remaining
 fault-injection and cross-platform scenarios are validation work beyond the
 current Windows regression suite.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_file](clm_file.md), [clm_path](clm_path.md), [clm_string](clm_string.md).
+
+## Example use cases
+
+Inspect existence, type, emptiness and entries; create directories and directory trees.

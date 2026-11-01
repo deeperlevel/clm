@@ -1,7 +1,29 @@
-## clm_ua — language-neutral contract
+# CLM Ua
 
-Heuristic browser and OS detection, version extraction, desktop/mobile/tablet classification, and crawler token check. Specific browser tokens (Edge, Opera, Samsung Internet) take priority over generic Chrome/Safari. Unknown results are named `Unknown`. This is not identity verification or a reliable security signal; User-Agent strings are spoofable.
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
-### Cross-language expectations
+## Purpose
 
-This document specifies observable behavior, not syntax or compiler bindings. Keep input order, output values, error cases, and data ownership consistent across CLM language ports. For C signatures, see `include/clm_ua.h`.
+Heuristic parsing of HTTP User-Agent strings.
+
+## Capabilities and operations
+
+- Detect likely browser and operating-system families and versions.
+- Classify desktop, tablet and mobile clients and recognize common crawlers.
+- Prioritize specific browser tokens over generic compatibility tokens.
+- Results are advisory heuristics, not trustworthy security or identity evidence.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_string](clm_string.md).
+
+## Example use cases
+
+Detect likely browser and operating-system families and versions.

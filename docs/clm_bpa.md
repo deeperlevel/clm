@@ -1,4 +1,18 @@
-# CLM - Block Pool Allocation
+# CLM Bpa
+
+## Purpose
+
+Block Pool Allocation: ID-addressed, typed blocks and arrays. In the current C implementation, recyclable small-object pools use [clm_arena](clm_arena.md) internally for pinned slab storage.
+
+## Capabilities and operations
+
+- Create, read, modify, inspect and delete typed blocks through numeric IDs.
+- Allocate and manage array resources (BPAA) with element type and size semantics.
+- Manage explicit object lifetimes; deleting a resource invalidates its ID and dependent views.
+- Do not assume synchronization for shared global BPA storage: serialize cross-thread access when required.
+- In the current C implementation, reuse slab storage from `clm_arena` through retained direct-access leases; this does not change BPA's public block/array contract.
+
+## Detailed module contract
 
 ## 1. Purpose and scope
 
@@ -9,7 +23,7 @@
 
 BPA/BPAA are *storage mechanisms*, not virtual objects or multidimensional data models. `clm_vos` may use BPA/BPAA for typed virtual objects and AVO (Arrays of Virtual Objects); `clm_storage` may use BPAA for rows, columns, and layers. Neither is part of `clm_bpa`, and neither is required to use it.
 
-The module aims to reduce duplicated resource-management code in implementations of `clm_container`, `clm_storage`, `clm_depend`, and other CLM modules. **Use is optional:** applications and higher-level language ports can use native memory and collections when that is more appropriate, provided they preserve the public behavioral contract of the modules they expose.
+The module aims to reduce duplicated resource-management code in implementations of `clm_container`, `clm_storage`, `clm_container`, and other CLM modules. **Use is optional:** applications and higher-level language ports can use native memory and collections when that is more appropriate, provided they preserve the public behavioral contract of the modules they expose.
 
 The D port exposes `ClmBpaBlockNode`, `ClmBpaaArrayNode`, and `ClmBpaPoolClass`.
 Their C-style names (`clm_bpa_block_node`, `clm_bpaa_array_node`, and
@@ -19,21 +33,21 @@ Their C-style names (`clm_bpa_block_node`, `clm_bpaa_array_node`, and
 
 ```text
 clm_base
-   ↑
-clm_bpa
-   ├── BPA  — individually managed blocks
-   └── BPAA — structure-agnostic managed arrays
-   ↑
-   ├── clm_vos      (optional virtual objects and AVO)
-   ├── clm_storage  (2D / 3D organization)
-   └── other modules, where useful
+   ├──> clm_arena  — independent bump allocation and tracked leases
+   │         │
+   │         └────> clm_bpa (current C: internal slab backing)
+   └────────────────> clm_bpa (base types)
+                              ├── BPA  — individually managed blocks
+                              └── BPAA — structure-agnostic managed arrays
+                                      │
+                                      └──> clm_storage and other consumers
 ```
 
-Arrows signify possible implementation dependencies, not compulsory dependencies for every language.
+The current C `clm_bpa` implementation directly depends on both `clm_base` and [clm_arena](clm_arena.md). The arena dependency is **internal**: callers still work with BPA/BPAA IDs, and other language implementations may use their own allocator facilities while preserving BPA's public behavior. Arrows describe the C implementation and typical consumers, not a compulsory allocator architecture for every language.
 
 ## 2. Identity and resource model
 
-Every live block and every live array is registered under a caller-supplied `clm_id`. The caller must select an unused ID **within that resource registry** before creation. Block and array registries are distinct in the current C implementation; the same numeric ID can therefore name one block and one array simultaneously. Callers must know which resource kind an API expects.
+Every live block and every live array is registered under a caller-supplied `clm_id`. The caller must select an unused ID **within that resource registry** before creation. Block and array registries are distinct in the current reference implementation; the same numeric ID can therefore name one block and one array simultaneously. Callers must know which resource kind an API expects.
 
 - **Block ID:** identifies one BPA-managed allocation.
 - **Array ID:** identifies an entire BPAA-managed array, not an individual element.
@@ -48,7 +62,7 @@ The registries are separate. `bpa.is_existing(block_id)` checks only the block r
 
 ## 3. Type and size model
 
-The current C implementation recognizes the following type categories. These are **semantic type names** for cross-language documentation; implementations may use language-native enums or aliases.
+The current reference implementation recognizes the following type categories. These are **semantic type names** for cross-language documentation; implementations may use language-native enums or aliases.
 
 | Type | Intended value | Fixed width |
 |---|---|---:|
@@ -61,7 +75,7 @@ The current C implementation recognizes the following type categories. These are
 | `DOUBLE` | 64-bit floating-point | 8 bytes |
 | `STRING` | Encoded text | Variable |
 | `UUID` | UUID representation | 16 bytes |
-| `DATETIME` | Datetime representation | 8 bytes in the current C implementation |
+| `DATETIME` | Datetime representation | 8 bytes in the current reference implementation |
 
 For named fixed-width types, the element size is derived from the type; `STRUCT` requires an explicit positive element size. The current BPA/BPAA C type tags **distinguish signed and unsigned integer values** of the same width. Exact signedness, UUID byte order, datetime units/timezone semantics, and permitted string encodings should be specified separately before those types are treated as portable serialized representations.
 
@@ -93,7 +107,7 @@ bpa.create(block_id, type)
 bpa.create_sized(block_id, STRUCT, element_size)
 ```
 
-Creating a fixed-width block reserves space for one value/record, initially zero-filled in the C implementation. A string block initially has no text payload and acquires it through a string setter. Creating `STRUCT` without a positive size fails. A failed creation must not register a partially constructed block.
+Creating a fixed-width block reserves space for one value/record, initially zero-filled in the reference implementation. A string block initially has no text payload and acquires it through a string setter. Creating `STRUCT` without a positive size fails. A failed creation must not register a partially constructed block.
 
 ### 5.2 Reads, writes, and copies
 
@@ -109,13 +123,13 @@ bpa.copy_block(source_block_id, destination_block_id)
 
 `is_existing` returns true only for a currently registered block. A matching array ID does not make it true.
 
-For fixed-width blocks, reads copy the stored bytes; writes require the expected block size. `get_to` accepts a destination at least as large as the stored value. `set_from` requires an exact byte-count match in the current C implementation. Neither operation transfers ownership of the external buffer.
+For fixed-width blocks, reads copy the stored bytes; writes require the expected block size. `get_to` accepts a destination at least as large as the stored value. `set_from` requires an exact byte-count match in the current reference implementation. Neither operation transfers ownership of the external buffer.
 
 `replace` provides one operation for replacing either kind of BPA payload. For a fixed-width block it follows the exact-size assignment rules of `set_from`. For a string block, it copies the bounded source bytes into separately managed storage, adds a terminator when the source has none within the supplied byte count, and replaces the old value only after the new copy is ready. The current C function returns `SET_SUCCESS` for fixed-width blocks and the resulting string byte length for strings; failure is `FAILURE`. The old value remains intact if validation or allocation fails.
 
 `copy_block` copies between two **already-created** blocks. Their type tags and fixed record widths must be compatible. For strings, the destination receives its own copy of the text. Managed-to-managed copying does not expose an internal pointer to application code.
 
-The C header also retains `bpa.get`/`bpa.set` as native-buffer spellings; `get_to`/`set_from` are explicit aliases. This is an exception to the general BPAA convention where unsuffixed operations use managed IDs.
+The language-specific reference also retains `bpa.get`/`bpa.set` as native-buffer spellings; `get_to`/`set_from` are explicit aliases. This is an exception to the general BPAA convention where unsuffixed operations use managed IDs.
 
 ### 5.3 Reference counting and destruction
 
@@ -125,7 +139,7 @@ bpa.unref(block_id)
 bpa.delete(block_id)
 ```
 
-- Creation starts with one reference in the current C implementation.
+- Creation starts with one reference in the current reference implementation.
 - `ref` increments the count unless it would overflow.
 - `unref` decrements and automatically destroys the block when the count reaches zero; decrementing an absent or zero-reference block fails.
 - **`delete` is explicit forced destruction.** It destroys the resource regardless of outstanding reference count. This is deliberate CLM policy, *not* an error in the reference-counting implementation.
@@ -139,7 +153,7 @@ References in this module are explicit counters, not automatically tracked langu
 bpa.borrow(block_id) → (status, temporary_address_or_view, size)
 ```
 
-The C implementation offers a direct borrowed pointer for interoperability or performance-sensitive code. **Pooling does not make dangling pointers safe.** Deletion, replacement, shutdown, or any relevant relocation invalidates the borrow; a freed pool slot can be reused for another allocation.
+The reference implementation offers a direct borrowed pointer for interoperability or performance-sensitive code. **Pooling does not make dangling pointers safe.** Deletion, replacement, shutdown, or any relevant relocation invalidates the borrow; a freed pool slot can be reused for another allocation.
 
 Borrowing is an *optional, implementation-specific facility*, not a required operation for languages that do not expose native pointers. Safe-copy methods are the portable default.
 
@@ -147,14 +161,23 @@ Borrowing is an *optional, implementation-specific facility*, not a required ope
 
 BPA may retain freed physical slots and reuse them for later allocations. An allocator is free to use slabs, size classes, free lists, native memory arenas, or equivalent language-runtime mechanisms. What must remain stable is **logical identity and ownership behavior**, not physical placement or allocator internals.
 
-**Current C strategy (not a cross-language requirement):**
+### 6.1 Current C strategy: arena-backed slabs
+
+The current C reference implements small-object pools **on top of [clm_arena](clm_arena.md)**:
 
 - Small individual payloads use reusable size-class pools with slots of 8, 16, 32, 64, 128, 256, 512, 1,024, 2,048, and 4,096 bytes (subject to native pointer-width alignment assumptions).
-- A new slab contributes 32 slots to its size class.
-- Released slots join a free list for reuse; slabs remain allocated until pool cleanup/shutdown.
-- Payloads larger than the largest pooled class use the underlying general-purpose allocator.
-- Block-node metadata and BPAA array backing allocations have their own allocation paths.
-- Pool statistics and slab cleanup are implementation facilities; Python, Go, Ruby, and other managed runtimes need not emulate physical slabs.
+- Each slab provides **32 slots** of a single size class. BPA creates a dedicated, internally owned `clm_arena` for each new slab and allocates its complete storage in one arena allocation.
+- BPA **borrows the new arena once**, obtains the backing pointer, and **retains the tracked lease until that slab is cleaned up**. The lease pins the arena storage so the normal arena API cannot relocate, reset, rewind, or destroy it while the slab is in use.
+- Allocation and release of individual BPA pool slots then use an in-band free list **directly inside the borrowed slab**, without performing an arena ID lookup for each slot operation. If the free list is exhausted, BPA creates another slab rather than allocating more bytes in an already borrowed arena.
+- Released slots rejoin their class's free list; whole slabs remain allocated until pool cleanup/shutdown. Cleanup **returns the arena lease before destroying the slab's arena**.
+- Payloads larger than the largest pooled class use the underlying general-purpose heap allocator. Block metadata, registry tables, and growable **BPAA array backing stores** also use separate heap allocation paths; **not all BPA memory is arena-backed**.
+- Pool statistics and slab cleanup remain implementation facilities; Python, Go, Ruby, and other managed runtimes need not emulate physical slabs or `clm_arena` internals.
+
+### 6.2 Public behavior and lease boundaries
+
+This refactor **does not change** the public BPA/BPAA resource model: blocks and arrays are still addressed by their own IDs, and deletion, reference counting, copying, resizing, and shutdown follow the BPA contract described in this document. Applications do **not** need to create or borrow arenas in order to use BPA.
+
+**Do not confuse borrowing mechanisms:** `clm_arena_borrow` gives BPA a *tracked, pinning arena lease* for an internal slab. The public `bpa.borrow`, `bpaa.slice_borrow`, and advanced BPAA borrow APIs expose **different, weaker lifetime guarantees**; they do not automatically prevent BPA block deletion, string replacement, array resizing, or module shutdown. See [clm_arena](clm_arena.md) for the stronger arena lease rules.
 
 Pooling can reduce repeated allocation costs but does **not** guarantee that every allocation is faster, that all blocks remain at permanent addresses, or that stale pointers remain readable.
 
@@ -185,7 +208,7 @@ Each BPAA array has:
 | `encoding` | String encoding metadata, where applicable |
 | `refcount` | Explicit lifetime reference counter |
 
-On creation, `count = 0` and `capacity` is the requested nonnegative reservation. In the C implementation, a positive capacity reserves actual array backing storage. A managed language may represent reserved capacity logically if its runtime does not expose physical reservation, but must preserve observable count/capacity behavior.
+On creation, `count = 0` and `capacity` is the requested nonnegative reservation. In the reference implementation, a positive capacity reserves actual array backing storage. A managed language may represent reserved capacity logically if its runtime does not expose physical reservation, but must preserve observable count/capacity behavior.
 
 An array is **homogeneous in element width**, but the allocator does not need to understand the fields of an arbitrary structure. `STRUCT` arrays can hold plain fixed-width records such as CLM positions, sizes, blocks, or application-defined ECS components.
 
@@ -209,7 +232,7 @@ Rules:
 1. The array ID and block ID must both resolve to live resources.
 2. The array index must be within bounds. An insertion index may equal `count` to insert at the end.
 3. For fixed-width elements, source/destination block size and `expected_size` must match the array element size.
-4. Type categories must be compatible. The current C implementation permits matching non-`STRUCT` type tags, and uses a size-based rule when the array type is `STRUCT`.
+4. Type categories must be compatible. The current reference implementation permits matching non-`STRUCT` type tags, and uses a size-based rule when the array type is `STRUCT`.
 5. The destination/source block is **not created automatically**. Allocate it explicitly before use.
 6. Reads overwrite the destination block's value; writes copy data into the array. Neither operation reassigns the block ID or array ID.
 7. `append` has no index argument; it adds after the last committed element.
@@ -241,7 +264,7 @@ This is a *direction convention*, not a demand that every language use identical
 
 ### 7.4 BPAA slicing
 
-The C API offers two independent-copy operations and a non-owning borrowed view (zero-based **element** indices):
+The module API offers two independent-copy operations and a non-owning borrowed view (zero-based **element** indices):
 
 ```text
 bpaa.slice(source_array_id, start, length, destination_array_id)
@@ -272,7 +295,7 @@ bpaa.slice_to(VALUES, start=1, length=3, destination_buffer=native_buffer,
 > unless you control the caller and can enforce the lifetime and invariants
 > described below.
 
-The C implementation provides this API for callers that need to avoid
+The reference implementation provides this API for callers that need to avoid
 repeated ID-registry lookups during bulk operations:
 
 ```text
@@ -332,9 +355,9 @@ bpaa.get_string_to(array_id, index, external_destination, byte_capacity)
 bpaa.set_string_from(array_id, index, external_source, byte_count)
 ```
 
-The corresponding external insertion/append operations use the general `insert_from` and `append_from` functions in the current C API. String destinations must be registered as BPA string blocks. String transfers copy contents rather than sharing ownership of the same underlying character buffer.
+The corresponding external insertion/append operations use the general `insert_from` and `append_from` functions in the current module API. String destinations must be registered as BPA string blocks. String transfers copy contents rather than sharing ownership of the same underlying character buffer.
 
-**BPA/BPAA storage behavior:** strings are NUL-terminated byte sequences stored as separately allocated copies; the array holds a sequence of string pointers. A read needs space for the terminating NUL. The low-level BPA/BPAA operations do not impose an encoding or Unicode indexing rule. The higher-level `clm_string` module defines its own encoding and character-index semantics. Embedded NUL is the end of the string in the current C implementation.
+**BPA/BPAA storage behavior:** strings are NUL-terminated byte sequences stored as separately allocated copies; the array holds a sequence of string pointers. A read needs space for the terminating NUL. The low-level BPA/BPAA operations do not impose an encoding or Unicode indexing rule. The higher-level `clm_string` module defines its own encoding and character-index semantics. Embedded NUL is the end of the string in the current reference implementation.
 
 ### 7.7 Array metadata queries
 
@@ -346,7 +369,7 @@ The corresponding external insertion/append operations use the general `insert_f
 | `get_current_index(array_id, block_id)` | `get_current_index_to(array_id, destination)` | Current cursor index |
 | `is_sealed(array_id, block_id)` | `is_sealed_to(array_id, destination)` | Capacity-seal flag |
 
-Managed metadata results require a **preallocated BPA destination**. In the current C implementation, count/capacity/length require the 32-bit `UNSIGNED_INT` block category; the cursor index requires `INT`, and sealed requires `BYTE`. Metadata getters fail if their source array or destination block is invalid or incompatible.
+Managed metadata results require a **preallocated BPA destination**. In the current reference implementation, count/capacity/length require the 32-bit `UNSIGNED_INT` block category; the cursor index requires `INT`, and sealed requires `BYTE`. Metadata getters fail if their source array or destination block is invalid or incompatible.
 
 `get_length` applies to string arrays and uses the current cursor rather than accepting an index. An invalid cursor or empty array causes failure.
 
@@ -371,7 +394,7 @@ bpaa.clear(array_id)
 - Automatic growth occurs when permitted and required for insertion/append.
 - Internal reallocations may relocate the array payload without changing its array ID.
 
-**Safety rule:** If source data may alias the array's backing allocation, insertion must snapshot the source before any reallocation or element shifting. On failed growth, existing elements and count must remain intact. In the current C implementation, the non-string external insert path takes a temporary snapshot to avoid alias invalidation.
+**Safety rule:** If source data may alias the array's backing allocation, insertion must snapshot the source before any reallocation or element shifting. On failed growth, existing elements and count must remain intact. In the current reference implementation, the non-string external insert path takes a temporary snapshot to avoid alias invalidation.
 
 ### 7.9 Traversal and cursor
 
@@ -413,11 +436,11 @@ bpaa.shuffle(array_id)
 ```
 
 - `sort_with` sorts using a caller-provided comparator; the comparator must define the intended order and obey the hosting language's sort contract.
-- `sort` is implemented as bubble sort. Its boolean predicate returns `true` when an adjacent pair should be exchanged; `sort_with` uses a three-way comparator with `qsort` in C.
+- `sort` is implemented as bubble sort. Its boolean predicate returns `true` when an adjacent pair should be exchanged; `sort_with` uses a three-way comparator with `qsort` in the reference implementation.
 - `reverse`, shift/rotate, swap, copy, and shuffle currently apply to non-string arrays.
 - Shift operations rotate the **suffix starting at the supplied index**, rather than leaving holes or changing the count.
 - `copy` overwrites another existing index; it does not insert or change count.
-- `shuffle` rearranges values in place. The current C code uses its standard pseudorandom generator and does not promise unbiased cryptographic randomness.
+- `shuffle` rearranges values in place. The reference implementation uses a pseudorandom generator and does not promise unbiased cryptographic randomness.
 
 ### 7.12 Deck-style drawing
 
@@ -432,7 +455,7 @@ BPAA supports a **deck state** using `deck_size`:
 
 1. The current deck consists of a prefix of the array, initially of length `count`.
 2. `draw_at` obtains the selected entry and swaps it with the last undrawn entry, then decrements `deck_size`.
-3. A `draw` takes a value from the active deck. When depleted, the current C implementation shuffles the full array and starts another cycle.
+3. A `draw` takes a value from the active deck. When depleted, the current reference implementation shuffles the full array and starts another cycle.
 4. Drawing **does not remove committed array elements** and does not reduce `count`.
 5. Array mutations and rearrangements can reset the deck cycle.
 
@@ -452,7 +475,7 @@ Array reference counting mirrors individual BPA blocks. Arrays begin with one re
 
 ### 8.2 Initialization
 
-**No mandatory explicit initialize call exists in the current C API.** Registries and pool classes are initialized lazily on first use. Other languages can construct their internal registries lazily as well, unless a later module specification introduces an explicit context.
+**No mandatory explicit initialize call exists in the current module API.** Registries and pool classes are initialized lazily on first use. Other languages can construct their internal registries lazily as well, unless a later module specification introduces an explicit context.
 
 ### 8.3 Shutdown
 
@@ -460,13 +483,13 @@ Array reference counting mirrors individual BPA blocks. Arrays begin with one re
 bpa.shutdown()
 ```
 
-`shutdown` force-releases outstanding BPA blocks and BPAA arrays, their ID registries, and internal pooled slabs, and resets the module's global state. It intentionally ignores outstanding reference counts. Repeated shutdown is supported in the current C implementation, and a subsequent allocation may lazily establish a fresh registry.
+`shutdown` force-releases outstanding BPA blocks and BPAA arrays, their ID registries, and internal pooled slabs, and resets the module's global state. It intentionally ignores outstanding reference counts. In the current C implementation, cleaning up each slab **returns its retained `clm_arena` lease and then destroys that slab's private arena**. Unrelated arenas created directly by applications are not owned by BPA and are not destroyed by BPA shutdown. Repeated shutdown is supported in the current reference implementation, and a subsequent allocation may lazily establish a fresh registry.
 
 Call shutdown **after** higher-level modules that depend on BPA have stopped. Borrowed pointers and live IDs become invalid. The current implementation is not thread-safe; no other thread should access the module while shutdown runs.
 
 ### 8.4 Pool-only maintenance (implementation facility)
 
-`pool_cleanup()` and `pool_stats()` are supported by the current C implementation. Pool cleanup requires that no pooled allocations remain live; full shutdown is the preferred whole-module cleanup operation. These low-level operations should not be required by portable application code unless the particular language binding exposes equivalent pool controls.
+`pool_cleanup()` and `pool_stats()` are supported by the current reference implementation. Pool cleanup requires that no pooled allocations remain live; it returns the outstanding slab leases to `clm_arena` before destroying those arenas. Full shutdown is the preferred whole-module cleanup operation. These low-level operations should not be required by portable application code unless the particular language binding exposes equivalent pool controls.
 
 ## 9. Safety and performance contract
 
@@ -485,7 +508,7 @@ CLM favors verified resource identity and predictable access over guaranteeing t
 **Important limits:**
 
 - A native external pointer plus declared size cannot be proven valid merely from the signature.
-- Borrowed pointers can become dangling after deletion/reuse or relocation.
+- Borrowed BPA/BPAA pointers can become dangling after deletion/reuse or relocation; the internal arena leases used for C slab backing do not upgrade their public lifetime guarantees.
 - BPA IDs are not automatically generation-checked and can be explicitly reused.
 - Internal reference counters do not provide thread synchronization.
 - Array cursors and global registries are currently single-threaded facilities.
@@ -498,7 +521,7 @@ None of these limitations invalidate the module's purpose; they define the level
 
 | Language category | Plausible implementation | Portability requirement |
 |---|---|---|
-| C | Hash registries, slab/free-list pools, resizable byte arrays | Enforce ID, width, bounds, lifetime and result rules |
+| C | Hash registries; `clm_arena`-backed small-object slab pools; heap-backed growable arrays | Enforce ID, width, bounds, lifetime and result rules; return internal leases before slab destruction |
 | C++ | Templates and aliases over native containers or custom pools | Restrict byte-copy pathways to suitable types; preserve IDs |
 | D / Odin / Zig | Native allocators and collections or explicit pool implementations | Preserve ownership and checked resource behavior |
 | Go | Maps, slices, and runtime-managed objects | Implement logical capacity/ID/lifetime semantics |
@@ -527,7 +550,7 @@ CLM's cross-language promise is **consistent operations and observable behavior*
 | Shutdown | Live resources released, repeated shutdown, subsequent fresh allocation |
 | Robustness | Overflow/large-size cases, invalid arguments, allocator failures, thread-safety constraints |
 
-For native C implementations, use sanitizers or comparable memory instrumentation in addition to assertions. A conforming higher-level implementation should test **the same behavior**, not the same memory addresses or pool statistics.
+For native reference implementations, use sanitizers or comparable memory instrumentation in addition to assertions. A conforming higher-level implementation should test **the same behavior**, not the same memory addresses or pool statistics.
 
 ## 12. Cross-module usage examples (pseudocode)
 
@@ -556,7 +579,7 @@ bpa.delete(POSITION_BUFFER)
 count = bpaa.get_count_to(ARRAY_ID)
 ```
 
-The C implementation uses an external destination argument; managed languages may return `(status, count)` or equivalent.
+The reference implementation uses an external destination argument; managed languages may return `(status, count)` or equivalent.
 
 ### 12.3 Get array count into a managed block
 
@@ -583,8 +606,23 @@ The following are **not settled cross-language promises** and should be document
 9. Distinguishing implementation-only pooling metrics and borrowed-pointer APIs from portable features.
 10. Separate context instances versus the current C global registry architecture.
 
-**Design principle:** `clm_base` defines basic types; `clm_bpa` manages physical blocks and arrays; optional `clm_vos` manages virtual objects; `clm_storage` manages dimensional organization; other modules reuse these capabilities where useful without mandatory VOS overhead.
+**Design principle:** `clm_base` defines basic types; `clm_arena` provides independent bump allocation and tracked memory leases; `clm_bpa` manages typed blocks and arrays (using arena-backed slabs internally in C); optional `clm_vos` manages virtual objects; `clm_storage` manages dimensional organization; other modules reuse these capabilities where useful without mandatory VOS overhead.
 
 ---
 
-*This is a language-agnostic development document, not a guarantee of finalized CLM 1.0 APIs. Updated for the October 2026 C slicing additions.*
+*This is a language-agnostic development document, not a guarantee of finalized CLM 1.0 APIs. Updated for the 2026-11-01 C arena-backed slab integration.*
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md); [clm_arena](clm_arena.md) (internal small-object slab backing in the current C implementation).
+
+## Example use cases
+
+Create, read, modify, inspect and delete typed blocks through numeric IDs.

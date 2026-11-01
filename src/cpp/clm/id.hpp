@@ -21,6 +21,11 @@
 
 namespace clm::id {
 
+inline constexpr clm_id ID_STORAGE_ID = UINT64_C(0x0F000001);
+inline constexpr clm_id CLM_ID_INDEX_STORAGE_ID = UINT64_C(0x0F000002);
+inline constexpr clm_id CLM_ID_NAMES_STORAGE_ID = UINT64_C(0x0F000004);
+inline constexpr clm_id CLM_ID_VALUES_STORAGE_ID = UINT64_C(0x0F000005);
+inline constexpr clm_id CLM_ID_NAME_BUFFER_ID = UINT64_C(0x0F000003);
 inline constexpr clm_id CLM_ID_NOT_FOUND = std::numeric_limits<clm_id>::max();
 inline constexpr int CLM_BPA_FAILURE = dictionary::CLM_BPA_FAILURE;
 inline constexpr int CLM_BPA_SUCCESS = dictionary::CLM_BPA_SUCCESS;
@@ -31,10 +36,12 @@ namespace detail {
 struct mapping {
     clm_id value;
     std::string spelling;
+    std::size_t registration_order;
 };
 
 struct state {
     std::unordered_map<std::string, mapping> mappings;
+    std::size_t next_registration_order = 0;
     bool case_sensitive = true;
     clm_id next_generated = 0;
     bool generator_exhausted = false;
@@ -114,7 +121,9 @@ inline int add(const char* name, const clm_id value)
     try {
         if (registry.mappings.contains(key))
             return CLM_BPA_FAILURE;
-        registry.mappings.emplace(key, detail::mapping{value, text});
+        registry.mappings.emplace(
+            key, detail::mapping{value, text, registry.next_registration_order});
+        ++registry.next_registration_order;
     } catch (...) {
         return CLM_BPA_FAILURE;
     }
@@ -168,8 +177,11 @@ inline int set(const char* name, const clm_id value)
         detail::normalize(text, detail::registry().case_sensitive));
     if (entry == mappings.end()) {
         try {
-            mappings.emplace(detail::normalize(text, detail::registry().case_sensitive),
-                             detail::mapping{value, text});
+            auto& registry = detail::registry();
+            mappings.emplace(detail::normalize(text, registry.case_sensitive),
+                             detail::mapping{value, text,
+                                            registry.next_registration_order});
+            ++registry.next_registration_order;
         } catch (...) {
             return CLM_BPA_FAILURE;
         }
@@ -273,21 +285,26 @@ inline int get_name(
     if (byte_length == nullptr || (buffer == nullptr && capacity != 0))
         return CLM_BPA_FAILURE;
     const auto& registry = detail::registry();
-    for (const auto& [_, item] : registry.mappings) {
-        if (item.value == id) {
-            *byte_length = item.spelling.size();
-            if (capacity <= item.spelling.size()) {
-                if (buffer != nullptr && capacity != 0) {
-                    std::memcpy(buffer, item.spelling.data(), capacity - 1);
-                    buffer[capacity - 1] = '\0';
-                }
-                return CLM_BPA_FAILURE;
-            }
-            std::memcpy(buffer, item.spelling.data(), item.spelling.size() + 1);
-            return CLM_BPA_GET_SUCCESS;
+    const detail::mapping* first = nullptr;
+    for (const auto& [_, item] : registry.mappings)
+        if (item.value == id &&
+            (first == nullptr ||
+             item.registration_order < first->registration_order))
+            first = &item;
+    if (first == nullptr)
+        return CLM_BPA_FAILURE;
+    *byte_length = first->spelling.size();
+    if (buffer == nullptr)
+        return CLM_BPA_GET_SUCCESS;
+    if (capacity <= first->spelling.size()) {
+        if (capacity != 0) {
+            std::memcpy(buffer, first->spelling.data(), capacity - 1);
+            buffer[capacity - 1] = '\0';
         }
+        return CLM_BPA_FAILURE;
     }
-    return CLM_BPA_FAILURE;
+    std::memcpy(buffer, first->spelling.data(), first->spelling.size() + 1);
+    return CLM_BPA_GET_SUCCESS;
 }
 
 inline int remove(const char* name)

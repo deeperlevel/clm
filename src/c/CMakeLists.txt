@@ -23,6 +23,7 @@ add_executable(main
     main.c
     clm/base.h
     clm/bpa.h
+    clm/arena.h
     clm/dictionary.h
     clm/tree.h
     clm/table.h
@@ -33,6 +34,14 @@ add_executable(main
     clm/string_toml.h
     clm/string_json.h
     clm/string_yaml.h
+    clm/string_httpp.h
+    clm/bytes.h
+    clm/stream.h
+    clm/template.h
+    clm/compress.h
+    clm/multipart.h
+    clm/tls.h
+    clm/net_web.h
     clm/async.h
     clm/async_pool.h
     clm/container.h
@@ -58,12 +67,12 @@ add_executable(main
     clm/id.h
     clm/string.h
     clm/ext/freehash.h
-    clm/ext/freehash.c
     clm/hash.h
     clm/crypto.h
     clm/ext/monocypher.h
     tests/test.h
     tests/test_clm_bpa.h
+    tests/test_clm_arena.h
     tests/test_clm_hash.h
     tests/test_clm_crypto.h
     tests/test_clm_dictionary.h
@@ -76,6 +85,14 @@ add_executable(main
     tests/test_clm_string_toml.h
     tests/test_clm_string_json.h
     tests/test_clm_string_yaml.h
+    tests/test_clm_string_httpp.h
+    tests/test_clm_bytes.h
+    tests/test_clm_stream.h
+    tests/test_clm_template.h
+    tests/test_clm_compress.h
+    tests/test_clm_multipart.h
+    tests/test_clm_tls.h
+    tests/test_clm_net_web.h
     tests/test_clm_gen.h
     tests/test_clm_id.h
     tests/test_clm_console.h
@@ -101,14 +118,46 @@ add_executable(main
 )
 
 find_package(Threads REQUIRED)
-target_link_libraries(main PRIVATE uriparser::uriparser Threads::Threads)
+file(GLOB CLM_C_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/clm/*.c")
+
+# Vendored compressors. Brotli's headers are included as <brotli/...> but ship flat.
+set(CLM_VENDOR_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/vendor_include")
+file(GLOB CLM_BROTLI_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/clm/ext/brotli/include/*.h")
+foreach(header ${CLM_BROTLI_HEADERS})
+    get_filename_component(header_name "${header}" NAME)
+    configure_file("${header}" "${CLM_VENDOR_INCLUDE}/brotli/${header_name}" COPYONLY)
+endforeach()
+file(GLOB CLM_BROTLI_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/clm/ext/brotli/common/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clm/ext/brotli/dec/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clm/ext/brotli/enc/*.c")
+set(CLM_VENDOR_SOURCES
+    clm/ext/lz4/lz4.c
+    clm/ext/lz4/lz4hc.c
+    clm/ext/lz4/lz4frame.c
+    clm/ext/lz4/xxhash.c
+    clm/ext/miniz/miniz.c
+    clm/ext/miniz/miniz_tdef.c
+    clm/ext/miniz/miniz_tinfl.c
+    clm/ext/miniz/miniz_zip.c
+    ${CLM_BROTLI_SOURCES})
+
+add_library(clm STATIC ${CLM_C_SOURCES} clm/ext/freehash.c ${CLM_VENDOR_SOURCES})
+target_include_directories(clm PRIVATE "${CLM_VENDOR_INCLUDE}")
+target_compile_definitions(clm PRIVATE MINIZ_NO_ZLIB_COMPATIBLE_NAMES)
+target_include_directories(clm PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(clm PUBLIC uriparser::uriparser Threads::Threads)
+
+target_link_libraries(main PRIVATE clm)
 include(CTest)
 add_test(NAME clm COMMAND main)
 if(WIN32)
-    target_link_libraries(main PRIVATE bcrypt normaliz)
+    target_link_libraries(clm PUBLIC bcrypt normaliz secur32 crypt32)
 else()
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(clm PUBLIC OpenSSL::SSL OpenSSL::Crypto)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(IDN2 REQUIRED IMPORTED_TARGET libidn2)
-    target_link_libraries(main PRIVATE PkgConfig::IDN2 m)
-    target_compile_definitions(main PRIVATE _XOPEN_SOURCE=700 _GNU_SOURCE _FILE_OFFSET_BITS=64)
+    target_link_libraries(clm PUBLIC PkgConfig::IDN2 m)
+    target_compile_definitions(clm PUBLIC _XOPEN_SOURCE=700 _GNU_SOURCE _FILE_OFFSET_BITS=64)
 endif()

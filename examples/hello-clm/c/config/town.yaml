@@ -1,0 +1,9 @@
+# This is parsed into a CLM tree with typed scalar values.
+town:
+  name: "Crabville 🦀"
+  motto: "Don't start from scratch, bro."
+  population: 24
+resources:
+  grain: 150
+  wood: 75
+  water: 200

@@ -1,9 +1,24 @@
-# CLM URL
+# CLM Url
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+URI, URL and IRI parsing, reconstruction and normalization utilities.
+
+## Capabilities and operations
+
+- Parse scheme, authority, user info, host, port, path, query and fragments.
+- Resolve relative references, normalize parts and inspect origins.
+- Handle percent encoding and internationalized identifiers through appropriate rules.
+- Distinguish URL syntax from filesystem paths; normalization is not a security policy.
+
+## Detailed module contract
 
 ## Status and Scope
 
 This is a **language-neutral API catalog** for URI, URL, and IRI manipulation.
-The C binding implements all 63 listed operations using uriparser for RFC 3986
+The reference binding implements all 63 listed operations using uriparser for RFC 3986
 syntax, normalization, and resolution. Cross-language policy remains a draft
 where bindings can differ; references below to pending policies concern that
 broader specification. Current C behavior is defined in the binding contract
@@ -22,7 +37,7 @@ host, origin, and file-URL policies require additional explicit decisions.
 
 ## Language-Neutral Model
 
-### Current C Binding Contract
+### Portable behavior
 
 - Text arguments and output destinations are existing BPA string IDs. Operations
 	return 0 on success and 1 on failure; predicates return 0/1 or -1 on error.
@@ -394,3 +409,18 @@ field 3: key=empty, value="",   has_value=true
 8. Define query empty-field rules, bare keys, missing matches, insertion, and sorting order.
 9. Define redaction configuration and limits without implying comprehensive secret detection.
 10. Define platform-specific file-URL conversion and raw-text/buffer binding conveniences.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_path](clm_path.md), [clm_platform](clm_platform.md), [clm_string](clm_string.md).
+
+## Example use cases
+
+Parse scheme, authority, user info, host, port, path, query and fragments.

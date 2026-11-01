@@ -1,8 +1,21 @@
-# CLM Crypto - Language-Neutral Module Contract
+# CLM Crypto
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+Cryptographic primitives for authenticated encryption, key material and secure random operations.
+
+## Capabilities and operations
+
+- Encrypt/decrypt with authenticated algorithms and verify authentication before accepting plaintext.
+- Generate cryptographically secure random bytes and use explicit encoding/decoding helpers where provided.
+- Keep keys and nonces governed by algorithm-specific requirements, including nonce uniqueness.
+- Use designated clearing/erasure paths for secrets; do not confuse fast hashes with password hashing.
+
+## Detailed module contract
 
 **Module:** `clm_crypto`  
-**C header:** `clm/crypto.h`  
-**Backend:** [Monocypher](https://monocypher.org/), core 4.0.3  
 **Scope:** Authenticated encryption, secure randomness, password-based key
 derivation, X25519 key agreement, and byte/text adapters.
 
@@ -18,11 +31,7 @@ file format, identity system, or secure-memory allocator. It does not negotiate
 algorithms, manage encryption keys, prevent replay, track used nonces, or
 serialize messages. Applications supply those policies.
 
-The C adapter uses Monocypher's XChaCha20-Poly1305, Argon2id, and X25519
-primitives. Randomness comes from the operating system, not Monocypher:
-Windows uses `BCryptGenRandom`; supported Unix-like platforms read
-`/dev/urandom`. Other platforms return a backend error rather than use a weak
-random source.
+The reference algorithm families include XChaCha20-Poly1305, Argon2id and X25519. Cryptographic randomness must use an operating-system-backed secure source (or an equivalent vetted cryptographic source), not an ordinary pseudorandom generator. When a secure source is unavailable, return a failure rather than silently weakening security.
 
 ## 2. Algorithms and representations
 
@@ -111,7 +120,7 @@ native names while preserving these input and output semantics.
 |---|---|---|
 | `encrypt_bytes` | Explicit-length plaintext bytes | Binary ciphertext and tag |
 | `decrypt_bytes` | Binary ciphertext and tag | Authenticated plaintext bytes |
-| `encrypt_bytes_as` | NUL-terminated C string, no UTF-8 validation | Binary ciphertext and tag |
+| `encrypt_bytes_as` | NUL-terminated null-terminated text, no UTF-8 validation | Binary ciphertext and tag |
 | `encrypt_bytes_from` | CLM plaintext string ID | Binary ciphertext and tag |
 | `encrypt_bytes_to` | Explicit-length plaintext bytes | Ciphertext hex in an existing string ID; binary tag |
 | `decrypt_bytes_as` | NUL-terminated ciphertext hex and binary tag | Plaintext bytes |
@@ -219,25 +228,27 @@ EdDSA size constants do not imply signature support.
 | `ERROR_NO_MEMORY` | -6 | Staging or derivation allocation failed |
 | `ERROR_INVALID_TEXT` | -7 | Malformed hex or plaintext incompatible with UTF-8 string output |
 
-C constants carry the `CLM_CRYPTO_` prefix. Some composite ID adapters classify
+Status identifiers use the `CLM_CRYPTO_` prefix. Some composite ID adapters classify
 an inadequate tag destination as an invalid argument rather than a buffer-size
 error. Error-check order is not standardized across operation families.
 Metadata-size queries return a size or zero, rather than a status.
 
-## 9. C integration and backend license
+## 9. Portability and backend choice
 
-Define `CLM_CRYPTO_IMPLEMENTATION` before including the crypto header in
-**exactly one translation unit**. That unit includes the vendored
-`clm/ext/monocypher.c`; do not also compile/link that source separately.
-Other translation units include the header without the implementation macro.
-String/BPA adapters need their normal `CLM_STRING_IMPLEMENTATION` and
-`CLM_BPA_IMPLEMENTATION` definitions exactly once as well.
+Each CLM language implementation may bind to a suitable vetted cryptographic backend while preserving algorithm names, input/output formats, authentication and error behavior. Vendor code and cryptographic libraries retain their own licensing terms; their source is not part of the language-neutral contract. Review the selected backend's current security guidance before deploying it.
 
-Windows needs the `bcrypt` library for randomness. The CLM test executable
-already links it. The adapter uses Monocypher core only; optional Ed25519
-sources are not required.
+## Shared behavioral contract
 
-Backend source: [LoupVaillant/Monocypher](https://github.com/LoupVaillant/Monocypher).
-The CLM adapter is CC0-1.0; Monocypher is dual-licensed BSD-2-Clause or
-CC0-1.0. See the vendored source notices and
-[monocypher.license.md](../src/c/clm/ext/monocypher.license.md).
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+- Algorithm/primitive selection should be documented by each language port; third-party cryptography remains subject to its own license.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_string](clm_string.md).
+
+## Example use cases
+
+Encrypt/decrypt with authenticated algorithms and verify authentication before accepting plaintext.

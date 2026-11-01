@@ -1,4 +1,19 @@
-# CLM String INI
+# CLM String Ini
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+INI text parsing and serialization into CLM trees.
+
+## Capabilities and operations
+
+- Parse sections, keys and supported value syntax from text or files.
+- Serialize supported tree data into INI form.
+- Keep the documented subset and duplicate-key behavior consistent.
+- Uses structured CLM nodes rather than an ad hoc key/value runtime.
+
+## Detailed module contract
 
 ## Purpose
 
@@ -42,3 +57,18 @@ Treat the parsed root as an object. Each source key must already map to a
 unique numeric field ID within its containing object. Preserve string values,
 section structure, and insertion order. Do not promise source comments or
 formatting on round trip.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_file](clm_file.md), [clm_string_format](clm_string_format.md).
+
+## Example use cases
+
+Parse sections, keys and supported value syntax from text or files.

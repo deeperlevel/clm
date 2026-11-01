@@ -1,4 +1,19 @@
-# CLM - Dictionary
+# CLM Dictionary
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+ID-keyed dictionary resources for typed and heterogeneous values.
+
+## Capabilities and operations
+
+- Create and destroy dictionaries; associate numeric keys with values.
+- Use typed operations or heterogeneous-value operations as appropriate.
+- Enumerate keys and read values without relying on unspecified insertion order.
+- Manage ownership of referenced IDs and stored resources explicitly.
+
+## Detailed module contract
 
 ## 1. Purpose and scope
 
@@ -130,7 +145,7 @@ when their entries are removed.
 `contains` returns `false` both for an absent key and for an invalid dictionary.
 Count functions return `CLM_BPA_FAILURE` for an invalid dictionary.
 
-The C typed dictionary uses open addressing with linear probing and grows its
+The reference typed dictionary uses open addressing with linear probing and grows its
 hash table as entries are added. A separate key array preserves insertion
 order. The dynamic dictionary stores its key-to-block-reference index in a
 typed dictionary. Like BPA/BPAA registries, dictionary operations are not
@@ -146,42 +161,15 @@ directly. `clm_bpa_shutdown()` forcibly cleans underlying resources and
 invalidates every dictionary. Dictionary IDs belong to BPA's block ID
 namespace; avoid using a dictionary ID as an unrelated BPA block.
 
-The C metadata layouts are private and may change; do not persist or share them
+Private metadata layouts are private and may change; do not persist or share them
 across versions. The API does not serialize dictionaries or manage persistent
 files.
 
 ### Example (C)
 
-```c
-clm_typed_dictionary_new(100, CLM_BPA_TYPE_INT, 0);
-clm_int score = 42;
-clm_typed_dictionary_add_from(100, 900, &score, sizeof(score));
-score = 99;
-clm_typed_dictionary_set_from(100, 900, &score, sizeof(score));
-clm_id key;
-clm_typed_dictionary_iterate_reset(100);
-while (clm_typed_dictionary_iterate_next(100, &key) == CLM_BPA_GET_SUCCESS) {
-    clm_int current;
-    if (clm_typed_dictionary_get_to(100, key, &current, sizeof(current)) ==
-        CLM_BPA_GET_SUCCESS) {
-        /* use key and current */
-    }
-}
-clm_typed_dictionary_clear(100);
-clm_typed_dictionary_delete(100);
-```
+> Binding-specific code sample omitted; refer to the language implementation for executable examples.
 
-```c
-clm_dictionary_new(200);
-clm_dictionary_set_from(200, 1, CLM_BPA_TYPE_STRING,
-                        "host", sizeof("host"));
-clm_dictionary_set_from(200, 2, CLM_BPA_TYPE_INT,
-                        &score, sizeof(score));
-clm_byte value_type;
-clm_dictionary_get_type(200, 1, &value_type); /* STRING */
-clm_dictionary_get_type(200, 2, &value_type); /* INT */
-clm_dictionary_delete(200); /* also releases copied values */
-```
+> Binding-specific code sample omitted; refer to the language implementation for executable examples.
 
 ### Additional conformance tests
 
@@ -189,3 +177,18 @@ clm_dictionary_delete(200); /* also releases copied values */
 - Both kinds: stable insertion order, delete/reinsert ordering, collisions, key zero, count, clear, reuse, and cleanup.
 - Typed values: exact-size `STRUCT`, empty strings, and copy independence.
 - Heterogeneous values: mixed BPA types, type/ID lookup, compatible destination checks, borrowed-block lifetime, owned-copy cleanup on replacement/removal/clear/delete.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_bpa](clm_bpa.md).
+
+## Example use cases
+
+Create and destroy dictionaries; associate numeric keys with values.

@@ -225,3 +225,4 @@ __marimo__/
 /src/python/tests.old
 /src/python/clm.old
 /src/ruby/.idea
+/examples/hello-clm/c/.idea

@@ -1,9 +1,24 @@
 # CLM Path
 
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+Platform-aware filesystem path inspection and manipulation without directly performing file I/O.
+
+## Capabilities and operations
+
+- Classify absolute/relative paths and inspect path components.
+- Join, split, normalize and transform path segments and separators.
+- Handle platform-specific drive and UNC forms where supported.
+- Do not conflate filesystem paths with URLs.
+
+## Detailed module contract
+
 ## Status and Scope
 
 This is a **language-neutral API catalog** for filesystem path manipulation and
-selected filesystem queries. The C binding implements all 43 listed operations.
+selected filesystem queries. The reference binding implements all 43 listed operations.
 Shared cross-language policy remains a draft where bindings can differ; references
 below to pending policies concern that broader specification. The current C
 behavior is defined in the binding contract section below and supersedes those
@@ -19,7 +34,7 @@ modules, rather than lexical path manipulation.
 
 ## Language-Neutral Model
 
-### Current C Binding Contract
+### Portable behavior
 
 - Text arguments are existing BPA string IDs. Invalid or wrong-type IDs fail.
 - Operations return 0 on success and 1 on error. Predicates return 0/1 or -1 on error.
@@ -170,7 +185,7 @@ Normalization changes lexical representation; making absolute uses directory
 context; canonicalization accesses the filesystem and resolves links. Removing
 `..` lexically can differ from resolving it through a symbolic link.
 
-## UNC API
+## UNmodule API
 
 UNC recognition is syntactic, not a network reachability test. Recognition covers
 complete ordinary and extended UNC paths; generic Windows device paths and local
@@ -271,3 +286,18 @@ resource URL:    smb://server/share/report.txt -> URL module
 8. Define relative-path requirements and drive/share/root compatibility.
 9. Specify Unicode/native conversion, invalid native names, and extended UNC round trips.
 10. Specify binding-specific raw-text and buffer convenience APIs separately from the shared model.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_platform](clm_platform.md), [clm_string](clm_string.md).
+
+## Example use cases
+
+Classify absolute/relative paths and inspect path components.

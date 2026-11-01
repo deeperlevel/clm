@@ -3,6 +3,25 @@
 #include "test.h"
 #include "../clm/file.h"
 #include "../clm/gen.h"
+#include "../clm/string_json.h"
+#include "../clm/string_yaml.h"
+#include "../clm/tree.h"
+
+static clm_stringtify_status clm_file_test_interceptor(
+    clm_id id, const clm_stringtify_options* options, clm_stringtify_writer* writer, void* user)
+{
+    (void)id; (void)options;
+    ++*(int*)user;
+    return clm_stringtify_writer_append_cstr(writer, "X");
+}
+
+static int clm_file_test_content_equals(const char* path, const char* expected)
+{
+    char text[512];
+    size_t required = 0;
+    return clm_file_read_all_text_to(path, CLM_FILE_TEXT_ENCODING_UTF8, text, sizeof(text), &required) == 0 &&
+           strcmp(text, expected) == 0;
+}
 
 static int clm_file_test_set(clm_id id, const char* text)
 {
@@ -165,6 +184,48 @@ static int clm_file_tests(void)
                clm_file_write_all_text(9101, -1, 9103, 3) == -1 &&
                clm_file_append_text_as(path, -1, 9103, 3) == -1 && clm_bpa_delete(9108) == 0,
                "preserve BPA-read outputs and reject invalid text encodings before writes");
+    {
+        int intercepted = 0;
+        CLM_ASSERT(clm_string_new(9401, "hello") && clm_string_new(9402, "") &&
+                   clm_test_parse_text(9403, "[1,2]", 9404, clm_string_json_loads) == CLM_FORMAT_DESERIALIZE_SUCCESS,
+                   "create object write fixtures");
+        CLM_ASSERT(clm_file_write_block_as(path, CLM_FILE_TEXT_ENCODING_UTF8, 9401) == 0 &&
+                   clm_file_test_content_equals(path, "hello") &&
+                   clm_file_append_block(9101, CLM_FILE_TEXT_ENCODING_UTF8, 9401) == 0 &&
+                   clm_file_test_content_equals(path, "hellohello") &&
+                   clm_file_write_inspect_block_as(path, CLM_FILE_TEXT_ENCODING_UTF8, 9401) == 0 &&
+                   !clm_file_test_content_equals(path, "hello"),
+                   "write and append raw string blocks while inspect quotes them");
+        CLM_ASSERT(clm_file_write_tree_as_json(9101, CLM_FILE_TEXT_ENCODING_UTF8, 9404) == 0 &&
+                   clm_file_test_content_equals(path, "[\n  1,\n  2\n]") &&
+                   clm_file_append_tree_as_json_as(path, CLM_FILE_TEXT_ENCODING_UTF8, 9404) == 0 &&
+                   clm_file_test_content_equals(path, "[\n  1,\n  2\n][\n  1,\n  2\n]"),
+                   "write and append indented JSON trees");
+        CLM_ASSERT(clm_string_yaml_dumps(9404, 9402) == CLM_FORMAT_SERIALIZE_SUCCESS &&
+                   clm_file_write_tree_as_yaml_as(path, CLM_FILE_TEXT_ENCODING_UTF8, 9404) == 0 &&
+                   clm_file_test_content_equals(path, (const char*)clm_bpa_find_block(9402)->data),
+                   "write YAML trees using the YAML serializer output");
+        clm_file_intercept_object_writes(clm_file_test_interceptor, &intercepted);
+        CLM_ASSERT(clm_file_write_tree_as(path, CLM_FILE_TEXT_ENCODING_UTF8, 9404) == 0 &&
+                   clm_file_test_content_equals(path, "X") &&
+                   clm_file_append_tree(9101, CLM_FILE_TEXT_ENCODING_UTF8, 9404) == 0 &&
+                   clm_file_test_content_equals(path, "XX") && intercepted == 4 &&
+                   clm_file_write_tree_as_json_as(path, CLM_FILE_TEXT_ENCODING_UTF8, 9404) == 0 &&
+                   clm_file_test_content_equals(path, "[\n  1,\n  2\n]") && intercepted == 4,
+                   "apply the file interceptor except for YAML and JSON writers");
+        clm_file_do_not_intercept_object_writes();
+        CLM_ASSERT(clm_file_write_block_as(path, CLM_FILE_TEXT_ENCODING_UTF8, 9401) == 0 &&
+                   clm_file_write_block_as(path, CLM_FILE_TEXT_ENCODING_UTF8, 9999) == -1 &&
+                   clm_file_write_block_as(path, -1, 9401) == -1 &&
+                   clm_file_write_block_as(NULL, CLM_FILE_TEXT_ENCODING_UTF8, 9401) == -1 &&
+                   clm_file_append_block(9999, CLM_FILE_TEXT_ENCODING_UTF8, 9401) == -1 &&
+                   clm_file_write_tree_as_yaml_as(path, CLM_FILE_TEXT_ENCODING_UTF8, 9401) == -1 &&
+                   clm_file_append_tree_as_json_as(path, CLM_FILE_TEXT_ENCODING_UTF8, 9401) == -1 &&
+                   clm_file_test_content_equals(path, "hello"),
+                   "reject invalid objects, paths, and encodings without changing the file");
+        CLM_ASSERT(clm_tree_delete(9404) == CLM_BPA_SUCCESS && clm_string_delete(9401) &&
+                   clm_string_delete(9402), "release object write fixtures");
+    }
     CLM_ASSERT(clm_bpa_delete(9101) == 0 && clm_bpa_delete(9102) == 0 && clm_bpa_delete(9103) == 0 &&
                clm_bpa_delete(9104) == 0 && clm_bpaa_delete(9105) == 0 && clm_bpa_delete(9106) == 0 && clm_bpa_delete(9107) == 0,
                "release all file test data registrations");

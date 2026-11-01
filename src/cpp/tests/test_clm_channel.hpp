@@ -1,39 +1,50 @@
-#pragma once
+﻿#pragma once
 
 #include "test.hpp"
 #include "../clm/channel.hpp"
 
-#include <thread>
+#include <threads.h>
 
-struct clm_channel_test_send_args {
-	clm_id channel_id{0};
-	clm_id message_id{0};
-	clm_int result{CLM_CHANNEL_OPERATION_FAILURE};
-};
+typedef struct clm_channel_test_send_args {
+	clm_id channel_id;
+	clm_id message_id;
+	clm_int result;
+} clm_channel_test_send_args;
 
-struct clm_channel_test_receive_args {
-	clm_id channel_id{0};
-	clm_id message_id{0};
-	bool open{false};
-	clm_int result{CLM_CHANNEL_OPERATION_FAILURE};
-};
+typedef struct clm_channel_test_receive_args {
+	clm_id channel_id;
+	clm_id message_id;
+	bool open;
+	clm_int result;
+} clm_channel_test_receive_args;
 
-static void clm_channel_test_sender(clm_channel_test_send_args* args)
+static int clm_channel_test_sender(void* context)
 {
+	clm_channel_test_send_args* args =
+		(clm_channel_test_send_args*)context;
 	args->result = clm_channel_send(args->channel_id, args->message_id);
+	return 0;
 }
 
-static void clm_channel_test_receiver(clm_channel_test_receive_args* args)
+static int clm_channel_test_receiver(void* context)
 {
-	args->result = clm_channel_receive(args->channel_id, &args->message_id, &args->open);
+	clm_channel_test_receive_args* args =
+		(clm_channel_test_receive_args*)context;
+	args->result = clm_channel_receive(args->channel_id, &args->message_id,
+		&args->open);
+	return 0;
 }
 
-static void clm_channel_test_blocked_receiver(clm_channel_test_receive_args* args)
+static int clm_channel_test_blocked_receiver(void* context)
 {
-	args->result = clm_channel_receive(args->channel_id, &args->message_id, &args->open);
+	clm_channel_test_receive_args* args =
+		(clm_channel_test_receive_args*)context;
+	args->result = clm_channel_receive(args->channel_id, &args->message_id,
+		&args->open);
+	return 0;
 }
 
-static int test_clm_channel()
+static int clm_channel_tests(void)
 {
 	clm_test_result result = {0};
 	clm_test_begin("CLM - Channel");
@@ -42,7 +53,7 @@ static int test_clm_channel()
 	const clm_id close_waiter_id = 93003;
 	clm_id message_id = 999;
 	bool open = false;
-	clm_channel_info info = {0, 0, false};
+	clm_channel_info info = {0};
 
 	CLM_ASSERT(clm_channel_create(buffered_id, 2) ==
 		CLM_CHANNEL_OPERATION_SUCCESS &&
@@ -82,25 +93,21 @@ static int test_clm_channel()
 		"create an unbuffered rendezvous channel");
 	clm_channel_test_send_args send_args = {rendezvous_id, 52,
 		CLM_CHANNEL_OPERATION_FAILURE};
-	std::thread sender_thread(clm_channel_test_sender, &send_args);
-	CLM_ASSERT(clm_channel_receive(rendezvous_id, &message_id, &open) ==
-		CLM_CHANNEL_OPERATION_SUCCESS && message_id == 52 && open,
-		"receive unbuffered handoff message");
-	if (sender_thread.joinable())
-		sender_thread.join();
-	CLM_ASSERT(send_args.result == CLM_CHANNEL_OPERATION_SUCCESS,
+	thrd_t sender;
+	CLM_ASSERT(thrd_create(&sender, clm_channel_test_sender, &send_args) ==
+		thrd_success &&
+		clm_channel_receive(rendezvous_id, &message_id, &open) ==
+		CLM_CHANNEL_OPERATION_SUCCESS && message_id == 52 && open &&
+		thrd_join(sender, NULL) == thrd_success &&
+		send_args.result == CLM_CHANNEL_OPERATION_SUCCESS,
 		"pair a blocking unbuffered sender with a receiver");
-
 	clm_channel_test_receive_args receive_args = {rendezvous_id, 999, false,
 		CLM_CHANNEL_OPERATION_FAILURE};
-	std::thread receiver_thread(clm_channel_test_receiver, &receive_args);
-	// give the receiver thread time to enter wait
-	std::this_thread::sleep_for(std::chrono::milliseconds(5));
-	CLM_ASSERT(clm_channel_send(rendezvous_id, 0) == CLM_CHANNEL_OPERATION_SUCCESS,
-		"send zero ID to waiting receiver");
-	if (receiver_thread.joinable())
-		receiver_thread.join();
-	CLM_ASSERT(receive_args.result == CLM_CHANNEL_OPERATION_SUCCESS &&
+	thrd_t receiver;
+	CLM_ASSERT(thrd_create(&receiver, clm_channel_test_receiver, &receive_args) ==
+		thrd_success && clm_channel_send(rendezvous_id, 0) ==
+		CLM_CHANNEL_OPERATION_SUCCESS && thrd_join(receiver, NULL) == thrd_success &&
+		receive_args.result == CLM_CHANNEL_OPERATION_SUCCESS &&
 		receive_args.message_id == 0 && receive_args.open,
 		"pair a receiver with a blocking unbuffered sender");
 	CLM_ASSERT(clm_channel_close(rendezvous_id) == CLM_CHANNEL_OPERATION_SUCCESS &&
@@ -116,13 +123,11 @@ static int test_clm_channel()
 	receive_args.message_id = 777;
 	receive_args.open = true;
 	receive_args.result = CLM_CHANNEL_OPERATION_FAILURE;
-	std::thread blocked_receiver_thread(clm_channel_test_blocked_receiver, &receive_args);
-	std::this_thread::sleep_for(std::chrono::milliseconds(5));
-	CLM_ASSERT(clm_channel_close(close_waiter_id) == CLM_CHANNEL_OPERATION_SUCCESS,
-		"close channel while receiver is blocked");
-	if (blocked_receiver_thread.joinable())
-		blocked_receiver_thread.join();
-	CLM_ASSERT(receive_args.result == CLM_CHANNEL_OPERATION_CLOSED &&
+	CLM_ASSERT(thrd_create(&receiver, clm_channel_test_blocked_receiver,
+		&receive_args) == thrd_success &&
+		clm_channel_close(close_waiter_id) == CLM_CHANNEL_OPERATION_SUCCESS &&
+		thrd_join(receiver, NULL) == thrd_success &&
+		receive_args.result == CLM_CHANNEL_OPERATION_CLOSED &&
 		receive_args.message_id == 0 && !receive_args.open &&
 		clm_channel_send_timeout(close_waiter_id, 1, 0) ==
 		CLM_CHANNEL_OPERATION_CLOSED &&
@@ -131,5 +136,10 @@ static int test_clm_channel()
 
 	clm_test_summary(result.passed, result.failed);
 	return result.failed == 0 ? 0 : 1;
+}
+
+static int test_clm_channel(void)
+{
+    return clm_channel_tests();
 }
 

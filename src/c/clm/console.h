@@ -1,36 +1,41 @@
 #pragma once
 
 /*
-* =============================================================================
+ * =============================================================================
  * CLM — Cross Language Modules
- *
- * An initiative by deeperlevel, developed with community contributions.
+ * 
  * https://github.com/deeperlevel/clm
- * Contact: deeparchive@outlook.com
+ * Contact: [deeparchive@outlook.com](mailto:deeparchive@outlook.com)
  *
- * Public Domain — CC0 1.0 Universal
+ * A collection of reusable, composable foundational modules providing
+ * consistent capabilities and behavior across programming languages.
+ * Designed to eliminate repetitive groundwork while preserving the
+ * flexibility, independence, and native strengths of each language.
+ *
+ * Unless a file states otherwise, CLM-authored code is dedicated to the
+ * public domain under CC0 1.0 Universal.
  * https://creativecommons.org/publicdomain/zero/1.0/
  *
  * Free to use, modify, redistribute, and bundle for any purpose.
  * Attribution and retention of this notice are appreciated, not required.
  *
- * Provided AS IS, without warranty or liability.
+ * Third-party code under ext/ or vendor/ retains its original licenses,
+ * copyright notices, and disclaimers. CLM's CC0 dedication does not
+ * apply to such code. Refer to the accompanying vendor license files.
  *
- * Don't start from scratch, bro.
+ * CLM is provided AS IS, without warranty or liability.
+ * CLM maintainers and contributors make no warranties regarding
+ * third-party code and disclaim liability for its use to the extent
+ * permitted by applicable law. Original vendor terms remain applicable.
+ *
  * =============================================================================
  */
 
 #include "base.h"
+#include "stringtify.h"
 
-#include <ctype.h>
-#include <limits.h>
-#include <math.h>
 #include <stdbool.h>
-#include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
 
 /** Result codes returned by console operations. */
 typedef enum clm_console_status {
@@ -83,31 +88,17 @@ typedef enum clm_console_status {
  * @param text Text to write.
  * @return SUCCESS, INVALID_ARGUMENT for NULL inputs, or FAILURE on I/O error.
  */
-static inline clm_console_status clm_console_write_to(
-    FILE* stream,
-    const char* text)
-{
-    if (stream == NULL || text == NULL)
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    return fputs(text, stream) == EOF
-        ? CLM_CONSOLE_FAILURE : CLM_CONSOLE_SUCCESS;
-}
+clm_console_status clm_console_write_to(FILE* stream, const char* text);
 
 /** Initializes the standard-C console interface; currently performs no setup.
  * @return CLM_CONSOLE_SUCCESS.
  */
-static inline clm_console_status clm_console_init(void)
-{
-    return CLM_CONSOLE_SUCCESS;
-}
+clm_console_status clm_console_init(void);
 
 /** Restores console state; currently performs no platform-specific operation.
  * @return CLM_CONSOLE_SUCCESS.
  */
-static inline clm_console_status clm_console_restore(void)
-{
-    return CLM_CONSOLE_SUCCESS;
-}
+clm_console_status clm_console_restore(void);
 
 /** Emits ANSI clear-screen and home-cursor controls to a stream.
  * The stream must be connected to an ANSI-compatible terminal for control
@@ -115,29 +106,17 @@ static inline clm_console_status clm_console_restore(void)
  * @param stream Destination stream.
  * @return SUCCESS, INVALID_ARGUMENT for a NULL stream, or FAILURE on I/O error.
  */
-static inline clm_console_status clm_console_clear_to(FILE* stream)
-{
-    return clm_console_write_to(stream, "\x1b[2J\x1b[H");
-}
+clm_console_status clm_console_clear_to(FILE* stream);
 
 /** Clears stdout and flushes it.
  * @return CLM_CONSOLE_SUCCESS, or CLM_CONSOLE_FAILURE on I/O error.
  */
-static inline clm_console_status clm_console_clear(void)
-{
-    const clm_console_status status = clm_console_clear_to(stdout);
-    return status == CLM_CONSOLE_SUCCESS && fflush(stdout) == EOF
-        ? CLM_CONSOLE_FAILURE : status;
-}
+clm_console_status clm_console_clear(void);
 
 /** Flushes stdout.
  * @return CLM_CONSOLE_SUCCESS, or CLM_CONSOLE_FAILURE on I/O error.
  */
-static inline clm_console_status clm_console_flush(void)
-{
-    return fflush(stdout) == 0
-        ? CLM_CONSOLE_SUCCESS : CLM_CONSOLE_FAILURE;
-}
+clm_console_status clm_console_flush(void);
 
 /** Emits an ANSI cursor-position sequence to a stream.
  * Position coordinates are zero-based in the API and converted to ANSI's
@@ -147,81 +126,42 @@ static inline clm_console_status clm_console_flush(void)
  * @return SUCCESS, INVALID_ARGUMENT for a NULL stream or negative coordinate,
  *         or FAILURE on formatting/I/O error.
  */
-static inline clm_console_status clm_console_set_cursor_position_to(
-    FILE* stream,
-    const clm_position position)
-{
-    char sequence[64];
-    if (stream == NULL || position.x < 0 || position.y < 0)
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    const int written = snprintf(
-        sequence,
-        sizeof(sequence),
-        "\x1b[%u;%uH",
-        (unsigned int)((clm_uint)position.y + 1u),
-        (unsigned int)((clm_uint)position.x + 1u));
-    if (written < 0 || (size_t)written >= sizeof(sequence))
-        return CLM_CONSOLE_FAILURE;
-    return clm_console_write_to(stream, sequence);
-}
+clm_console_status clm_console_set_cursor_position_to(FILE* stream, clm_position position);
 
 /** Moves the cursor on stdout and flushes the stream.
  * @param position Zero-based x/y cursor position.
  * @return SUCCESS, INVALID_ARGUMENT for negative coordinates, or FAILURE.
  */
-static inline clm_console_status clm_console_set_cursor_position(
-    const clm_position position)
-{
-    const clm_console_status status =
-        clm_console_set_cursor_position_to(stdout, position);
-    return status == CLM_CONSOLE_SUCCESS && fflush(stdout) == EOF
-        ? CLM_CONSOLE_FAILURE : status;
-}
+clm_console_status clm_console_set_cursor_position(clm_position position);
 
 /** Emits an ANSI sequence to show or hide the cursor on a stream.
  * @param stream Destination stream.
  * @param visible true to show the cursor; false to hide it.
  * @return SUCCESS, INVALID_ARGUMENT for a NULL stream, or FAILURE on I/O error.
  */
-static inline clm_console_status clm_console_set_cursor_visible_to(
-    FILE* stream,
-    const bool visible)
-{
-    return clm_console_write_to(
-        stream,
-        visible ? "\x1b[?25h" : "\x1b[?25l");
-}
+clm_console_status clm_console_set_cursor_visible_to(FILE* stream, bool visible);
 
 /** Shows the cursor on stdout and flushes the stream.
  * @return CLM_CONSOLE_SUCCESS, or CLM_CONSOLE_FAILURE on I/O error.
  */
-static inline clm_console_status clm_console_show_cursor(void)
-{
-    const clm_console_status status =
-        clm_console_set_cursor_visible_to(stdout, true);
-    return status == CLM_CONSOLE_SUCCESS && fflush(stdout) == EOF
-        ? CLM_CONSOLE_FAILURE : status;
-}
+clm_console_status clm_console_show_cursor(void);
 
 /** Hides the cursor on stdout and flushes the stream.
  * @return CLM_CONSOLE_SUCCESS, or CLM_CONSOLE_FAILURE on I/O error.
  */
-static inline clm_console_status clm_console_hide_cursor(void)
-{
-    const clm_console_status status =
-        clm_console_set_cursor_visible_to(stdout, false);
-    return status == CLM_CONSOLE_SUCCESS && fflush(stdout) == EOF
-        ? CLM_CONSOLE_FAILURE : status;
-}
+clm_console_status clm_console_hide_cursor(void);
 
 /** Writes text to stdout without a newline.
  * @param text NUL-terminated text.
  * @return SUCCESS, INVALID_ARGUMENT for NULL, or FAILURE on I/O error.
  */
-static inline clm_console_status clm_console_write(const char* text)
-{
-    return clm_console_write_to(stdout, text);
-}
+clm_console_status clm_console_write(const char* text);
+
+/** Writes text to stderr without a newline.
+ * @param text NUL-terminated text.
+ * @return SUCCESS, INVALID_ARGUMENT for NULL, or FAILURE on I/O error.
+ */
+clm_console_status clm_console_error(const char* text);
 
 /** Formats variadic arguments and writes the result to a stream.
  * The va_list is consumed only through copies; the caller retains its state.
@@ -230,41 +170,7 @@ static inline clm_console_status clm_console_write(const char* text)
  * @param arguments Values matching the format specifiers.
  * @return SUCCESS, INVALID_ARGUMENT for NULL stream/format, or FAILURE.
  */
-static inline clm_console_status clm_console_vwrite_format_to(
-    FILE* stream,
-    const char* format,
-    va_list arguments)
-{
-    va_list measure_arguments;
-    va_list write_arguments;
-
-    if (stream == NULL || format == NULL)
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-
-    va_copy(measure_arguments, arguments);
-    int length = vsnprintf(NULL, 0, format, measure_arguments);
-    va_end(measure_arguments);
-    if (length < 0)
-        return CLM_CONSOLE_FAILURE;
-
-    char* buffer = (char*)malloc((size_t)length + 1);
-    if (buffer == NULL)
-        return CLM_CONSOLE_FAILURE;
-
-    va_copy(write_arguments, arguments);
-    if (vsnprintf(buffer, (size_t)length + 1, format, write_arguments) != length) {
-        va_end(write_arguments);
-        free(buffer);
-        return CLM_CONSOLE_FAILURE;
-    }
-    va_end(write_arguments);
-
-    const clm_console_status status = fwrite(buffer, 1, (size_t)length, stream) == (size_t)length
-                                    ? CLM_CONSOLE_SUCCESS
-                                    : CLM_CONSOLE_FAILURE;
-    free(buffer);
-    return status;
-}
+clm_console_status clm_console_vwrite_format_to(FILE* stream, const char* format, va_list arguments);
 
 /** Formats and writes a line to a stream, appending one LF character.
  * @param stream Destination stream.
@@ -272,18 +178,7 @@ static inline clm_console_status clm_console_vwrite_format_to(
  * @param arguments Values matching the format specifiers.
  * @return SUCCESS, INVALID_ARGUMENT for NULL stream/format, or FAILURE.
  */
-static inline clm_console_status clm_console_vwrite_line_format_to(
-    FILE* stream,
-    const char* format,
-    va_list arguments)
-{
-    clm_console_status status =
-        clm_console_vwrite_format_to(stream, format, arguments);
-    if (status != CLM_CONSOLE_SUCCESS)
-        return status;
-    return fputc('\n', stream) == EOF
-        ? CLM_CONSOLE_FAILURE : CLM_CONSOLE_SUCCESS;
-}
+clm_console_status clm_console_vwrite_line_format_to(FILE* stream, const char* format, va_list arguments);
 
 /** Writes printf-style formatted output to a stream without a newline.
  * @param stream Destination stream.
@@ -291,17 +186,7 @@ static inline clm_console_status clm_console_vwrite_line_format_to(
  * @param ... Values matching the format specifiers.
  * @return SUCCESS, INVALID_ARGUMENT for NULL stream/format, or FAILURE.
  */
-static inline clm_console_status clm_console_write_format_to(
-    FILE* stream,
-    const char* format,
-    ...)
-{
-    va_list arguments;
-    va_start(arguments, format);
-    const clm_console_status status = clm_console_vwrite_format_to(stream, format, arguments);
-    va_end(arguments);
-    return status;
-}
+clm_console_status clm_console_write_format_to(FILE* stream, const char* format, ...);
 
 /** Writes printf-style formatted output to a stream followed by LF.
  * @param stream Destination stream.
@@ -309,76 +194,41 @@ static inline clm_console_status clm_console_write_format_to(
  * @param ... Values matching the format specifiers.
  * @return SUCCESS, INVALID_ARGUMENT for NULL stream/format, or FAILURE.
  */
-static inline clm_console_status clm_console_write_line_format_to(
-    FILE* stream,
-    const char* format,
-    ...)
-{
-    va_list arguments;
-    va_start(arguments, format);
-    const clm_console_status status = clm_console_vwrite_line_format_to(stream, format, arguments);
-    va_end(arguments);
-    return status;
-}
+clm_console_status clm_console_write_line_format_to(FILE* stream, const char* format, ...);
 
 /** Writes printf-style formatted output to stdout without a newline.
  * @param format printf-style format string.
  * @param ... Values matching the format specifiers.
  * @return SUCCESS, INVALID_ARGUMENT for a NULL format, or FAILURE.
  */
-static inline clm_console_status clm_console_write_format(const char* format, ...)
-{
-    va_list arguments;
-    va_start(arguments, format);
-    const clm_console_status status = clm_console_vwrite_format_to(stdout, format, arguments);
-    va_end(arguments);
-    return status;
-}
+clm_console_status clm_console_write_format(const char* format, ...);
+
+/** Writes printf-style formatted output to stderr without a newline.
+ * @param format printf-style format string.
+ * @param ... Values matching the format specifiers.
+ * @return SUCCESS, INVALID_ARGUMENT for a NULL format, or FAILURE.
+ */
+clm_console_status clm_console_error_format(const char* format, ...);
 
 /** Writes printf-style formatted output to stdout followed by LF, then flushes.
  * @param format printf-style format string.
  * @param ... Values matching the format specifiers.
  * @return SUCCESS, INVALID_ARGUMENT for a NULL format, or FAILURE.
  */
-static inline clm_console_status clm_console_write_line_format(
-    const char* format,
-    ...)
-{
-    va_list arguments;
-    va_start(arguments, format);
-    const clm_console_status status = clm_console_vwrite_line_format_to(stdout, format, arguments);
-    va_end(arguments);
-    if (status == CLM_CONSOLE_SUCCESS && fflush(stdout) == EOF)
-        return CLM_CONSOLE_FAILURE;
-    return status;
-}
+clm_console_status clm_console_write_line_format(const char* format, ...);
 
 /** Writes text and a newline to a stream without flushing it.
  * @param stream Destination stream.
  * @param text NUL-terminated text.
  * @return SUCCESS, INVALID_ARGUMENT for NULL inputs, or FAILURE on I/O error.
  */
-static inline clm_console_status clm_console_write_line_to(
-    FILE* stream,
-    const char* text)
-{
-    clm_console_status status = clm_console_write_to(stream, text);
-    if (status != CLM_CONSOLE_SUCCESS)
-        return status;
-    return fputc('\n', stream) == EOF
-        ? CLM_CONSOLE_FAILURE : CLM_CONSOLE_SUCCESS;
-}
+clm_console_status clm_console_write_line_to(FILE* stream, const char* text);
 
 /** Writes text and a newline to stdout, then flushes it.
  * @param text NUL-terminated text.
  * @return SUCCESS, INVALID_ARGUMENT for NULL, or FAILURE on I/O error.
  */
-static inline clm_console_status clm_console_write_line(const char* text)
-{
-    const clm_console_status status = clm_console_write_line_to(stdout, text);
-    return status == CLM_CONSOLE_SUCCESS && fflush(stdout) == EOF
-        ? CLM_CONSOLE_FAILURE : status;
-}
+clm_console_status clm_console_write_line(const char* text);
 
 /** Reads one line from a stream, stripping LF and an optional preceding CR.
  * Lines that exceed capacity are drained and reported as failures.
@@ -388,39 +238,7 @@ static inline clm_console_status clm_console_write_line(const char* text)
  * @return SUCCESS, INVALID_ARGUMENT for invalid arguments, or FAILURE on EOF,
  *         I/O error, or an overlong line.
  */
-static inline clm_console_status clm_console_read_line_from(
-    FILE* stream,
-    char* buffer,
-    const size_t capacity)
-{
-    if (stream == NULL || buffer == NULL || capacity < 2 || capacity > INT_MAX)
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    if (fgets(buffer, (int)capacity, stream) == NULL)
-        return CLM_CONSOLE_FAILURE;
-    size_t length = strlen(buffer);
-    if (length != 0 && buffer[length - 1] == '\n') {
-        buffer[--length] = '\0';
-        if (length != 0 && buffer[length - 1] == '\r')
-            buffer[--length] = '\0';
-        return CLM_CONSOLE_SUCCESS;
-    }
-
-    int next = fgetc(stream);
-    if (next != EOF && next != '\n') {
-        do {
-            next = fgetc(stream);
-        } while (next != EOF && next != '\n');
-        buffer[0] = '\0';
-        return CLM_CONSOLE_FAILURE;
-    }
-    if (next == EOF && ferror(stream)) {
-        buffer[0] = '\0';
-        return CLM_CONSOLE_FAILURE;
-    }
-    if (length != 0 && buffer[length - 1] == '\r')
-        buffer[length - 1] = '\0';
-    return CLM_CONSOLE_SUCCESS;
-}
+clm_console_status clm_console_read_line_from(FILE* stream, char* buffer, size_t capacity);
 
 /** Reads a line from stdin into shared internal storage.
  * The returned pointer is overwritten by the next line or character read.
@@ -428,37 +246,14 @@ static inline clm_console_status clm_console_read_line_from(
  * @param out_value Receives the shared line pointer; must not be NULL.
  * @return SUCCESS, INVALID_ARGUMENT for NULL, or FAILURE on input error/EOF.
  */
-static inline clm_console_status clm_console_read_line(const char** out_value)
-{
-    /* The returned text is shared storage, overwritten by the next read. */
-    static char buffer[CLM_CONSOLE_INPUT_CAPACITY];
-    if (out_value == NULL)
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    if (clm_console_read_line_from(stdin, buffer, sizeof(buffer)) !=
-        CLM_CONSOLE_SUCCESS)
-        return CLM_CONSOLE_FAILURE;
-    *out_value = buffer;
-    return CLM_CONSOLE_SUCCESS;
-}
+clm_console_status clm_console_read_line(const char** out_value);
 
 /** Writes an optional prompt to stdout, flushes it, then reads a line.
  * @param prompt Optional prompt; NULL suppresses prompt output.
  * @param out_value Receives a pointer to shared input storage.
  * @return SUCCESS, INVALID_ARGUMENT for NULL output, or FAILURE on I/O/input.
  */
-static inline clm_console_status clm_console_read(
-    const char* prompt,
-    const char** out_value)
-{
-    if (out_value == NULL)
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    if (prompt != NULL &&
-        clm_console_write_to(stdout, prompt) != CLM_CONSOLE_SUCCESS)
-        return CLM_CONSOLE_FAILURE;
-    if (fflush(stdout) == EOF)
-        return CLM_CONSOLE_FAILURE;
-    return clm_console_read_line(out_value);
-}
+clm_console_status clm_console_read(const char* prompt, const char** out_value);
 
 /** Reads one byte from a stream.
  * This reads a byte, not a decoded Unicode character.
@@ -466,18 +261,7 @@ static inline clm_console_status clm_console_read(
  * @param out_character Receives the byte converted to char.
  * @return SUCCESS, INVALID_ARGUMENT for NULL arguments, or FAILURE on EOF/I/O.
  */
-static inline clm_console_status clm_console_read_character_from(
-    FILE* stream,
-    char* out_character)
-{
-    if (stream == NULL || out_character == NULL)
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    int character = fgetc(stream);
-    if (character == EOF)
-        return CLM_CONSOLE_FAILURE;
-    *out_character = (char)character;
-    return CLM_CONSOLE_SUCCESS;
-}
+clm_console_status clm_console_read_character_from(FILE* stream, char* out_character);
 
 /** Reads one byte from stdin into shared, NUL-terminated storage.
  * Standard C input may be line-buffered; this is not raw key input. The pointer
@@ -485,29 +269,13 @@ static inline clm_console_status clm_console_read_character_from(
  * @param out_value Receives the shared one-byte string; must not be NULL.
  * @return SUCCESS, INVALID_ARGUMENT for NULL, or FAILURE on EOF/input error.
  */
-static inline clm_console_status clm_console_read_character(
-    const char** out_value)
-{
-    /* The returned character is shared storage, overwritten by the next read. */
-    static char buffer[2];
-    if (out_value == NULL)
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    if (clm_console_read_character_from(stdin, &buffer[0]) !=
-        CLM_CONSOLE_SUCCESS)
-        return CLM_CONSOLE_FAILURE;
-    buffer[1] = '\0';
-    *out_value = buffer;
-    return CLM_CONSOLE_SUCCESS;
-}
+clm_console_status clm_console_read_character(const char** out_value);
 
 /** Reads one byte from stdin; equivalent to clm_console_read_character.
  * @param out_value Receives a pointer to shared one-byte storage.
  * @return SUCCESS, INVALID_ARGUMENT for NULL, or FAILURE on EOF/input error.
  */
-static inline clm_console_status clm_console_read_key(const char** out_value)
-{
-    return clm_console_read_character(out_value);
-}
+clm_console_status clm_console_read_key(const char** out_value);
 
 /** Writes one complete, valid UTF-8 encoded Unicode scalar value to a stream.
  * @param stream Destination stream.
@@ -515,51 +283,13 @@ static inline clm_console_status clm_console_read_key(const char** out_value)
  * @return SUCCESS, INVALID_ARGUMENT for malformed/multiple sequences or NULL,
  *         or FAILURE on I/O error.
  */
-static inline clm_console_status clm_console_write_character_to(
-    FILE* stream,
-    const char* character)
-{
-    const unsigned char* bytes = (const unsigned char*)character;
-    size_t length;
-    if (stream == NULL || character == NULL || character[0] == '\0')
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    if (bytes[0] <= 0x7f)
-        length = 1;
-    else if (bytes[0] >= 0xc2 && bytes[0] <= 0xdf)
-        length = 2;
-    else if (bytes[0] >= 0xe0 && bytes[0] <= 0xef)
-        length = 3;
-    else if (bytes[0] >= 0xf0 && bytes[0] <= 0xf4)
-        length = 4;
-    else
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    for (size_t index = 1; index < length; ++index) {
-        if (bytes[index] == '\0' ||
-            (bytes[index] & 0xc0) != 0x80)
-            return CLM_CONSOLE_INVALID_ARGUMENT;
-    }
-    if ((length == 3 && bytes[0] == 0xe0 && bytes[1] < 0xa0) ||
-        (length == 3 && bytes[0] == 0xed && bytes[1] >= 0xa0) ||
-        (length == 4 && bytes[0] == 0xf0 && bytes[1] < 0x90) ||
-        (length == 4 && bytes[0] == 0xf4 && bytes[1] >= 0x90) ||
-        bytes[length] != '\0')
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    return fwrite(bytes, 1, length, stream) == length
-        ? CLM_CONSOLE_SUCCESS : CLM_CONSOLE_FAILURE;
-}
+clm_console_status clm_console_write_character_to(FILE* stream, const char* character);
 
 /** Writes one UTF-8 scalar value to stdout and flushes it.
  * @param character NUL-terminated UTF-8 sequence containing exactly one scalar.
  * @return SUCCESS, INVALID_ARGUMENT for malformed input, or FAILURE.
  */
-static inline clm_console_status clm_console_write_character(
-    const char* character)
-{
-    const clm_console_status status =
-        clm_console_write_character_to(stdout, character);
-    return status == CLM_CONSOLE_SUCCESS && fflush(stdout) == EOF
-        ? CLM_CONSOLE_FAILURE : status;
-}
+clm_console_status clm_console_write_character(const char* character);
 
 /** Prompts for and parses a yes/no response from supplied streams.
  * Leading/trailing whitespace is ignored; accepted answers are y/yes/n/no,
@@ -571,59 +301,14 @@ static inline clm_console_status clm_console_write_character(
  * @return SUCCESS, INVALID_ARGUMENT for invalid arguments/response, or FAILURE
  *         on I/O error or an overlong input line.
  */
-static inline clm_console_status clm_console_confirm_from(
-    FILE* input,
-    FILE* output,
-    const char* prompt,
-    bool* out_value)
-{
-    char response[CLM_CONSOLE_INPUT_CAPACITY];
-    if (input == NULL || output == NULL || out_value == NULL)
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    if (prompt != NULL && clm_console_write_to(output, prompt) != CLM_CONSOLE_SUCCESS)
-        return CLM_CONSOLE_FAILURE;
-    if (clm_console_write_to(output, " [y/n]: ") != CLM_CONSOLE_SUCCESS ||
-        fflush(output) == EOF)
-        return CLM_CONSOLE_FAILURE;
-    if (clm_console_read_line_from(input, response, sizeof(response)) !=
-        CLM_CONSOLE_SUCCESS)
-        return CLM_CONSOLE_FAILURE;
-    const char* cursor = response;
-    while (*cursor != '\0' && isspace((unsigned char)*cursor))
-        ++cursor;
-    size_t length = strlen(cursor);
-    while (length != 0 && isspace((unsigned char)cursor[length - 1]))
-        --length;
-    if ((length == 1 &&
-         (cursor[0] == 'y' || cursor[0] == 'Y' ||
-          cursor[0] == 'n' || cursor[0] == 'N')) ||
-        (length == 3 &&
-         (cursor[0] == 'y' || cursor[0] == 'Y') &&
-         (cursor[1] == 'e' || cursor[1] == 'E') &&
-         (cursor[2] == 's' || cursor[2] == 'S'))) {
-        *out_value = cursor[0] == 'y' || cursor[0] == 'Y';
-        return CLM_CONSOLE_SUCCESS;
-    }
-    if (length == 2 &&
-        (cursor[0] == 'n' || cursor[0] == 'N') &&
-        (cursor[1] == 'o' || cursor[1] == 'O')) {
-        *out_value = false;
-        return CLM_CONSOLE_SUCCESS;
-    }
-    return CLM_CONSOLE_INVALID_ARGUMENT;
-}
+clm_console_status clm_console_confirm_from(FILE* input, FILE* output, const char* prompt, bool* out_value);
 
 /** Prompts on stdin/stdout for a yes/no response.
  * @param prompt Optional prompt text.
  * @param out_value Receives the parsed answer; must not be NULL.
  * @return SUCCESS, INVALID_ARGUMENT for invalid response/input, or FAILURE.
  */
-static inline clm_console_status clm_console_confirm(
-    const char* prompt,
-    bool* out_value)
-{
-    return clm_console_confirm_from(stdin, stdout, prompt, out_value);
-}
+clm_console_status clm_console_confirm(const char* prompt, bool* out_value);
 
 /** Writes ANSI color prefix, text, and reset sequence to a stream.
  * ANSI interpretation depends on the destination terminal.
@@ -632,33 +317,14 @@ static inline clm_console_status clm_console_confirm(
  * @param color ANSI color/style sequence.
  * @return SUCCESS, INVALID_ARGUMENT for NULL arguments, or FAILURE on I/O.
  */
-static inline clm_console_status clm_console_write_color_to(
-    FILE* stream,
-    const char* text,
-    const char* color)
-{
-    if (stream == NULL || text == NULL || color == NULL)
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    if (clm_console_write_to(stream, color) != CLM_CONSOLE_SUCCESS ||
-        clm_console_write_to(stream, text) != CLM_CONSOLE_SUCCESS ||
-        clm_console_write_to(stream, CONSOLE_COLOR_RESET) != CLM_CONSOLE_SUCCESS)
-        return CLM_CONSOLE_FAILURE;
-    return CLM_CONSOLE_SUCCESS;
-}
+clm_console_status clm_console_write_color_to(FILE* stream, const char* text, const char* color);
 
 /** Writes ANSI-colored text to stdout and flushes it.
  * @param text Text to write.
  * @param color ANSI color/style sequence.
  * @return SUCCESS, INVALID_ARGUMENT for NULL arguments, or FAILURE on I/O.
  */
-static inline clm_console_status clm_console_write_color(
-    const char* text,
-    const char* color)
-{
-    const clm_console_status status = clm_console_write_color_to(stdout, text, color);
-    return status == CLM_CONSOLE_SUCCESS && fflush(stdout) == EOF
-        ? CLM_CONSOLE_FAILURE : status;
-}
+clm_console_status clm_console_write_color(const char* text, const char* color);
 
 /** Busy-waits for a duration using the C standard clock.
  * This consumes CPU while waiting and is intended for simple presentation
@@ -667,25 +333,7 @@ static inline clm_console_status clm_console_write_color(
  * @return SUCCESS, INVALID_ARGUMENT for negative/non-finite input, or FAILURE
  *         if the clock cannot be read.
  */
-static inline clm_console_status clm_console_wait(
-    const double seconds)
-{
-    clock_t current;
-    if (!isfinite(seconds) || seconds < 0.0)
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    if (seconds == 0.0)
-        return CLM_CONSOLE_SUCCESS;
-    const clock_t start = clock();
-    if (start == (clock_t)-1)
-        return CLM_CONSOLE_FAILURE;
-    do {
-        current = clock();
-        if (current == (clock_t)-1 || current < start)
-            return CLM_CONSOLE_FAILURE;
-    } while (((double)current - (double)start) / (double)CLOCKS_PER_SEC <
-             seconds);
-    return CLM_CONSOLE_SUCCESS;
-}
+clm_console_status clm_console_wait(double seconds);
 
 /** Writes text one byte at a time, waiting between bytes.
  * UTF-8 multibyte sequences are emitted byte-by-byte. Waiting uses a busy loop.
@@ -695,23 +343,7 @@ static inline clm_console_status clm_console_wait(
  * @return SUCCESS, INVALID_ARGUMENT for invalid arguments, or FAILURE on I/O
  *         or clock error.
  */
-static inline clm_console_status clm_console_write_effect_to(
-    FILE* stream,
-    const char* text,
-    const double delay_seconds)
-{
-    if (stream == NULL || text == NULL || !isfinite(delay_seconds) ||
-        delay_seconds < 0.0)
-        return CLM_CONSOLE_INVALID_ARGUMENT;
-    for (const unsigned char* character = (const unsigned char*)text; *character != '\0'; ++character) {
-        if (fputc(*character, stream) == EOF || fflush(stream) == EOF)
-            return CLM_CONSOLE_FAILURE;
-        if (character[1] != '\0' &&
-            clm_console_wait(delay_seconds) != CLM_CONSOLE_SUCCESS)
-            return CLM_CONSOLE_FAILURE;
-    }
-    return CLM_CONSOLE_SUCCESS;
-}
+clm_console_status clm_console_write_effect_to(FILE* stream, const char* text, double delay_seconds);
 
 /** Writes text to stdout one byte at a time with a busy-wait delay.
  * @param text NUL-terminated text.
@@ -719,10 +351,126 @@ static inline clm_console_status clm_console_write_effect_to(
  * @return SUCCESS, INVALID_ARGUMENT for invalid arguments, or FAILURE on I/O
  *         or clock error.
  */
-static inline clm_console_status clm_console_write_effect(
-    const char* text,
-    const double delay_seconds)
-{
-    /* clock() keeps the implementation within standard C, at the cost of busy-waiting. */
-    return clm_console_write_effect_to(stdout, text, delay_seconds);
-}
+clm_console_status clm_console_write_effect(const char* text, double delay_seconds);
+
+/**
+ * Enables or disables ANSI coloring for CLM object writes.
+ *
+ * When enabled, console object writes use the console's ANSI
+ * stringtify adapter.
+ *
+ * When disabled, object writes use the default uncolored formatter,
+ * unless an interceptor provides its own representation.
+ *
+ * Parameters:
+ *   value - Nonzero enables coloring; zero disables it.
+ *
+ * Default:
+ *   Enabled (1).
+ *
+ * Thread safety:
+ *   The setting is shared across console users. Each object write
+ *   captures the current setting before conversion.
+ */
+void clm_console_set_color_on_object_writes(clm_int value);
+
+/**
+ * Registers a global stringtify interceptor for console object writes.
+ *
+ * The interceptor takes precedence over the console color adapter.
+ * Returning CLM_STRINGTIFY_USE_DEFAULT allows normal rendering,
+ * including the color adapter when enabled.
+ *
+ * Passing NULL clears the current interceptor.
+ *
+ * The callback must remain valid while it may be invoked.
+ */
+void clm_console_intercept_object_writes(
+    clm_stringtify_interceptor_fn interceptor, void *user);
+
+/**
+ * Clears the global interceptor for console object writes.
+ *
+ * Subsequent writes use the normal console formatting behavior.
+ * Does not free the callback or its application-owned resources.
+ */
+void clm_console_do_not_intercept_object_writes(void);
+
+/**
+ * Writes a BPA block to standard output.
+ *
+ * UTF-8 string blocks are written as raw text, preserving line breaks.
+ * Other BPA types are converted using clm_stringtify.
+ *
+ * Parameters:
+ *   id - ID of the BPA block to write.
+ *
+ * Returns:
+ *   SUCCESS when output completes, otherwise an error status.
+ *
+ * Ownership:
+ *   Does not modify or release the supplied block.
+ */
+clm_console_status clm_console_write_block(clm_id id);
+
+/**
+ * Writes a formatted CLM dictionary to standard output.
+ *
+ * Uses readable presentation with indentation.
+ * A custom stringtify adapter may later add ANSI coloring.
+ *
+ * The dictionary remains owned by the caller.
+ */
+clm_console_status clm_console_write_dictionary(clm_id id);
+
+/**
+ * Writes a formatted CLM storage object to standard output.
+ *
+ * Displays its stored elements through clm_stringtify.
+ * The storage object remains owned by the caller.
+ */
+clm_console_status clm_console_write_storage(clm_id id);
+
+/**
+ * Writes a CLM table to standard output.
+ *
+ * Uses aligned columns and visible table borders.
+ * The table remains owned by the caller.
+ */
+clm_console_status clm_console_write_table(clm_id id);
+
+/**
+ * Writes a CLM tree to standard output.
+ *
+ * Uses an indented, human-readable representation.
+ * The tree remains owned by the caller.
+ */
+clm_console_status clm_console_write_tree(clm_id id);
+
+/**
+ * Writes the debug representation of any supported BPA block.
+ *
+ * Unlike write_block(), string values are quoted and escaped.
+ * Useful when examining block content rather than displaying text.
+ */
+clm_console_status clm_console_inspect_block(clm_id id);
+
+/**
+ * Writes a CLM tree to standard output in YAML format.
+ *
+ * Uses clm_string_yaml through a per-call interceptor for indented output.
+ * Bypasses the global interceptor and ANSI coloring without changing settings.
+ * The root must be an object or array; invalid roots return INVALID_ARGUMENT.
+ * The tree remains owned by the caller.
+ */
+clm_console_status clm_console_write_tree_as_yaml(clm_id id);
+
+/**
+ * Writes a CLM tree to standard output in JSON format.
+ *
+ * Uses clm_string_json through a per-call interceptor with two-space indentation.
+ * Bypasses the global interceptor and ANSI coloring without changing settings.
+ * The root must be an object or array; invalid roots return INVALID_ARGUMENT.
+ * The tree remains owned by the caller.
+ */
+clm_console_status clm_console_write_tree_as_json(clm_id id);

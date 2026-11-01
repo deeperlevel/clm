@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CLM net/web: a lightweight HTTP/1.1 server built from composable Cross Language Modules.">
+  <title>It works! — CLM net/web</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page">
+    <header>
+      <a class="brand" href="/" aria-label="CLM net/web home">
+        <span class="brand-mark">CLM</span>
+        <span>Cross Language Modules</span>
+      </a>
+      <span class="edition">net/web &middot; HTTP/1.1</span>
+    </header>
+
+    <main>
+      <section aria-labelledby="welcome-title">
+        <span class="eyebrow"><span class="dot" aria-hidden="true"></span> WEB SERVER IS RUNNING</span>
+        <h1 id="welcome-title">It works<span class="accent">.</span><br>Powered by CLM<span class="accent">.</span></h1>
+        <p class="lead">
+          Congratulations! This page is being served by <strong>CLM net/web</strong>,
+          an HTTP/1.1 server built on <strong>Cross Language Modules</strong>.
+          Small, reusable components work together to handle connections,
+          parse HTTP requests, route traffic, and send responses.
+        </p>
+      </section>
+
+      <aside class="signal" aria-label="Example server details">
+        <div><strong>Request</strong> <code>GET /</code></div>
+        <div><strong>Response</strong> <code>200 OK</code></div>
+        <div><strong>Server</strong> <code>clm net/web</code></div>
+        <div><strong>Content</strong> <code>text/html; charset=utf-8</code></div>
+      </aside>
+
+      <section aria-labelledby="features-title">
+        <h2 id="features-title">A small server. A composable foundation.</h2>
+        <p class="section-desc">The CLM HTTP server combines independent modules instead of bundling everything into one framework.</p>
+        <div class="cards">
+          <article class="card">
+            <span class="symbol" aria-hidden="true">{ }</span>
+            <h3>Routing &amp; middleware</h3>
+            <p>Register GET routes, match parameterized paths, and process requests through ordered middleware.</p>
+          </article>
+          <article class="card">
+            <span class="symbol" aria-hidden="true">↔</span>
+            <h3>Connections &amp; workers</h3>
+            <p>Serve HTTP/1.1 with keep-alive and connection dispatch powered by CLM networking and async pools.</p>
+          </article>
+          <article class="card">
+            <span class="symbol" aria-hidden="true">+</span>
+            <h3>Beyond plain HTML</h3>
+            <p>Optional HTTPS, gzip responses, templates, and multipart handling are available through other CLM modules.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="bottom" aria-label="Server details and roadmap">
+        <div class="panel">
+          <h2>Try the endpoint</h2>
+          <p>This example serves one cached <code>index.html</code> file from two GET routes. Other methods return <code>405 Method Not Allowed</code>.</p>
+          <pre><code>curl -i http://127.0.0.1:8080/
+
+HTTP/1.1 200 OK
+Server: clm net/web
+Content-Type: text/html; charset=utf-8</code></pre>
+          <p class="subtle" style="margin: 13px 0 0">The command assumes the default port, 8080. The response also includes generated headers.</p>
+        </div>
+        <div class="panel">
+          <h2>What's next?</h2>
+          <p>CLM net/web starts with HTTP/1.1. The broader roadmap includes more efficient streaming and connections, an HTTP client, and future HTTP/2 and HTTP/3 protocol support.</p>
+          <span class="pill">HTTP body streaming</span>
+          <span class="pill">HTTP client / ProxyPass</span>
+          <span class="pill">HTTP/2</span>
+          <span class="pill">HTTP/3 + QUIC</span>
+          <p class="subtle" style="margin: 13px 0 0">These roadmap features are not enabled by this example.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>CLM &mdash; reusable foundations, native strengths.</span>
+      <a href="https://github.com/deeperlevel/clm" rel="noopener noreferrer">Explore CLM on GitHub</a>
+    </footer>
+  </div>
+</body>
+</html>

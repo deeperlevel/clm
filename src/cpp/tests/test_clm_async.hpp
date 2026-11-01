@@ -1,17 +1,16 @@
-#pragma once
+﻿#pragma once
 
 #include "test.hpp"
 #include "../clm/async_pool.hpp"
 
-#include <atomic>
-#include <cstring>
-#include <thread>
+#include <stdatomic.h>
+#include <threads.h>
 
 static clm_id clm_async_test_scheduler_id;
 static int clm_async_test_steps[16];
 static int clm_async_test_cleanups[16];
-static std::atomic<int> clm_async_test_pool_steps[16];
-static std::atomic<int> clm_async_test_pool_cleanups[16];
+static atomic_int clm_async_test_pool_steps[16];
+static atomic_int clm_async_test_pool_cleanups[16];
 
 static clm_async_step_result clm_async_test_yield_once(
 	const clm_id task_id,
@@ -53,13 +52,15 @@ static clm_async_step_result clm_async_test_pool_complete(
 	const clm_id context_id)
 {
 	(void)task_id;
-	return clm_async_test_pool_steps[context_id].fetch_add(1, std::memory_order_relaxed) == 0
+	return atomic_fetch_add_explicit(&clm_async_test_pool_steps[context_id], 1,
+		memory_order_relaxed) == 0
 		? CLM_ASYNC_STEP_WAIT : CLM_ASYNC_STEP_COMPLETE;
 }
 
 static void clm_async_test_pool_cleanup(const clm_id context_id)
 {
-	clm_async_test_pool_cleanups[context_id].fetch_add(1, std::memory_order_relaxed);
+	atomic_fetch_add_explicit(&clm_async_test_pool_cleanups[context_id], 1,
+		memory_order_relaxed);
 }
 
 static bool clm_async_test_wait_pool_state(
@@ -67,23 +68,23 @@ static bool clm_async_test_wait_pool_state(
 	const clm_id task_id,
 	const clm_async_task_state expected)
 {
-	for (std::size_t attempt = 0; attempt < 100000; ++attempt) {
+	for (size_t attempt = 0; attempt < 100000; ++attempt) {
 		clm_async_task_state state;
 		if (clm_async_pool_get_state(pool_id, task_id, &state) ==
 			CLM_ASYNC_OPERATION_SUCCESS && state == expected)
 			return true;
-		std::this_thread::yield();
+		thrd_yield();
 	}
 	return false;
 }
 
-static int test_clm_async()
+static int clm_async_tests(void)
 {
 	clm_test_result result = {0};
 	clm_test_begin("CLM - Async");
 	clm_async_test_scheduler_id = 92000;
-	std::memset(clm_async_test_steps, 0, sizeof(clm_async_test_steps));
-	std::memset(clm_async_test_cleanups, 0, sizeof(clm_async_test_cleanups));
+	memset(clm_async_test_steps, 0, sizeof(clm_async_test_steps));
+	memset(clm_async_test_cleanups, 0, sizeof(clm_async_test_cleanups));
 	CLM_ASSERT(clm_async_scheduler_create(clm_async_test_scheduler_id) ==
 		CLM_ASYNC_OPERATION_SUCCESS &&
 		clm_async_scheduler_create(clm_async_test_scheduler_id) ==
@@ -96,7 +97,7 @@ static int test_clm_async()
 		clm_async_test_yield_once, 2, clm_async_test_cleanup) ==
 		CLM_ASYNC_OPERATION_SUCCESS,
 		"submit stackless tasks with caller-owned context IDs");
-	std::size_t steps = 0;
+	size_t steps = 0;
 	clm_async_task_state state;
 	CLM_ASSERT(clm_async_run(clm_async_test_scheduler_id, 3, &steps) ==
 		CLM_ASYNC_OPERATION_SUCCESS && steps == 3 &&
@@ -161,10 +162,6 @@ static int test_clm_async()
 	clm_async_task_token token_a;
 	clm_async_task_token token_b;
 	clm_async_task_token token_c;
-	for (int i = 0; i < 16; ++i) {
-		clm_async_test_pool_steps[i].store(0);
-		clm_async_test_pool_cleanups[i].store(0);
-	}
 	const bool spawned_ab =
 		clm_async_pool_spawn(pool_id, 101, clm_async_test_pool_complete,
 			1, clm_async_test_pool_cleanup) == CLM_ASYNC_OPERATION_SUCCESS &&
@@ -177,9 +174,9 @@ static int test_clm_async()
 		clm_async_pool_spawn(pool_id, 103, clm_async_test_pool_complete,
 			3, clm_async_test_pool_cleanup) == CLM_ASYNC_OPERATION_SUCCESS,
 		"fill both workers and queue a third task");
-	std::size_t worker_a = CLM_ASYNC_NO_WORKER;
-	std::size_t worker_b = CLM_ASYNC_NO_WORKER;
-	std::size_t worker_c = 0;
+	size_t worker_a = CLM_ASYNC_NO_WORKER;
+	size_t worker_b = CLM_ASYNC_NO_WORKER;
+	size_t worker_c = 0;
 	CLM_ASSERT(clm_async_pool_task_get_worker_index(pool_id, 101, &worker_a) ==
 		CLM_ASYNC_OPERATION_SUCCESS && worker_a == 0 &&
 		clm_async_pool_task_get_worker_index(pool_id, 102, &worker_b) ==
@@ -203,16 +200,16 @@ static int test_clm_async()
 		CLM_ASYNC_OPERATION_SUCCESS,
 		"wake a queued task after it is assigned");
 	clm_async_pool_stats stats = {0};
-	for (std::size_t attempt = 0; attempt < 100000; ++attempt) {
+	for (size_t attempt = 0; attempt < 100000; ++attempt) {
 		if (clm_async_pool_get_stats(pool_id, &stats) !=
 			CLM_ASYNC_OPERATION_SUCCESS || stats.terminal == 3)
 			break;
-		std::this_thread::yield();
+		thrd_yield();
 	}
 	CLM_ASSERT(stats.pending == 0 && stats.terminal == 3 &&
-		clm_async_test_pool_steps[1].load(std::memory_order_relaxed) == 2 &&
-		clm_async_test_pool_steps[2].load(std::memory_order_relaxed) == 2 &&
-		clm_async_test_pool_steps[3].load(std::memory_order_relaxed) == 2,
+		atomic_load_explicit(&clm_async_test_pool_steps[1], memory_order_relaxed) == 2 &&
+		atomic_load_explicit(&clm_async_test_pool_steps[2], memory_order_relaxed) == 2 &&
+		atomic_load_explicit(&clm_async_test_pool_steps[3], memory_order_relaxed) == 2,
 		"run worker tasks and drain the pending FIFO");
 	CLM_ASSERT(clm_async_pool_task_release(pool_id, 101) ==
 		CLM_ASYNC_OPERATION_SUCCESS &&
@@ -220,13 +217,17 @@ static int test_clm_async()
 		CLM_ASYNC_OPERATION_SUCCESS &&
 		clm_async_pool_task_release(pool_id, 103) ==
 		CLM_ASYNC_OPERATION_SUCCESS &&
-		clm_async_test_pool_cleanups[1].load(std::memory_order_relaxed) == 1 &&
-		clm_async_test_pool_cleanups[2].load(std::memory_order_relaxed) == 1 &&
-		clm_async_test_pool_cleanups[3].load(std::memory_order_relaxed) == 1 &&
+		atomic_load_explicit(&clm_async_test_pool_cleanups[1], memory_order_relaxed) == 1 &&
+		atomic_load_explicit(&clm_async_test_pool_cleanups[2], memory_order_relaxed) == 1 &&
+		atomic_load_explicit(&clm_async_test_pool_cleanups[3], memory_order_relaxed) == 1 &&
 		clm_async_pool_destroy(pool_id) == CLM_ASYNC_OPERATION_SUCCESS,
 		"release completed worker tasks and join the pool");
-
 	clm_test_summary(result.passed, result.failed);
 	return result.failed == 0 ? 0 : 1;
+}
+
+static int test_clm_async(void)
+{
+    return clm_async_tests();
 }
 

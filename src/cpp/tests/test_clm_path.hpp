@@ -1,33 +1,31 @@
-#pragma once
+﻿#pragma once
 
 #include "test.hpp"
 #include "../clm/path.hpp"
 
-#include <cstring>
-
 static int clm_path_test_set(clm_id id, const char* text)
 {
-    return clm_bpa_set_string(id, text, static_cast<clm_uint>(std::strlen(text)) + 1) == static_cast<int>(std::strlen(text));
+    return clm_bpa_set_string(id, text, (clm_uint)strlen(text) + 1) == (int)strlen(text);
 }
 
 static int clm_path_test_equals(clm_id id, const char* expected)
 {
     char buffer[2048];
-    return clm_bpa_get_string(id, buffer, sizeof(buffer)) == static_cast<int>(std::strlen(expected)) &&
-           std::strcmp(buffer, expected) == 0;
+    return clm_bpa_get_string(id, buffer, sizeof(buffer)) == (int)strlen(expected) &&
+           strcmp(buffer, expected) == 0;
 }
 
-static int test_clm_path()
+static int clm_path_tests(void)
 {
     clm_test_result result = {0};
     clm_test_begin("CLM - Path");
-    CLM_ASSERT(clm_bpa_create(8101, clm::bpa::CLM_BPA_TYPE_STRING) == clm::bpa::CLM_BPA_SUCCESS,
+    CLM_ASSERT(clm_bpa_create(8101, CLM_BPA_TYPE_STRING) == CLM_BPA_SUCCESS,
                "create an empty path string");
     CLM_ASSERT(clm_path_is_empty(8101) == 1,
                "recognize an existing empty path string");
-    CLM_ASSERT(clm_bpa_create(8102, clm::bpa::CLM_BPA_TYPE_STRING) == clm::bpa::CLM_BPA_SUCCESS &&
-               clm_bpa_create(8103, clm::bpa::CLM_BPA_TYPE_STRING) == clm::bpa::CLM_BPA_SUCCESS &&
-               clm_bpa_create(8104, clm::bpa::CLM_BPA_TYPE_INT) == clm::bpa::CLM_BPA_SUCCESS,
+    CLM_ASSERT(clm_bpa_create(8102, CLM_BPA_TYPE_STRING) == CLM_BPA_SUCCESS &&
+               clm_bpa_create(8103, CLM_BPA_TYPE_STRING) == CLM_BPA_SUCCESS &&
+               clm_bpa_create(8104, CLM_BPA_TYPE_INT) == CLM_BPA_SUCCESS,
                "create path destinations and a wrong-type fixture");
     CLM_ASSERT(clm_path_is_empty(8199) == -1 && clm_path_is_empty(8104) == -1,
                "distinguish invalid path references from false predicates");
@@ -114,7 +112,7 @@ static int test_clm_path()
                clm_path_test_set(8101, ".") && clm_path_get_full_path(8101) == 0 &&
                clm_path_is_fully_qualified(8101) == 1 &&
                clm_path_set_current_directory(8102) == 0, "obtain absolute paths and restore the current directory");
-    clm_path_info info = {0, 0, 0, 0, 0};
+    clm_path_info info = {0};
     CLM_ASSERT(clm_path_get_info(8102, 1, &info) == 0 && info.exists && info.is_directory &&
                clm_path_exists(8102) == 1 && clm_path_is_directory(8102) == 1 &&
                clm_path_is_file(8102) == 0 && clm_path_is_symlink(8102) == 0,
@@ -127,29 +125,29 @@ static int test_clm_path()
     const DWORD temporary_length = GetTempPathW(32768, temporary_directory);
     const int named_fixture = temporary_length && temporary_length < 32768 &&
         GetTempFileNameW(temporary_directory, L"clm", 0, temporary_file) != 0;
-    char* fixture_path = named_fixture ? clm_path_internal_utf8(temporary_file) : nullptr;
+    char* fixture_path = named_fixture ? clm_path_internal_utf8(temporary_file) : NULL;
 #else
     char temporary_file[] = "/tmp/clm-path-XXXXXX";
     const int descriptor = mkstemp(temporary_file);
     const int named_fixture = descriptor >= 0;
     if (descriptor >= 0) close(descriptor);
-    char* fixture_path = named_fixture ? clm_path_internal_copy(temporary_file) : nullptr;
+    char* fixture_path = named_fixture ? clm_path_internal_copy(temporary_file) : NULL;
 #endif
     CLM_ASSERT(named_fixture && fixture_path, "create an exclusive named temporary file");
     if (fixture_path) {
         CLM_ASSERT(clm_path_test_set(8101, fixture_path) && clm_path_is_file(8101) == 1 &&
                    clm_path_is_directory(8101) == 0 && clm_path_get_info(8101, 0, &info) == 0 && info.is_file,
                    "classify an actual regular file through its UTF-8 path");
-        const std::size_t fixture_size = std::strlen(fixture_path) + 10;
-        char* directory_path = static_cast<char*>(std::malloc(fixture_size));
-        char* link_path = static_cast<char*>(std::malloc(fixture_size));
+        const size_t fixture_size = strlen(fixture_path) + 10;
+        char* directory_path = (char*)malloc(fixture_size);
+        char* link_path = (char*)malloc(fixture_size);
         if (directory_path && link_path) {
-            std::snprintf(directory_path, fixture_size, "%s.dir", fixture_path);
-            std::snprintf(link_path, fixture_size, "%s.link", fixture_path);
+            snprintf(directory_path, fixture_size, "%s.dir", fixture_path);
+            snprintf(link_path, fixture_size, "%s.link", fixture_path);
 #if defined(_WIN32)
             wchar_t* directory_wide = clm_path_internal_wide(directory_path);
             wchar_t* link_wide = clm_path_internal_wide(link_path);
-            const int created_directory = directory_wide && CreateDirectoryW(directory_wide, nullptr);
+            const int created_directory = directory_wide && CreateDirectoryW(directory_wide, NULL);
             const int created_link = link_wide && CreateSymbolicLinkW(link_wide, temporary_file, 2);
             CLM_ASSERT(SetFileAttributesW(temporary_file, FILE_ATTRIBUTE_HIDDEN) && clm_path_is_hidden(8101) == 1,
                        "read Windows hidden-file attributes");
@@ -181,20 +179,20 @@ static int test_clm_path()
 #if defined(_WIN32)
             if (created_link) DeleteFileW(link_wide);
             if (created_directory) RemoveDirectoryW(directory_wide);
-            std::free(directory_wide); std::free(link_wide);
+            free(directory_wide); free(link_wide);
 #else
             if (created_link) unlink(link_path);
             if (created_directory) rmdir(directory_path);
 #endif
         }
-        std::free(directory_path); std::free(link_path);
+        free(directory_path); free(link_path);
 #if defined(_WIN32)
         DeleteFileW(temporary_file);
 #else
         unlink(fixture_path);
 #endif
     }
-    std::free(fixture_path); std::free(original_directory);
+    free(fixture_path); free(original_directory);
     CLM_ASSERT(clm_path_test_set(8101, "../../a/../b") && clm_path_normalize(8101) == 0 &&
 #if defined(_WIN32)
                clm_path_test_equals(8101, "..\\..\\b"),
@@ -211,12 +209,18 @@ static int test_clm_path()
                clm_path_canonicalize(8101) == 1, "distinguish absent paths from invalid queries");
     CLM_ASSERT(clm_path_get_root(8102) == 0 && clm_path_trim_ending_separator(8102) == 0 &&
                clm_path_is_fully_qualified(8102) == 1, "preserve native roots during trailing-separator trimming");
-    CLM_ASSERT(clm_path_get_info(8104, 1, &info) == 1 && clm_path_get_info(8102, 1, nullptr) == 1 &&
+    CLM_ASSERT(clm_path_get_info(8104, 1, &info) == 1 && clm_path_get_info(8102, 1, NULL) == 1 &&
                clm_path_get_unc_share(8102, 8104) == 1, "reject invalid references and null metadata outputs");
     CLM_ASSERT(clm_bpa_delete(8102) == 0 && clm_bpa_delete(8103) == 0 && clm_bpa_delete(8104) == 0,
                "release all additional path fixtures");
-    CLM_ASSERT(clm_bpa_delete(8101) == clm::bpa::CLM_BPA_SUCCESS,
+    CLM_ASSERT(clm_bpa_delete(8101) == CLM_BPA_SUCCESS,
                "release the path fixture");
     clm_test_summary(result.passed, result.failed);
     return result.failed != 0;
 }
+
+static int test_clm_path(void)
+{
+    return clm_path_tests();
+}
+

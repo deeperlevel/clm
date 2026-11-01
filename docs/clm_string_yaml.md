@@ -1,4 +1,19 @@
-# CLM String YAML
+# CLM String Yaml
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+YAML text parsing and serialization into CLM trees.
+
+## Capabilities and operations
+
+- Parse an indentation-oriented subset of YAML collections and scalar values.
+- Serialize compatible CLM trees to YAML.
+- Provide text/file adapters and preserve nested relationships.
+- This is a documented YAML subset, not an unrestricted YAML 1.2 engine with every advanced feature.
+
+## Detailed module contract
 
 ## Purpose
 
@@ -44,3 +59,18 @@ Represent mappings with registered numeric field IDs, sequences with ordered
 array nodes, and resolved scalar types with the corresponding tree leaf type.
 Keep unsupported YAML features explicit; do not treat successful parsing of
 this subset as general YAML conformance.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_file](clm_file.md), [clm_string_format](clm_string_format.md).
+
+## Example use cases
+
+Parse an indentation-oriented subset of YAML collections and scalar values.

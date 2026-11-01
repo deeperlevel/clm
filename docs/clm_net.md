@@ -1,7 +1,21 @@
-# CLM Net — Language-Neutral Module Contract
+# CLM Net
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+TCP/UDP networking primitives for addresses, sockets and readiness-based I/O.
+
+## Capabilities and operations
+
+- Initialize networking; create, bind, listen, connect, accept, send and receive on sockets.
+- Resolve addresses and inspect local/remote endpoints.
+- Use nonblocking mode and poll/readiness operations for scalable event handling.
+- Maintain explicit socket ownership and handle would-block, connect-in-progress, timeout and closure as distinct states.
+
+## Detailed module contract
 
 **Module:** `clm_net`  
-**C header:** `clm/net.h`  
 **License:** CC0 1.0 Universal  
 **Scope:** Portable low-level TCP and UDP networking for higher-level CLM services.
 
@@ -9,9 +23,9 @@
 
 `clm_net` provides the essential transport primitives from which TCP-based HTTP servers, HTTP clients, WebSocket transports, and other network protocols can be implemented. It is **not** an HTTP server, an HTTP client, a WebSocket implementation, a TLS stack, a DNS cache, or an event-loop scheduler.
 
-The interface is meant to be implemented *natively* in each CLM language. The C version uses the operating system's socket APIs. Other languages can use their corresponding standard or native networking facilities while preserving the behavior below.
+The interface is meant to be implemented *natively* in each CLM language. Bindings may use their operating system socket APIs. Other languages can use their corresponding standard or native networking facilities while preserving the behavior below.
 
-The base socket API depends on **`clm_base` (`base.h`)**, which supplies the common `clm_id` type, and exchanges raw byte buffers rather than copying packets into BPA. Optional string-ID adapters use **`clm_string` (`string.h`)** for address text, hostnames, and sending UTF-8 string contents. Applications using those adapters must also instantiate `CLM_STRING_IMPLEMENTATION` and its `CLM_BPA_IMPLEMENTATION` dependency as usual. `clm_net` does not depend on `clm_async`, `clm_async_pool`, `clm_channel`, or `clm_container`.
+The base socket layer uses shared IDs from [clm_base](clm_base.md) and exchanges bytes rather than owning BPA payloads. Optional text adapters may use [clm_string](clm_string.md). Network transport does not require the scheduling, channels or service-container modules.
 
 ## 2. Resource and ownership model
 
@@ -48,7 +62,7 @@ A socket is not a message object: TCP is a **byte stream** with no preserved app
 | `CLM_NET_TIMEOUT` | Explicit readiness timeout expired. |
 | `CLM_NET_CLOSED` | TCP peer performed orderly end-of-stream (receive returned zero). |
 
-Native error codes are platform-specific. They must not be used as portable status codes. The C API records the most recent native error on the calling thread, including address-resolution codes. A later successful call need not clear that recorded error; the caller should inspect it immediately following a native error status.
+Native error codes are platform-specific. They must not be used as portable status codes. The module API records the most recent native error on the calling thread, including address-resolution codes. A later successful call need not clear that recorded error; the caller should inspect it immediately following a native error status.
 
 Unless documented otherwise, outputs are unchanged on a failure. Exceptions: `resolve()` writes the number of discovered addresses and may fill a partial array on `BUFFER_TOO_SMALL`; `receive()` writes a byte count of zero for `CLOSED`; `poll()` and `wait()` write zero ready results for `TIMEOUT`.
 
@@ -58,11 +72,11 @@ An address contains an IP family (IPv4 or IPv6), the TCP/UDP port in **host byte
 
 The IPv6 scope ID is carried separately. The current C text parser accepts plain IPv6 literals, **not** interface-name zone syntax such as `%en0`; the caller may set the numeric scope ID explicitly.
 
-`resolve(host, port, transport)` uses transport-specific hints and returns the addresses in the native resolver's order. The number and order of DNS answers can vary; callers must not assume that IPv4 comes first or that hostname resolution is instantaneous. No DNS caching or cancellation is supplied. The C resolver is blocking.
+`resolve(host, port, transport)` uses transport-specific hints and returns the addresses in the native resolver's order. The number and order of DNS answers can vary; callers must not assume that IPv4 comes first or that hostname resolution is instantaneous. No DNS caching or cancellation is supplied. The reference implementation resolver is blocking.
 
 **Cross-language invariant:** Do not treat a hostname as a numeric address. Resolution and numeric parsing are distinct operations.
 
-The C-only string-ID adapters accept CLM strings, which store validated UTF-8 internally. Sending a string transmits its UTF-8 bytes without a terminating NUL, encoding conversion, or message delimiter. It remains a byte send: TCP can send only part of the text, and applications must still frame their messages. Receive operations stay byte-oriented so arbitrary binary datagrams and incomplete TCP text remain representable.
+Optional string-ID adapters accept CLM strings, which store validated UTF-8 internally. Sending a string transmits its UTF-8 bytes without a terminating NUL, encoding conversion, or message delimiter. It remains a byte send: TCP can send only part of the text, and applications must still frame their messages. Receive operations stay byte-oriented so arbitrary binary datagrams and incomplete TCP text remain representable.
 
 ## 5. Socket lifecycle and transport operations
 
@@ -105,12 +119,12 @@ The C-only string-ID adapters accept CLM strings, which store validated UTF-8 in
 `poll(entries, timeout)` accepts an array of socket IDs and READ/WRITE interests. A successful call fills each entry's observed event flags and returns the number of entries with at least one event. Additional HANGUP and ERROR flags may be reported. No message is read or written by polling.
 
 - `timeout = 0`: instantaneous check.
-- Positive timeout: wait up to the specified number of milliseconds. This portable C implementation accepts at most `INT_MAX` milliseconds per call; larger finite values are rejected, so applications can split unusually long waits.
+- Positive timeout: wait up to the specified number of milliseconds. This portable reference implementation accepts at most `INT_MAX` milliseconds per call; larger finite values are rejected, so applications can split unusually long waits.
 - `CLM_NET_WAIT_FOREVER`: wait without a deadline.
 - On timeout, all observed flags and ready count become zero.
 - Readable TCP sockets may be ready because the peer has closed. The caller must receive to distinguish data from end-of-stream.
 - Poll timeout is a per-call relative duration; platforms can round and schedule it approximately. A signal/interruption can cause a system error rather than an automatic retry.
-- On POSIX the C implementation uses `poll()`. On Windows it uses `select()` and is subject to `FD_SETSIZE` limitations. Windows' event flags do not provide the same hangup detail as POSIX.
+- On POSIX the reference implementation uses `poll()`. On Windows it uses `select()` and is subject to `FD_SETSIZE` limitations. Windows' event flags do not provide the same hangup detail as POSIX.
 
 This is a **portable baseline**, not an epoll/kqueue/IOCP replacement. An application may use another event reactor for larger deployments without changing the basic socket abstraction.
 
@@ -142,24 +156,17 @@ In languages with native asynchronous sockets, use those capabilities while matc
 
 ## 9. Explicitly excluded high-level concerns
 
-`clm_net` does **not** implement: HTTP parsing, HTTP/2 frames, WebSocket upgrade or framing, TLS, certificate validation, connection pooling, URL interpretation, proxy negotiation, automatic reconnect, service discovery, DNS caching, IP filtering, host-to-host authentication, or application framing. These belong to future modules such as `clm_net_http`, `clm_net_web`, and `clm_request`, or dedicated security/event-loop libraries.
+`clm_net` does **not** implement: HTTP parsing, HTTP/2 frames, WebSocket upgrade or framing, TLS, certificate validation, connection pooling, URL interpretation, proxy negotiation, automatic reconnect, service discovery, DNS caching, IP filtering, host-to-host authentication, or application framing. These belong to future modules such as `clm_net_web` or future HTTP client and request modules, or dedicated security/event-loop libraries.
 
 HTTP server and client implementations should impose their own maximum header/body/message sizes, I/O deadlines, and security policies. These policies are not implied by opening a TCP socket.
 
-## 10. C implementation and build notes
+## 10. Platform portability
 
-C11 compiler with `<threads.h>` support is required. The C distribution is header-only and maintains a process-wide socket ID table. In **exactly one** source file, define `CLM_NET_IMPLEMENTATION` before including `clm/net.h`. Other translation units include the header normally. All public entry points are `static inline`, while shared state is instantiated once. If using the string-ID adapters, also instantiate `CLM_STRING_IMPLEMENTATION` and its `CLM_BPA_IMPLEMENTATION` dependency once in the application.
-
-- Windows: Winsock 2; link `Ws2_32`. The implementation requests Windows Vista+ socket APIs. Verify your compiler/toolchain supports C11 threading and thread-local storage.
-- Linux and other POSIX systems: BSD sockets, `poll`, and `getaddrinfo`; enable `_POSIX_C_SOURCE=200809L` before system headers when compiling in strict language mode. Link the platform threading runtime as appropriate.
-- macOS / BSD: POSIX sockets. SIGPIPE suppression uses `SO_NOSIGPIPE` where available (Linux uses `MSG_NOSIGNAL`).
-- iOS/Android: may expose compatible POSIX sockets, but **these platforms have not been verified with this delivery**.
-
-Tests exercise localhost/loopback only, with no external-network dependency. The CMake build and loopback tests were run on Windows; other platform behavior remains unverified.
+Socket handling may use the networking facilities native to the host language and operating system. Name-resolution order, permission errors and availability of advanced socket features can differ among platforms. The shared contract distinguishes success, would-block, in-progress, timeout, closure and failure; exact system error details may remain implementation-specific.
 
 ## 11. Future extension points
 
-The current C API is a portable baseline rather than a complete socket-option surface. The most useful additions for broader production reuse are:
+The current module API is a portable baseline rather than a complete socket-option surface. The most useful additions for broader production reuse are:
 
 - **UDP truncation reporting:** `receive_from()` currently cannot distinguish a complete datagram from one truncated to the caller's buffer capacity. Add an explicit truncation result/flag before building protocols that require reliable datagram-size validation.
 - **Connection liveness and tuning:** optional keepalive controls and send/receive buffer-size queries/configuration are common needs for long-lived connections and throughput-sensitive services. Keep platform-specific option values out of the language-neutral contract.
@@ -168,3 +175,18 @@ The current C API is a portable baseline rather than a complete socket-option su
 - **Higher-level adapters:** TLS, multi-address connection attempts, streaming backpressure, and HTTP/WebSocket parsers belong in separate modules.
 
 These are extension candidates, not requirements for the current low-level TCP/UDP scope. Keep optional capabilities separate from the minimal portable socket contract.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_string](clm_string.md).
+
+## Example use cases
+
+Initialize networking; create, bind, listen, connect, accept, send and receive on sockets.

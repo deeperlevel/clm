@@ -153,6 +153,130 @@ namespace clm::string {
             return measure(text, count);
         }
 
+        inline std::uint32_t casefold_codepoint(const std::uint32_t codepoint)
+        {
+            if ((codepoint >= 'A' && codepoint <= 'Z') ||
+                (codepoint >= 0x00c0 && codepoint <= 0x00d6) ||
+                (codepoint >= 0x00d8 && codepoint <= 0x00de) ||
+                (codepoint >= 0x0391 && codepoint <= 0x03a1) ||
+                (codepoint >= 0x03a3 && codepoint <= 0x03ab) ||
+                (codepoint >= 0x0410 && codepoint <= 0x042f))
+                return codepoint + 0x20;
+            if (codepoint >= 0x0400 && codepoint <= 0x040f)
+                return codepoint + 0x50;
+            if (codepoint == 0x0178)
+                return 0x00ff;
+            if (codepoint == 0x03c2)
+                return 0x03c3;
+            if ((codepoint >= 0x0100 && codepoint <= 0x012f &&
+                 (codepoint & 1u) == 0) ||
+                (codepoint >= 0x0132 && codepoint <= 0x0137 &&
+                 (codepoint & 1u) == 0) ||
+                (codepoint >= 0x014a && codepoint <= 0x0177 &&
+                 (codepoint & 1u) == 0))
+                return codepoint + 1;
+            if (codepoint >= 0x0139 && codepoint <= 0x0148 &&
+                (codepoint & 1u) == 1)
+                return codepoint + 1;
+            return codepoint;
+        }
+
+        inline bool whitespace(const std::uint32_t codepoint)
+        {
+            return (codepoint >= 0x0009 && codepoint <= 0x000d) ||
+                codepoint == 0x0020 || codepoint == 0x0085 ||
+                codepoint == 0x00a0 || codepoint == 0x1680 ||
+                (codepoint >= 0x2000 && codepoint <= 0x200a) ||
+                codepoint == 0x2028 || codepoint == 0x2029 ||
+                codepoint == 0x202f || codepoint == 0x205f ||
+                codepoint == 0x3000;
+        }
+
+        inline clm_int compare_text(
+            const std::string_view left,
+            const std::string_view right,
+            const bool ignore_case)
+        {
+            if (!valid_input(left) || !valid_input(right))
+                return failure;
+            std::size_t left_offset = 0;
+            std::size_t right_offset = 0;
+            while (left_offset < left.size() && right_offset < right.size()) {
+                std::uint32_t left_codepoint;
+                std::uint32_t right_codepoint;
+                if (!next_codepoint(left, left_offset, left_codepoint) ||
+                    !next_codepoint(right, right_offset, right_codepoint))
+                    return failure;
+                if (ignore_case) {
+                    left_codepoint = casefold_codepoint(left_codepoint);
+                    right_codepoint = casefold_codepoint(right_codepoint);
+                }
+                if (left_codepoint != right_codepoint)
+                    return left_codepoint < right_codepoint ? -1 : 1;
+            }
+            return left_offset < left.size() ? 1 :
+                right_offset < right.size() ? -1 : 0;
+        }
+
+        inline bool trim_bounds(
+            const std::string_view text,
+            const bool trim_left,
+            const bool trim_right,
+            std::size_t& begin,
+            std::size_t& end,
+            std::size_t& removed)
+        {
+            if (!valid_input(text))
+                return false;
+            begin = 0;
+            end = text.size();
+            removed = 0;
+            if (trim_left) {
+                while (begin < end) {
+                    std::size_t next = begin;
+                    std::uint32_t codepoint;
+                    if (!next_codepoint(text, next, codepoint))
+                        return false;
+                    if (!whitespace(codepoint))
+                        break;
+                    begin = next;
+                    ++removed;
+                }
+            }
+            if (trim_right) {
+                std::size_t offset = begin;
+                std::size_t last_non_whitespace = begin;
+                std::size_t trailing = 0;
+                while (offset < end) {
+                    std::uint32_t codepoint;
+                    if (!next_codepoint(text, offset, codepoint))
+                        return false;
+                    if (whitespace(codepoint)) {
+                        ++trailing;
+                    } else {
+                        last_non_whitespace = offset;
+                        trailing = 0;
+                    }
+                }
+                end = last_non_whitespace;
+                removed += trailing;
+            }
+            return true;
+        }
+
+        inline std::string_view trimmed(
+            const std::string_view text,
+            const bool trim_left,
+            const bool trim_right,
+            std::size_t& removed)
+        {
+            std::size_t begin;
+            std::size_t end;
+            if (!trim_bounds(text, trim_left, trim_right, begin, end, removed))
+                return {};
+            return text.substr(begin, end - begin);
+        }
+
         inline void append_utf8(std::string& output, const std::uint32_t cp)
         {
             if (cp < 0x80) {
@@ -674,6 +798,118 @@ namespace clm::string {
             : std::optional<encoding>(found->preferred);
     }
 
+    inline clm_int compare(const clm_id left_id, const clm_id right_id)
+    {
+        const auto* left = detail::find_string(left_id);
+        const auto* right = detail::find_string(right_id);
+        return left == nullptr || right == nullptr ? failure
+            : detail::compare_text(left->text, right->text, false);
+    }
+
+    inline clm_int compare_ignore_case(
+        const clm_id left_id,
+        const clm_id right_id)
+    {
+        const auto* left = detail::find_string(left_id);
+        const auto* right = detail::find_string(right_id);
+        return left == nullptr || right == nullptr ? failure
+            : detail::compare_text(left->text, right->text, true);
+    }
+
+    inline clm_int compare_from(
+        const std::string_view left,
+        const std::string_view right)
+    {
+        return detail::compare_text(left, right, false);
+    }
+
+    inline clm_int compare_ignore_case_from(
+        const std::string_view left,
+        const std::string_view right)
+    {
+        return detail::compare_text(left, right, true);
+    }
+
+    inline clm_int trim(
+        const clm_id id,
+        const bool trim_left,
+        const bool trim_right)
+    {
+        auto* value = detail::find_string(id);
+        std::size_t begin;
+        std::size_t end;
+        std::size_t removed;
+        if (value == nullptr || !detail::trim_bounds(
+                value->text, trim_left, trim_right, begin, end, removed) ||
+            removed > static_cast<std::size_t>(
+                std::numeric_limits<clm_int>::max()))
+            return failure;
+        if (removed != 0)
+            value->text = value->text.substr(begin, end - begin);
+        return static_cast<clm_int>(removed);
+    }
+
+    inline clm_int left_trim(const clm_id id)
+    {
+        return trim(id, true, false);
+    }
+
+    inline clm_int right_trim(const clm_id id)
+    {
+        return trim(id, false, true);
+    }
+
+    inline clm_int trim(const clm_id id)
+    {
+        return trim(id, true, true);
+    }
+
+    inline clm_int trim_from(
+        const clm_id destination_id,
+        const std::string_view text,
+        const bool trim_left,
+        const bool trim_right)
+    {
+        std::size_t begin;
+        std::size_t end;
+        std::size_t removed;
+        if (!detail::trim_bounds(text, trim_left, trim_right,
+                                 begin, end, removed) ||
+            removed > static_cast<std::size_t>(
+                std::numeric_limits<clm_int>::max()))
+            return failure;
+        const auto trimmed = text.substr(begin, end - begin);
+        auto* destination = detail::find_string(destination_id);
+        if (destination == nullptr) {
+            if (!create(destination_id, trimmed))
+                return failure;
+        } else if (set(destination_id, trimmed) < 0) {
+            return failure;
+        }
+        return static_cast<clm_int>(removed);
+    }
+
+    inline clm_int left_trim_from(
+        const clm_id destination_id,
+        const std::string_view text)
+    {
+        return trim_from(destination_id, text, true, false);
+    }
+
+    inline clm_int right_trim_from(
+        const clm_id destination_id,
+        const std::string_view text)
+    {
+        return trim_from(destination_id, text, false, true);
+    }
+
+    inline clm_int trim_from(
+        const clm_id destination_id,
+        const std::string_view text)
+    {
+        return trim_from(destination_id, text, true, true);
+    }
+
     inline bool array_create(const clm_id id, const clm_int reserved = 0)
     {
         if (reserved < 0 || detail::find_array(id) != nullptr)
@@ -687,6 +923,90 @@ namespace clm::string {
     inline bool array_erase(const clm_id id)
     {
         return detail::arrays().erase(id) != 0;
+    }
+
+    inline clm_int split_from(
+        const clm_id destination_id,
+        const std::string_view text,
+        const std::string_view delimiter)
+    {
+        if (delimiter.empty() || !detail::valid_input(text) ||
+            !detail::valid_input(delimiter) || !array_create(destination_id))
+            return failure;
+        auto* destination = detail::find_array(destination_id);
+        try {
+            std::size_t start = 0;
+            while (true) {
+                const auto match = text.find(delimiter, start);
+                if (match == std::string_view::npos) {
+                    destination->values.emplace_back(text.substr(start));
+                    break;
+                }
+                destination->values.emplace_back(text.substr(start, match - start));
+                start = match + delimiter.size();
+            }
+        } catch (...) {
+            array_erase(destination_id);
+            return failure;
+        }
+        destination->deck_size = destination->values.size();
+        return success;
+    }
+
+    inline clm_int split(
+        const clm_id destination_id,
+        const clm_id source_id,
+        const clm_id delimiter_id)
+    {
+        const auto* source = detail::find_string(source_id);
+        const auto* delimiter = detail::find_string(delimiter_id);
+        return source == nullptr || delimiter == nullptr ? failure
+            : split_from(destination_id, source->text, delimiter->text);
+    }
+
+    inline clm_int split_lines_from(
+        const clm_id destination_id,
+        const std::string_view text)
+    {
+        if (!detail::valid_input(text) || !array_create(destination_id))
+            return failure;
+        auto* destination = detail::find_array(destination_id);
+        try {
+            std::size_t start = 0;
+            std::size_t offset = 0;
+            while (offset < text.size()) {
+                const std::size_t line_break_start = offset;
+                std::uint32_t codepoint;
+                if (!detail::next_codepoint(text, offset, codepoint)) {
+                    array_erase(destination_id);
+                    return failure;
+                }
+                if (codepoint == '\r' || codepoint == '\n' || codepoint == 0x85 ||
+                    codepoint == 0x2028 || codepoint == 0x2029) {
+                    destination->values.emplace_back(
+                        text.substr(start, line_break_start - start));
+                    if (codepoint == '\r' && offset < text.size() &&
+                        text[offset] == '\n')
+                        ++offset;
+                    start = offset;
+                }
+            }
+            destination->values.emplace_back(text.substr(start));
+        } catch (...) {
+            array_erase(destination_id);
+            return failure;
+        }
+        destination->deck_size = destination->values.size();
+        return success;
+    }
+
+    inline clm_int split_lines(
+        const clm_id destination_id,
+        const clm_id source_id)
+    {
+        const auto* source = detail::find_string(source_id);
+        return source == nullptr ? failure
+            : split_lines_from(destination_id, source->text);
     }
 
     inline clm_int array_length_at(const clm_id id, const clm_int index)
@@ -768,6 +1088,170 @@ namespace clm::string {
             array->values.size() > static_cast<std::size_t>(
                 std::numeric_limits<clm_int>::max())
             ? failure : static_cast<clm_int>(array->values.size());
+    }
+
+    inline std::optional<std::string_view> array_value(
+        const clm_id id,
+        const clm_int index)
+    {
+        const auto* array = detail::find_array(id);
+        if (array == nullptr || index < 0 ||
+            static_cast<std::size_t>(index) >= array->values.size())
+            return std::nullopt;
+        return array->values[static_cast<std::size_t>(index)];
+    }
+
+    inline clm_int array_compare_text(
+        const clm_id id,
+        const clm_int index,
+        const std::string_view text,
+        const bool ignore_case)
+    {
+        const auto* array = detail::find_array(id);
+        if (array == nullptr || index < 0 ||
+            static_cast<std::size_t>(index) >= array->values.size())
+            return failure;
+        return detail::compare_text(
+            array->values[static_cast<std::size_t>(index)], text, ignore_case);
+    }
+
+    inline clm_int array_compare(
+        const clm_id id,
+        const clm_int index,
+        const clm_id string_id,
+        const bool ignore_case = false)
+    {
+        const auto* value = detail::find_string(string_id);
+        return value == nullptr ? failure
+            : array_compare_text(id, index, value->text, ignore_case);
+    }
+
+    inline clm_int array_compare_ignore_case(
+        const clm_id id,
+        const clm_int index,
+        const clm_id string_id)
+    {
+        return array_compare(id, index, string_id, true);
+    }
+
+    inline clm_int array_compare_from(
+        const clm_id id,
+        const clm_int index,
+        const std::string_view text,
+        const bool ignore_case = false)
+    {
+        return array_compare_text(id, index, text, ignore_case);
+    }
+
+    inline clm_int array_compare_ignore_case_from(
+        const clm_id id,
+        const clm_int index,
+        const std::string_view text)
+    {
+        return array_compare_from(id, index, text, true);
+    }
+
+    inline clm_int array_trim(
+        const clm_id id,
+        const bool trim_left,
+        const bool trim_right)
+    {
+        auto* array = detail::find_array(id);
+        if (array == nullptr)
+            return failure;
+        std::size_t total_removed = 0;
+        for (const auto& text : array->values) {
+            std::size_t begin;
+            std::size_t end;
+            std::size_t removed;
+            if (!detail::trim_bounds(text, trim_left, trim_right,
+                                     begin, end, removed) ||
+                removed > static_cast<std::size_t>(
+                    std::numeric_limits<clm_int>::max()) - total_removed)
+                return failure;
+            total_removed += removed;
+        }
+        if (total_removed == 0)
+            return 0;
+        for (auto& text : array->values) {
+            std::size_t begin;
+            std::size_t end;
+            std::size_t removed;
+            if (!detail::trim_bounds(text, trim_left, trim_right,
+                                     begin, end, removed))
+                return failure;
+            if (removed != 0)
+                text = text.substr(begin, end - begin);
+        }
+        return static_cast<clm_int>(total_removed);
+    }
+
+    inline clm_int array_left_trim(const clm_id id)
+    {
+        return array_trim(id, true, false);
+    }
+
+    inline clm_int array_right_trim(const clm_id id)
+    {
+        return array_trim(id, false, true);
+    }
+
+    inline clm_int array_trim(const clm_id id)
+    {
+        return array_trim(id, true, true);
+    }
+
+    inline clm_int array_join_from(
+        const clm_id destination_id,
+        const clm_id array_id,
+        const std::string_view separator)
+    {
+        const auto* array = detail::find_array(array_id);
+        if (array == nullptr || !detail::valid_input(separator))
+            return failure;
+        std::string joined;
+        std::size_t character_count = 0;
+        try {
+            for (std::size_t index = 0; index < array->values.size(); ++index) {
+                const auto& text = array->values[index];
+                std::size_t text_count;
+                if (!detail::measure(text, text_count) ||
+                    text_count > static_cast<std::size_t>(
+                        std::numeric_limits<clm_int>::max()) - character_count)
+                    return failure;
+                joined.append(text);
+                character_count += text_count;
+                if (index + 1 < array->values.size()) {
+                    std::size_t separator_count;
+                    if (!detail::measure(separator, separator_count) ||
+                        separator_count > static_cast<std::size_t>(
+                            std::numeric_limits<clm_int>::max()) - character_count)
+                        return failure;
+                    joined.append(separator);
+                    character_count += separator_count;
+                }
+            }
+        } catch (...) {
+            return failure;
+        }
+        auto* destination = detail::find_string(destination_id);
+        if (destination == nullptr) {
+            if (!create(destination_id, joined))
+                return failure;
+        } else if (set(destination_id, joined) < 0) {
+            return failure;
+        }
+        return static_cast<clm_int>(character_count);
+    }
+
+    inline clm_int array_join(
+        const clm_id destination_id,
+        const clm_id array_id,
+        const clm_id separator_id)
+    {
+        const auto* separator = detail::find_string(separator_id);
+        return separator == nullptr ? failure
+            : array_join_from(destination_id, array_id, separator->text);
     }
 
     inline clm_int array_get(

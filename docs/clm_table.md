@@ -1,5 +1,20 @@
 # CLM Table
 
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+ID-based mutable tabular collection with rows, columns and string-valued cells.
+
+## Capabilities and operations
+
+- Create tables and define or query their columns.
+- Add, update, retrieve and remove rows or cell values.
+- Move between DSV text and the table representation via clm_string_dsv.
+- Treat missing values and column ordering according to the module’s schema rules.
+
+## Detailed module contract
+
 ## 1. Purpose
 
 `clm_table` is an ID-addressed, dynamically sized table for string-valued data.
@@ -71,7 +86,7 @@ Implementations must not silently replace a missing value with an empty string.
 
 ## 5. Public operations
 
-The C declarations are in `clm/table.h`. The language-neutral operations are:
+Exact signatures are defined by each language binding. The language-neutral operations are:
 
 | Operation | Behavior |
 |---|---|
@@ -134,20 +149,23 @@ CSV or other file syntax.
 The table owns its column metadata and copies each cell's text. Callers retain
 ownership of source buffers and source CLM string blocks. Deleting a table
 releases all internal resources and invalidates its ID. As with other CLM
-registries, implementations must document their concurrency behavior; the C
-reference is not thread-safe unless explicitly changed.
+registries, implementations must document their concurrency behavior; the reference behavior does not promise implicit synchronization.
 
-## 8. Implementation status
+## 8. Storage and mutation semantics
 
-`clm/table.h` implements the API using a private BPA metadata block, BPAA arrays
-for ordered column IDs, retained column names, and row dictionary IDs, plus one
-heterogeneous dictionary per row. Each present cell is a dictionary-owned BPA
-string block. Missing cells have no row-dictionary entry; empty strings are
-stored as present values.
+The table preserves an ordered column schema and ordered rows. Present cells own copies of their text; missing cells are distinct from present empty strings. Column IDs must be registered before use, and aliases mapping to an already-present column are not added twice. Deleting the table releases its owned data. These guarantees are behavioral; backing collection types are not prescribed across languages.
 
-Rows and columns are dynamically appended/inserted or removed. Column names
-must resolve through `clm_id` before being added, and aliases that map to an
-already-present column ID are rejected. The table owns row dictionaries and
-cell copies, but callers retain ownership of source strings and the `clm_id`
-registry. The test suite covers schema ordering, sparse cells, UTF-8 validation,
-row and column mutation, copy independence, and cleanup.
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_bpa](clm_bpa.md), [clm_id](clm_id.md), [clm_string](clm_string.md).
+
+## Example use cases
+
+Create tables and define or query their columns.

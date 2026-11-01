@@ -1,7 +1,29 @@
-## clm_dispatch — language-neutral contract
+# CLM Dispatch
 
-Exactly one handler per message ID. Handler declarations list numeric dependency IDs for explicit resolution. Four categorization methods—command, event, query and exception—call the same registered handler; events **do not fan out**. Optional logging receives an envelope before invocation. Each message hop carries an ID, correlation ID, and causation ID; children preserve correlation and record parent causation. The C port requires the parent to be passed explicitly, rather than using implicit asynchronous context propagation. The C implementation does not await asynchronous callbacks; its adapters may submit work to an async executor explicitly. Registrations own copies of dependency lists, **not** dependency instances.
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
-### Cross-language expectations
+## Purpose
 
-This document specifies observable behavior, not syntax or compiler bindings. Keep input order, output values, error cases, and data ownership consistent across CLM language ports. For C signatures, see `include/clm_dispatch.h`.
+Dispatches commands, events, queries and exceptions through registered handlers indexed by message ID.
+
+## Capabilities and operations
+
+- Associate one handler with each message ID and declare dependency IDs.
+- Dispatch categories share core handler invocation semantics.
+- Validate dependencies explicitly; event dispatch is not automatically a multi-subscriber broadcast.
+- Keep the message/handler lifetime under application control.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md).
+
+## Example use cases
+
+Associate one handler with each message ID and declare dependency IDs.

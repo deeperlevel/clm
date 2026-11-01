@@ -518,7 +518,15 @@ namespace detail {
     {
         auto* array = detail::find_array(id);
         if (array == nullptr || output == nullptr) return CLM_BPA_FAILURE;
-        *output = array->count * array->block_size;
+        if (array->type == CLM_BPA_TYPE_STRING) {
+            if (array->index >= array->strings.size() ||
+                array->strings[array->index].size() >
+                    std::numeric_limits<clm_uint>::max())
+                return CLM_BPA_FAILURE;
+            *output = static_cast<clm_uint>(array->strings[array->index].size());
+        } else {
+            *output = array->count * array->block_size;
+        }
         return CLM_BPA_GET_SUCCESS;
     }
     static inline int get_capacity_to(clm_id id, clm_uint* output)
@@ -561,12 +569,13 @@ namespace detail {
             return CLM_BPA_FAILURE;
         return resize(id, array->capacity + amount);
     }
-    static inline int shrink(clm_id id, clm_uint amount)
+    static inline int shrink(clm_id id, clm_uint new_capacity)
     {
         auto* array = detail::find_array(id);
-        if (array == nullptr || amount > array->capacity)
+        if (array == nullptr || array->sealed ||
+            new_capacity >= array->capacity || new_capacity < array->count)
             return CLM_BPA_FAILURE;
-        return resize(id, array->capacity - amount);
+        return resize(id, new_capacity);
     }
     static inline int get_raw(clm_id id, clm_int index, void* output,
                                     clm_uint size)
@@ -646,6 +655,9 @@ namespace detail {
             array->type == CLM_BPA_TYPE_STRING || input == nullptr ||
             size != array->block_size) return CLM_BPA_FAILURE;
         try {
+            std::vector<unsigned char> input_copy(
+                static_cast<const unsigned char*>(input),
+                static_cast<const unsigned char*>(input) + array->block_size);
             if (array->count == array->capacity &&
                 (array->capacity > std::numeric_limits<clm_uint>::max() / 2u ||
                  !detail::resize_capacity(*array, array->capacity == 0 ? 1u :
@@ -655,7 +667,7 @@ namespace detail {
                 static_cast<std::size_t>(index) * array->block_size;
             std::memmove(destination + array->block_size, destination,
                 static_cast<std::size_t>(array->count - index) * array->block_size);
-            std::memcpy(destination, input, array->block_size);
+            std::memcpy(destination, input_copy.data(), array->block_size);
             ++array->count;
             array->deck_size = array->count;
             return CLM_BPA_SUCCESS;
@@ -664,7 +676,8 @@ namespace detail {
     static inline int append_raw(clm_id id, const void* input, clm_uint size)
     {
         auto* array = detail::find_array(id);
-        if (array == nullptr || array->sealed || size != array->block_size)
+        if (array == nullptr || size != array->block_size ||
+            (array->sealed && array->count == array->capacity))
             return CLM_BPA_FAILURE;
         return detail::append_bytes(*array, input) ? CLM_BPA_SUCCESS : CLM_BPA_FAILURE;
     }
@@ -719,9 +732,10 @@ namespace detail {
     static inline int clear(clm_id id)
     {
         auto* array = detail::find_array(id);
-        if (array == nullptr || array->sealed) return CLM_BPA_FAILURE;
+        if (array == nullptr) return CLM_BPA_FAILURE;
         array->count = array->index = 0;
         array->deck_size = 0;
+        array->sealed = 0;
         for (const auto& text : array->strings)
             detail::track_pool_free(text.size() + 1);
         array->strings.clear();
@@ -1087,12 +1101,13 @@ namespace detail {
                                 clm_uint size)
     {
         auto* array = detail::find_array(id);
+        auto* block = detail::find_block(destination);
         if (array == nullptr || array->type == CLM_BPA_TYPE_STRING ||
             !detail::valid_index(*array, index) || size < array->block_size ||
-            block_exists(destination)) return CLM_BPA_FAILURE;
-        if (create_sized(destination, array->type, array->block_size) != CLM_BPA_SUCCESS)
+            block == nullptr || block->type == CLM_BPA_TYPE_STRING ||
+            (array->type != CLM_BPA_TYPE_STRUCT && block->type != array->type) ||
+            block->block_size != array->block_size)
             return CLM_BPA_FAILURE;
-        auto* block = detail::find_block(destination);
         std::memcpy(block->data.data(), array->blocks.data() +
                     static_cast<std::size_t>(index) * array->block_size, array->block_size);
         return CLM_BPA_GET_SUCCESS;
@@ -1101,7 +1116,11 @@ namespace detail {
                                 clm_uint size)
     {
         auto* block = detail::find_block(source);
-        if (block == nullptr || size < block->block_size) return CLM_BPA_FAILURE;
+        auto* array = detail::find_array(id);
+        if (array == nullptr || block == nullptr ||
+            (array->type != CLM_BPA_TYPE_STRUCT && array->type != block->type) ||
+            size != array->block_size || block->block_size != array->block_size)
+            return CLM_BPA_FAILURE;
         return set_raw(id, index, block->data.data(), block->block_size);
     }
     static inline int insert(clm_id id, clm_int index, clm_id source,
@@ -1110,8 +1129,10 @@ namespace detail {
         auto* block = detail::find_block(source);
         if (block == nullptr || size < block->block_size) return CLM_BPA_FAILURE;
         auto* array = detail::find_array(id);
-        if (array == nullptr || block->type != array->type ||
-            block->block_size != array->block_size) return CLM_BPA_FAILURE;
+        if (array == nullptr || block->type == CLM_BPA_TYPE_STRING ||
+            (array->type != CLM_BPA_TYPE_STRUCT && block->type != array->type) ||
+            size != array->block_size || block->block_size != array->block_size)
+            return CLM_BPA_FAILURE;
         if (array->type == CLM_BPA_TYPE_STRING)
             return CLM_BPA_FAILURE;
         return insert_raw(id, index, block->data.data(), block->block_size);
@@ -1120,8 +1141,10 @@ namespace detail {
     {
         auto* block = detail::find_block(source);
         auto* array = detail::find_array(id);
-        if (block == nullptr || array == nullptr || block->type != array->type ||
-            size < block->block_size) return CLM_BPA_FAILURE;
+        if (block == nullptr || array == nullptr || block->type == CLM_BPA_TYPE_STRING ||
+            (array->type != CLM_BPA_TYPE_STRUCT && block->type != array->type) ||
+            size != array->block_size || block->block_size != array->block_size)
+            return CLM_BPA_FAILURE;
         return array->type == CLM_BPA_TYPE_STRING
             ? append_string_raw(id, block->data.data(), block->length + 1)
             : append_raw(id, block->data.data(), block->block_size);
@@ -1131,17 +1154,24 @@ namespace detail {
     {
         auto* array = detail::find_array(id);
         if (array == nullptr || array->type != CLM_BPA_TYPE_STRING ||
-            !detail::valid_index(*array, index) || block_exists(destination))
+            !detail::valid_index(*array, index))
             return CLM_BPA_FAILURE;
-        if (create(destination, CLM_BPA_TYPE_STRING) != CLM_BPA_SUCCESS)
+        auto* block = detail::find_block(destination);
+        if (block != nullptr && block->type != CLM_BPA_TYPE_STRING)
             return CLM_BPA_FAILURE;
         const auto& value = array->strings[index];
-        if (size < value.size() + 1 ||
-            set_string(destination, value.c_str(), static_cast<clm_uint>(value.size() + 1)) < 0) {
-            erase_block(destination);
+        if (size < value.size() + 1)
+            return CLM_BPA_FAILURE;
+        const bool created = block == nullptr;
+        if (created && create(destination, CLM_BPA_TYPE_STRING) != CLM_BPA_SUCCESS)
+            return CLM_BPA_FAILURE;
+        if (set_string(destination, value.c_str(),
+                       static_cast<clm_uint>(value.size() + 1)) < 0) {
+            if (created)
+                erase_block(destination);
             return CLM_BPA_FAILURE;
         }
-        return CLM_BPA_SUCCESS;
+        return CLM_BPA_GET_SUCCESS;
     }
     static inline int set_string(clm_id id, clm_int index,
                                         clm_id source, clm_uint size)
@@ -1149,7 +1179,8 @@ namespace detail {
         auto* block = detail::find_block(source);
         if (block == nullptr || block->type != CLM_BPA_TYPE_STRING || size < block->length + 1)
             return CLM_BPA_FAILURE;
-        return set_string_raw(id, index, block->data.data(), block->length + 1);
+        return set_string_raw(id, index, block->data.data(), block->length + 1) < 0
+            ? CLM_BPA_FAILURE : CLM_BPA_SET_SUCCESS;
     }
     static inline int insert_string(clm_id id, clm_int index,
                                             clm_id source)
@@ -1566,6 +1597,24 @@ namespace detail {
 
 using clm_bpa_block_node = clm::bpa::clm_bpa_block_node;
 using clm_bpaa_array_node = clm::bpa::clm_bpaa_array_node;
+using clm::bpa::CLM_BPA_FAILURE;
+using clm::bpa::CLM_BPA_SUCCESS;
+using clm::bpa::CLM_BPA_GET_SUCCESS;
+using clm::bpa::CLM_BPA_SET_SUCCESS;
+using clm::bpa::CLM_BPA_TYPE_STRUCT;
+using clm::bpa::CLM_BPA_TYPE_SIGNED_BYTE;
+using clm::bpa::CLM_BPA_TYPE_BYTE;
+using clm::bpa::CLM_BPA_TYPE_SHORT;
+using clm::bpa::CLM_BPA_TYPE_UNSIGNED_SHORT;
+using clm::bpa::CLM_BPA_TYPE_INT;
+using clm::bpa::CLM_BPA_TYPE_UNSIGNED_INT;
+using clm::bpa::CLM_BPA_TYPE_LONG;
+using clm::bpa::CLM_BPA_TYPE_UNSIGNED_LONG;
+using clm::bpa::CLM_BPA_TYPE_FLOAT;
+using clm::bpa::CLM_BPA_TYPE_DOUBLE;
+using clm::bpa::CLM_BPA_TYPE_STRING;
+using clm::bpa::CLM_BPA_TYPE_UUID;
+using clm::bpa::CLM_BPA_TYPE_DATETIME;
 
 static inline bool clm_bpa_is_existing(const clm_id id)
 {
@@ -1591,12 +1640,12 @@ static inline int clm_bpa_delete(const clm_id id)
     return clm::bpa::CLM_BPA_FAILURE;
 }
 
-static inline int clm_bpa_set_string(const clm_id id, const char* text, const clm_uint size)
+static inline int clm_bpa_set_string(const clm_id id, const void* text, const clm_uint size)
 {
     return clm::bpa::set_string(id, text, size);
 }
 
-static inline int clm_bpa_get_string(const clm_id id, char* buffer, const clm_uint size)
+static inline int clm_bpa_get_string(const clm_id id, void* buffer, const clm_uint size)
 {
     return clm::bpa::get_string(id, buffer, size);
 }
@@ -1621,6 +1670,29 @@ static inline int clm_bpa_get(const clm_id id, void* output, const clm_uint size
     return clm::bpa::get(id, output, size);
 }
 
+static inline int clm_bpa_replace(const clm_id id, const void* input, const clm_uint size)
+{
+    return clm::bpa::replace(id, input, size);
+}
+
+static inline int clm_bpa_ref(const clm_id id)
+{
+    if (clm::bpa::block_exists(id))
+        return clm::bpa::ref_block(id);
+    if (clm::bpa::array_exists(id))
+        return clm::bpa::ref_array(id);
+    return CLM_BPA_FAILURE;
+}
+
+static inline int clm_bpa_unref(const clm_id id)
+{
+    if (clm::bpa::block_exists(id))
+        return clm::bpa::unref_block(id);
+    if (clm::bpa::array_exists(id))
+        return clm::bpa::unref_array(id);
+    return CLM_BPA_FAILURE;
+}
+
 static inline clm_bpaa_array_node* clm_bpaa_find_array(const clm_id id)
 {
     return clm::bpa::detail::find_array(id);
@@ -1638,6 +1710,9 @@ static inline int clm_bpaa_create(const clm_id id, const clm_byte type, const cl
 
 static inline int clm_bpaa_append_raw(const clm_id id, const void* input, const clm_uint size)
 {
+    const auto* array = clm::bpa::detail::find_array(id);
+    if (array != nullptr && array->type == CLM_BPA_TYPE_STRING)
+        return clm::bpa::append_string_raw(id, input, size);
     return clm::bpa::append_raw(id, input, size);
 }
 
@@ -1670,3 +1745,85 @@ static inline int clm_bpaa_set_string_raw(const clm_id id, const clm_int index, 
 {
     return clm::bpa::set_string_raw(id, index, input, size);
 }
+
+#define CLM_BPA_FORWARD_GLOBAL(name, target) \
+    template <typename... Args> \
+    static inline auto name(Args&&... args) \
+        -> decltype(clm::bpa::target(std::forward<Args>(args)...)) \
+    { \
+        return clm::bpa::target(std::forward<Args>(args)...); \
+    }
+
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_get_count_to, get_count_to)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_get_capacity_to, get_capacity_to)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_get_first_raw, get_first_raw)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_get_last_raw, get_last_raw)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_set_raw, set_raw)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_move_to, move_to)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_get_current_index_to, get_current_index_to)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_get_current_raw, get_current_raw)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_move_previous, move_previous)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_move_next, move_next)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_move_last, move_last)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_reset, reset)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_extend, extend)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_shrink, shrink)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_reverse, reverse)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_sort_with, sort_with)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_shift_left, shift_left)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_shift_right, shift_right)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_swap, swap)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_copy, copy)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_shuffle, shuffle)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_draw_at_raw, draw_at_raw)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_draw_raw, draw_raw)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_is_sealed_to, is_sealed_to)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_seal, seal)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_remove_first, remove_first)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_unseal, unseal)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_move_first, move_first)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_get_length_to, get_length_to)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_create_sized, create_sized)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_slice, slice)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_slice_to, slice_to)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_slice_borrow, slice_borrow)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_append_string, append_string)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_get_string, get_string)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_set_string, set_string)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_advanced_borrow, advanced_borrow)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_advanced_release, advanced_release)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_advanced_data, advanced_data)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_advanced_get_raw, advanced_get_raw)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_advanced_set_raw, advanced_set_raw)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_advanced_extend, advanced_extend)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_advanced_append_raw, advanced_append_raw)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_advanced_insert_raw, advanced_insert_raw)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_advanced_remove, advanced_remove)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_advanced_shrink, advanced_shrink)
+CLM_BPA_FORWARD_GLOBAL(clm_bpaa_advanced_clear, advanced_clear)
+CLM_BPA_FORWARD_GLOBAL(clm_bpa_pool_stats, pool_stats)
+CLM_BPA_FORWARD_GLOBAL(clm_bpa_pool_cleanup, pool_cleanup)
+
+static inline int clm_bpaa_sort(
+    const clm_id id,
+    const clm::bpa::clm_bpaa_predicate_fn predicate)
+{
+    return clm::bpa::sort(id, predicate);
+}
+
+static inline int clm_bpaa_ref(const clm_id id)
+{
+    return clm::bpa::ref_array(id);
+}
+
+static inline int clm_bpaa_unref(const clm_id id)
+{
+    return clm::bpa::unref_array(id);
+}
+
+static inline int clm_bpaa_delete(const clm_id id)
+{
+    return clm::bpa::erase_array(id);
+}
+
+#undef CLM_BPA_FORWARD_GLOBAL

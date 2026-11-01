@@ -1,19 +1,31 @@
 # CLM File
 
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+File-oriented filesystem operations for reading, writing, inspection and metadata management.
+
+## Capabilities and operations
+
+- Open and read files, write/append data, and work with file metadata or positions as supported.
+- Use whole-file convenience operations when bounded in memory; use stream/file primitives for incremental I/O.
+- Treat path resolution and permissions as potential failure points.
+- Do not assume the same atomicity, locking or metadata features on every operating system.
+
+## Detailed module contract
+
 ## Status and Scope
 
-This is a **language-neutral API reference** with a current C binding implementing
-86 entry points, including registry shutdown. The portable concepts below do not
+This is a **language-neutral API reference** for the file operation families in the current CLM snapshot. The portable concepts below do not
 require a particular native handle type or memory layout. Binding-specific behavior
 and platform limits are recorded explicitly; remaining cross-platform policy
 questions are not claims of features already provided on every operating system.
 
-The current suites exercise the Windows implementation. POSIX code is present
-but requires a separate runtime validation environment.
+Platform-specific behavior and test coverage should be verified separately for each language binding.
 
-### Current C Binding Contract
+### Portable behavior
 
-- Define `CLM_FILE_IMPLEMENTATION` in exactly one translation unit. Open-file
   resources are held in a shared registry independent of BPA object lifetimes.
   Callers must synchronize access; there is no internal thread-safety guarantee.
 - Duplicate IDs fail without replacing live resources. Close retires the native
@@ -82,7 +94,7 @@ IDs. They must release their resources on success and failure. Successful
 temporary-file creation is different: it deliberately returns both an open-file
 registration and the created path, transferring cleanup responsibility to the caller.
 
-The current C binding uses UTF-8 BPA path strings, fixed-capacity binary BPA
+The current reference binding uses UTF-8 BPA path strings, fixed-capacity binary BPA
 blocks, CLM strings, and CLM string arrays. Other bindings may use native text,
 buffers, references, and result records without copying C pointer syntax or memory
 layouts. Ownership, aliasing, buffer lifetimes, publication, and ID reuse rules
@@ -122,7 +134,7 @@ buffers remain unchanged while required sizes/counts are reported.
 - Per-call capacities and byte counts must fit the binding's addressable buffer size.
 - Binary transfers do not add a terminator or perform text conversion.
 - In-memory text is UTF-8 even when file bytes use another encoding.
-- Text capacities include a final NUL in the C buffer binding; successful text
+- Text capacities include a final NUL in a null-terminated buffer binding; successful text
   byte counts exclude it unless explicitly named `required_size`.
 - Missing/invalid output references are errors, not permission to discard results.
 - An insufficient whole-file buffer must not receive silently truncated content.
@@ -400,7 +412,7 @@ does not determine effective write permissions.
 Timestamp selection uses `CLM_FILE_TIME_CREATION`,
 `CLM_FILE_TIME_MODIFICATION`, and `CLM_FILE_TIME_ACCESS`. Unselected fields are
 unchanged. Creation time is birth time, never Unix metadata-change time. The
-current C binding uses native `time_t` precision rather than promising a universal
+current reference binding uses native `time_t` precision rather than promising a universal
 epoch/range or nanosecond resolution. Access-time updates can be deferred or
 disabled. Unsupported requested metadata updates fail explicitly.
 
@@ -436,7 +448,7 @@ behavior. Whole-file helpers do not need this explicit resource flow.
 
 ## Validation Plan
 
-The C regression suite covers binary and text adapters, all declared encodings,
+The reference regression suite covers binary and text adapters, all declared encodings,
 BOM append behavior, line packing, unknown/duplicate/retired IDs, EOF, 64-bit seek,
 positioned cursor preservation, range locks, metadata, atomic replacement,
 exclusive temporary creation, shutdown, and fixture cleanup on Windows. The
@@ -450,3 +462,18 @@ unsupported metadata, native locks, exclusive temporary creation, cleanup, and
 atomic-replacement failures. Fault injection is needed for meaningful late-write,
 allocation, sync, and close-error coverage. These are proposed tests, not claims
 of fault-injection or cross-platform verification beyond the current suite.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_gen](clm_gen.md), [clm_path](clm_path.md), [clm_string](clm_string.md), [clm_stringtify](clm_stringtify.md).
+
+## Example use cases
+
+Open and read files, write/append data, and work with file metadata or positions as supported.

@@ -1,0 +1,32 @@
+{
+    "version": 2,
+    "cmakeMinimumRequired": {
+        "major": 4,
+        "minor": 3,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "default",
+            "displayName": "Clang + Ninja",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "environment": {
+                "CC": "clang",
+                "CFLAGS": "-fuse-ld=lld"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "default",
+            "configurePreset": "default",
+            "targets": [
+                "main"
+            ]
+        }
+    ]
+}

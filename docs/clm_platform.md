@@ -1,5 +1,20 @@
 # CLM Platform
 
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+Exposes consistent descriptors of the current operating system, architecture and runtime platform.
+
+## Capabilities and operations
+
+- Identify OS family, architecture, bitness and endianness.
+- Inspect compiler/build or platform properties where meaningful to the implementation.
+- Expose standard conventions such as path separators and common directories.
+- Treat unsupported or unknown platform attributes as legitimate results.
+
+## Detailed module contract
+
 **Module:** `clm_platform`  
 **Purpose:** Identify the compilation target and expose conventional platform values through consistent Cross Language Modules (CLM) operations.
 
@@ -125,3 +140,18 @@ The separator is a *convention*, not a full set of path-parsing rules. The forth
 
 **CLM — Cross Language Modules** · [github.com/deeperlevel/clm](https://github.com/deeperlevel/clm)  
 **License:** CC0 1.0 Universal · Public Domain · Provided AS IS.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_bpa](clm_bpa.md), [clm_string](clm_string.md).
+
+## Example use cases
+
+Identify OS family, architecture, bitness and endianness.

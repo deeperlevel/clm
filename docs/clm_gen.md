@@ -1,4 +1,19 @@
-# CLM Generation
+# CLM Gen
+
+> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+
+## Purpose
+
+General-purpose generation of random values, identifiers and textual tokens.
+
+## Capabilities and operations
+
+- Generate integers and numeric ranges, hexadecimal text, UUID-like identifiers and alphanumeric/password-style strings.
+- Use a cryptographic source only for operations specifically documented as security-appropriate.
+- Distinguish generated randomness from deterministic pseudorandom simulation sequences.
+- Define output format, alphabet, length and uniqueness checks in the caller’s contract.
+
+## Detailed module contract
 
 **Module:** `clm_gen`  
 **Purpose:** Generate random numeric values, UUIDs, hexadecimal and alphanumeric strings, and strong-password-style strings using consistent CLM operations.
@@ -113,7 +128,7 @@ The algorithm ensures **character-class diversity**, not a site's password-polic
 
 ## Related modules
 
-- **`clm_base` / `base.h`:** Numeric types and their ranges.
+- **`clm_base`:** Numeric types and their ranges.
 - **BPA:** Storage for generated strings in ID-addressed blocks.
 - **`clm_platform`:** Compile-time target description; not itself a runtime random-source provider.
 
@@ -121,3 +136,18 @@ The algorithm ensures **character-class diversity**, not a site's password-polic
 
 **CLM — Cross Language Modules** · [github.com/deeperlevel/clm](https://github.com/deeperlevel/clm)  
 **License:** CC0 1.0 Universal · Public Domain · Provided AS IS.
+
+## Shared behavioral contract
+
+- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
+- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
+- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
+- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+
+## Related CLM modules
+
+**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md).
+
+## Example use cases
+
+Generate integers and numeric ranges, hexadecimal text, UUID-like identifiers and alphanumeric/password-style strings.

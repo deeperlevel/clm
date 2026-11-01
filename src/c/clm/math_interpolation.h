@@ -3,78 +3,103 @@
 /*
  * =============================================================================
  * CLM — Cross Language Modules
- *
- * An initiative by deeperlevel, developed with community contributions.
+ * 
  * https://github.com/deeperlevel/clm
- * Contact: deeparchive@outlook.com
+ * Contact: [deeparchive@outlook.com](mailto:deeparchive@outlook.com)
  *
- * Public Domain — CC0 1.0 Universal
+ * A collection of reusable, composable foundational modules providing
+ * consistent capabilities and behavior across programming languages.
+ * Designed to eliminate repetitive groundwork while preserving the
+ * flexibility, independence, and native strengths of each language.
+ *
+ * Unless a file states otherwise, CLM-authored code is dedicated to the
+ * public domain under CC0 1.0 Universal.
  * https://creativecommons.org/publicdomain/zero/1.0/
  *
  * Free to use, modify, redistribute, and bundle for any purpose.
  * Attribution and retention of this notice are appreciated, not required.
  *
- * Provided AS IS, without warranty or liability.
+ * Third-party code under ext/ or vendor/ retains its original licenses,
+ * copyright notices, and disclaimers. CLM's CC0 dedication does not
+ * apply to such code. Refer to the accompanying vendor license files.
  *
- * Don't start from scratch, bro.
+ * CLM is provided AS IS, without warranty or liability.
+ * CLM maintainers and contributors make no warranties regarding
+ * third-party code and disclaim liability for its use to the extent
+ * permitted by applicable law. Original vendor terms remain applicable.
+ *
  * =============================================================================
  */
 
 #include "math.h"
 #include "math_vector.h"
 
-/** Scalar linear interpolation; t is not clamped. */
-static inline double clm_math_interpolation_lerp(double a, double b, double t);
+/* Inline implementation — no separate .c file required. */
+/** Scalar linear interpolation; t is not clamped. 
+ * @param a First input value.
+ * @param b Second input value.
+ * @param t Interpolation factor; see summary for range behavior.
+ * @return Interpolated value.
+ */
+double clm_math_interpolation_lerp(double a, double b, double t);
 
-/** Returns the unbounded interpolation factor; equal endpoints are invalid. */
-static inline clm_math_status
+/** Returns the unbounded interpolation factor; equal endpoints are invalid. 
+ * @param a First input value.
+ * @param b Second input value.
+ * @param v Input parameter described above.
+ * @param out Writable output buffer.
+ * @return The unbounded interpolation factor; equal endpoints are invalid.
+ */
+clm_math_status
 clm_math_interpolation_inverse_lerp(double a, double b, double v, double *out);
 
-/** Computes smoothstep after clamping the normalized factor to [0,1]. */
-static inline clm_math_status
+/** Computes smoothstep after clamping the normalized factor to [0,1]. 
+ * @param a First input value.
+ * @param b Second input value.
+ * @param v Input parameter described above.
+ * @param out Writable output buffer.
+ * @return Success or error status, as described in the summary above.
+ */
+clm_math_status
 clm_math_interpolation_smoothstep(double a, double b, double v, double *out);
 
-/** Quadratic easing functions; t is not clamped. */
-static inline double clm_math_interpolation_ease_in(double t);
-static inline double clm_math_interpolation_ease_out(double t);
-static inline double clm_math_interpolation_ease_in_out(double t);
+/** Computes quadratic ease-in; t is not clamped. 
+ * @param t Interpolation factor; see summary for range behavior.
+ * @return Computed result described in the summary above.
+ */
+double clm_math_interpolation_ease_in(double t);
 
-/** Four-point Catmull-Rom interpolation; t is not clamped. */
-static inline double clm_math_interpolation_cubic(double a, double b, double c,
+/** Computes quadratic ease-out; t is not clamped. 
+ * @param t Interpolation factor; see summary for range behavior.
+ * @return Computed result described in the summary above.
+ */
+double clm_math_interpolation_ease_out(double t);
+
+/** Computes quadratic ease-in-out; t is not clamped. 
+ * @param t Interpolation factor; see summary for range behavior.
+ * @return Computed result described in the summary above.
+ */
+double clm_math_interpolation_ease_in_out(double t);
+
+/** Computes four-point Catmull-Rom interpolation; t is not clamped. 
+ * @param a First input value.
+ * @param b Second input value.
+ * @param c Input parameter described above.
+ * @param d Input parameter described above.
+ * @param t Interpolation factor; see summary for range behavior.
+ * @return Computed result described in the summary above.
+ */
+double clm_math_interpolation_cubic(double a, double b, double c,
                                                   double d, double t);
 
-/** Applies linear interpolation elementwise to equal-sized vector storages. */
-static inline clm_math_status
-clm_math_interpolation_storage_lerp(clm_id first, clm_id second, double t,
-                                    clm_id destination);
-
-/* Inline implementation — no separate .c file required. */
-static inline double clm_math_interpolation_lerp(double a, double b, double t) {
-  return clm_math_lerp(a, b, t);
-}
-static inline clm_math_status
-clm_math_interpolation_inverse_lerp(double a, double b, double v, double *out) {
-  return clm_math_inverse_lerp(a, b, v, out);
-}
-static inline clm_math_status
-clm_math_interpolation_smoothstep(double a, double b, double v, double *out) {
-  return clm_math_smoothstep(a, b, v, out);
-}
-static inline double clm_math_interpolation_ease_in(double t) { return t * t; }
-static inline double clm_math_interpolation_ease_out(double t) {
-  return 1 - (1 - t) * (1 - t);
-}
-static inline double clm_math_interpolation_ease_in_out(double t) {
-  return t * t * (3 - 2 * t);
-}
-static inline double clm_math_interpolation_cubic(double a, double b, double c,
-                                                  double d, double t) {
-  return .5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t +
-               (-a + 3 * b - 3 * c + d) * t * t * t);
-}
-static inline clm_math_status clm_math_interpolation_storage_lerp(clm_id first,
+/** Applies linear interpolation elementwise to equal-sized vector storages. 
+ * @param first First operand or source.
+ * @param second Second operand or source.
+ * @param t Interpolation factor; see summary for range behavior.
+ * @param dest Input parameter described above.
+ * @return Success or error status, as described in the summary above.
+ */
+clm_math_status clm_math_interpolation_storage_lerp(clm_id first,
                                                                   clm_id second,
                                                                   double t,
-                                                                  clm_id dest) {
-  return clm_math_vector_lerp(first, second, t, dest);
-}
+                                                                  clm_id dest);
