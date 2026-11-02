@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** None.
+- **External libraries / platform facilities (C reference):** TinyCThread (optional C11-threads compatibility backend; `CLM_USE_TINYCTHREAD`).
+
 ## Purpose
 
 A policy-driven coordinator for housekeeping and resource cleanup through configurable subsystem hooks.
@@ -34,10 +39,6 @@ Hooks, not the coordinator, perform actual resource deletion. Hook ordering is c
 - Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-
-## Related CLM modules
-
-This is a foundational module with no required public CLM module dependency in the reference snapshot.
 
 ## Example use cases
 

@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_dictionary](clm_dictionary.md), [clm_id](clm_id.md), [clm_storage](clm_storage.md), [clm_string_format](clm_string_format.md), [clm_string_json](clm_string_json.md), [clm_string_yaml](clm_string_yaml.md), [clm_table](clm_table.md), [clm_tree](clm_tree.md).
+- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+
 ## Purpose
 
 Converts ID-based CLM-managed objects into readable text for display and diagnostics.
@@ -27,10 +32,6 @@ The formatter supports **compact**, **pretty** and **detailed** styles. It can p
 - Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_dictionary](clm_dictionary.md), [clm_id](clm_id.md), [clm_storage](clm_storage.md), [clm_string_format](clm_string_format.md), [clm_string_json](clm_string_json.md), [clm_string_yaml](clm_string_yaml.md), [clm_table](clm_table.md), [clm_tree](clm_tree.md).
 
 ## Example use cases
 

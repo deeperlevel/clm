@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_base](clm_base.md).
+- **External libraries / platform facilities (C reference):** TinyCThread (optional C11-threads compatibility backend; `CLM_USE_TINYCTHREAD`).
+
 ## Purpose
 
 Bounded concurrent message channels for exchanging integer IDs between producers and consumers.
@@ -30,10 +35,6 @@ A channel does not make an ID-addressed payload safe for concurrent mutation. Sy
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
 - For a zero-capacity channel, a sender and receiver rendezvous directly. A successful receive removes one FIFO message.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_base](clm_base.md).
 
 ## Example use cases
 

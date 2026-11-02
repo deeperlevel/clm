@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_base](clm_base.md).
+- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+
 ## Purpose
 
 Shared math result codes and storage-adapter contract for ID-addressed numeric arrays.
@@ -26,10 +31,6 @@ Supported vector helpers require the expected dimension; unrelated object types 
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
 - This module defines the shared storage-adapter contract; the port may choose its own backing numeric storage.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_base](clm_base.md).
 
 ## Example use cases
 

@@ -2,6 +2,13 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_async](clm_async.md), [clm_async_pool](clm_async_pool.md), [clm_bytes](clm_bytes.md), [clm_compress](clm_compress.md), [clm_http_utils](clm_http_utils.md), [clm_multipart](clm_multipart.md), [clm_net](clm_net.md), [clm_stream](clm_stream.md), [clm_template](clm_template.md), [clm_tls](clm_tls.md).
+- **External libraries / platform facilities (C reference):** TinyCThread (optional C11-threads compatibility backend; `CLM_USE_TINYCTHREAD`). TLS/compression libraries are transitive through the CLM dependencies linked above.
+
+**Integration note:** [clm_http_utils](clm_http_utils.md) provides HTTP/1.x parsing, serialization, and chunked coding for request and response wire handling.
+
 ## Purpose
 
 A small HTTP/1.1 server with routes, middleware and response helpers, built on CLM networking and concurrency foundations.
@@ -40,10 +47,6 @@ The server speaks **HTTP/1.1** with a reactor and a worker pool. Idle connection
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
 - Protocol scope in this snapshot: HTTP/1.1 server. HTTP/2 and HTTP/3 require additional modules or future work.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_async_pool](clm_async_pool.md), [clm_bytes](clm_bytes.md), [clm_compress](clm_compress.md), [clm_multipart](clm_multipart.md), [clm_stream](clm_stream.md), [clm_http_utils](clm_http_utils.md) (HTTP/1.x parsing, serialization and chunked coding used for request and response wire handling), [clm_template](clm_template.md), [clm_tls](clm_tls.md).
 
 ## Example use cases
 

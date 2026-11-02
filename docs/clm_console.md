@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_string_format](clm_string_format.md), [clm_stringtify](clm_stringtify.md), [clm_tree](clm_tree.md).
+- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+
 ## Purpose
 
 Console text input/output, formatted object display and optional terminal styling.
@@ -132,10 +137,6 @@ Formatting syntax varies by language binding; and all status-returning operation
 - Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_string_format](clm_string_format.md), [clm_stringtify](clm_stringtify.md), [clm_tree](clm_tree.md).
 
 ## Example use cases
 

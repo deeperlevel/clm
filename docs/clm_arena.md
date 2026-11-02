@@ -1,5 +1,12 @@
 # CLM Arena
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_base](clm_base.md).
+- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+
+**Current C consumer:** [clm_bpa](clm_bpa.md) uses arena-backed, pinned slab storage for its small-object pools.
+
 ## Purpose
 
 `clm_arena` manages **ID-addressed, growable bump arenas**: contiguous regions of memory in which allocations are identified by **stable byte offsets** rather than individually owned addresses. Its optional **borrow/return lease** mechanism grants temporary direct access to the backing storage while preventing normal arena operations from invalidating that storage.
@@ -351,12 +358,6 @@ The following are not promises of the current module and should be considered se
 - Preserve observable create/allocate/borrow/return/reset/rewind/destroy behavior across language ports.
 - Use native storage, error, and lifetime mechanisms where appropriate without silently weakening the checked lease contract.
 - Binding-specific signatures, memory representations, packaging, and source layout belong to each language implementation.
-
-## Related CLM modules
-
-**Supporting module:** [clm_base](clm_base.md).
-
-**Current C consumer:** [clm_bpa](clm_bpa.md) uses arena-backed, pinned slab storage for its small-object pools.
 
 ## Example use cases
 

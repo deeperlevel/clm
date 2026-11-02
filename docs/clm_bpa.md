@@ -1,5 +1,10 @@
 # CLM Bpa
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_arena](clm_arena.md), [clm_base](clm_base.md).
+- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+
 ## Purpose
 
 Block Pool Allocation: ID-addressed, typed blocks and arrays. In the current C implementation, recyclable small-object pools use [clm_arena](clm_arena.md) internally for pinned slab storage.
@@ -618,10 +623,6 @@ The following are **not settled cross-language promises** and should be document
 - Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_base](clm_base.md); [clm_arena](clm_arena.md) (internal small-object slab backing in the current C implementation).
 
 ## Example use cases
 

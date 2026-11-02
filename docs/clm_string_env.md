@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_base](clm_base.md), [clm_dictionary](clm_dictionary.md), [clm_file](clm_file.md), [clm_string_format](clm_string_format.md), [clm_tree](clm_tree.md).
+- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+
 ## Purpose
 
 Reads and writes environment-file-style key/value text into CLM structured data.
@@ -62,10 +67,6 @@ expansion, interpolation, type inference, or process-environment updates.
 - Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_base](clm_base.md), [clm_file](clm_file.md), [clm_string_format](clm_string_format.md).
 
 ## Example use cases
 

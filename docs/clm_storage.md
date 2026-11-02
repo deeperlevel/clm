@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_bpa](clm_bpa.md).
+- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+
 ## Purpose
 
 ID-addressed fixed-dimension data grids and texture-atlas-like regions.
@@ -18,7 +23,6 @@ ID-addressed fixed-dimension data grids and texture-atlas-like regions.
 ## 1. Purpose
 
 `clm_storage` is an ID-addressed **fixed-dimension**, **row-major** data grid backed by one BPAA allocation with a BPA metadata block. It supports 2D grids, layered 3D grids, and an atlas interpretation of a grid divided into equal-sized rectangular frames. It stores fixed-width elements; it is not an image decoder, serializer, multidimensional object model, or table/query engine.
-
 
 ## 2. Data and coordinate model
 
@@ -86,7 +90,6 @@ Atlas operations do not promise zero-copy access to an individual frame, because
 
 ## 8. Conformance tests and limitations
 
-
 Current limitations: no resizing, no string cells, no strided/padded external frame buffers, no lazy/file-backed storage, no external buffer adoption/borrowing, no multidimensional region assignment, and no threadsafe access. `clm_storage` is not a database; future table semantics, indexes, transactions and schema handling should be built separately.
 
 **Cross-language promise:** consistent coordinate, layout, copy, and lifetime behavior; BPA-backed physical layout is one implementation choice rather than a requirement for ports in other languages.
@@ -97,10 +100,6 @@ Current limitations: no resizing, no string cells, no strided/padded external fr
 - Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_bpa](clm_bpa.md).
 
 ## Example use cases
 

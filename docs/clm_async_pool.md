@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_async](clm_async.md).
+- **External libraries / platform facilities (C reference):** TinyCThread (optional C11-threads compatibility backend; `CLM_USE_TINYCTHREAD`).
+
 ## Purpose
 
 A multiworker execution layer built on cooperative task schedulers. Workers run independent schedulers and tasks remain assigned to their worker.
@@ -53,10 +58,6 @@ consistently for the library and all consumers, and link POSIX threads.
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
 - Workers execute cooperative schedulers; submitting synchronous work to a worker does not make that work nonblocking.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_async](clm_async.md).
 
 ## Example use cases
 

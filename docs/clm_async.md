@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_base](clm_base.md).
+- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+
 ## Purpose
 
 A cooperative scheduler for stackless tasks. Each task performs bounded work and returns a step result instead of holding a thread while it waits.
@@ -39,10 +44,6 @@ This is a stackless scheduling contract: task callbacks do not preserve an impli
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
 - Step callbacks are stackless; the caller must preserve continuation state.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_base](clm_base.md).
 
 ## Example use cases
 

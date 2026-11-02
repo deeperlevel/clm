@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md).
+- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+
 ## Purpose
 
 ID-based service registration and resolution, with explicit dependency validation and instance lifetimes.
@@ -42,10 +47,6 @@ The current contract defines explicit process-wide **begin/end scope** and **beg
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
 - Singleton lifetime is eager; scoped and intern lifetimes use explicit process-wide frames; transient is per-resolution.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md).
 
 ## Example use cases
 

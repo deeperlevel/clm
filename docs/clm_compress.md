@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_bytes](clm_bytes.md), [clm_stream](clm_stream.md), [clm_string](clm_string.md).
+- **External libraries / platform facilities (C reference):** miniz (DEFLATE, zlib, gzip and ZIP), LZ4 (frame codec), and Brotli (encoder/decoder); included from `ext/` in the C reference.
+
 ## Purpose
 
 Compression and decompression of bytes, streams and in-memory ZIP archives using interoperable standard encodings.
@@ -37,10 +42,6 @@ ZIP helpers can write, enumerate, find and extract entries; archive entry names 
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
 - Default decompression size caps protect against decompression bombs; callers can request an explicit limit.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_bytes](clm_bytes.md), [clm_stream](clm_stream.md), [clm_string](clm_string.md).
 
 ## Example use cases
 

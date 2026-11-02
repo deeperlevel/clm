@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_bytes](clm_bytes.md), [clm_id](clm_id.md), [clm_string](clm_string.md), [clm_stringtify](clm_stringtify.md), [clm_tree](clm_tree.md).
+- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+
 ## Purpose
 
 Compiles and renders lightweight text templates using named data contexts.
@@ -29,10 +34,6 @@ Tree references are borrowed and must remain alive and unchanged throughout rend
 - Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_bytes](clm_bytes.md), [clm_id](clm_id.md), [clm_string](clm_string.md), [clm_stringtify](clm_stringtify.md), [clm_tree](clm_tree.md).
 
 ## Example use cases
 

@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_net](clm_net.md).
+- **External libraries / platform facilities (C reference):** OpenSSL (non-Windows backend); Windows Schannel/SSPI (native Windows backend).
+
 ## Purpose
 
 TLS-encrypted client/server sessions layered over connected TCP sockets.
@@ -36,10 +41,6 @@ A TLS client opens a session on an already connected TCP socket and verifies the
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
 - The TLS layer does not transfer ownership of the underlying registered network socket.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_net](clm_net.md).
 
 ## Example use cases
 

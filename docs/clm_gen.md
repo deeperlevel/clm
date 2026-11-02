@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md).
+- **External libraries / platform facilities (C reference):** OS random source: Windows BCrypt or `/dev/urandom` on Unix-like systems (platform facilities, not third-party packages).
+
 ## Purpose
 
 General-purpose generation of random values, identifiers and textual tokens.
@@ -143,10 +148,6 @@ The algorithm ensures **character-class diversity**, not a site's password-polic
 - Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md).
 
 ## Example use cases
 

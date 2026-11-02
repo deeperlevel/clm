@@ -2,6 +2,11 @@
 
 > **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
 
+## Dependencies
+
+- **CLM modules (C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_string](clm_string.md).
+- **External libraries / platform facilities (C reference):** Monocypher (bundled in `ext/`); OS entropy via Windows BCrypt or `/dev/urandom` on Unix-like systems.
+
 ## Purpose
 
 Cryptographic primitives for authenticated encryption, key material and secure random operations.
@@ -244,10 +249,6 @@ Each CLM language implementation may bind to a suitable vetted cryptographic bac
 - Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
 - These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
 - Algorithm/primitive selection should be documented by each language port; third-party cryptography remains subject to its own license.
-
-## Related CLM modules
-
-**Supporting modules:** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_string](clm_string.md).
 
 ## Example use cases
 
