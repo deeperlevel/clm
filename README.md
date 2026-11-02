@@ -116,8 +116,14 @@ CLM is developed incrementally, based on actual use in frameworks and libraries.
 ### Networking and serving
 
 - [clm_net](docs/clm_net.md) — Cross-platform socket/network primitives, readiness waiting, and polling.
-- [clm_net_web](docs/clm_net_web.md) — HTTP/1.1 server with reactor-assisted connection dispatch, routing, middleware, streaming helpers, TLS, gzip, and templates.
-- [clm_tls](docs/clm_tls.md) — TLS client/server sessions layered over sockets.
+- [clm_tls](docs/clm_tls.md) — TLS 1.2+ client and server sessions over TCP, with certificate verification, ALPN, and blocking or nonblocking encrypted I/O.
+- [clm_multipart](docs/clm_multipart.md) — Strict, zero-copy MIME multipart parsing and generation with boundary validation and caller-owned storage.
+- [clm_http_utils](docs/clm_http_utils.md) — HTTP/1.x message parsing, serialization, chunked encoding, header validation, and reusable HTTP utilities.
+- [clm_net_web](docs/clm_net_web.md) — Shared HTTP server routing, middleware, request/response handling, and asynchronous execution across supported HTTP versions.
+- [clm_net_quic](docs/clm_net_quic.md) — Optional server-side QUIC transport with TLS 1.3, multiplexed streams, flow control, and caller-managed UDP I/O.
+- [clm_net_web_h1](docs/clm_net_web_h1.md) — HTTP/1.1-only web-server facade over `clm_net_web`, supporting plain HTTP or HTTPS without HTTP/2 dispatch.
+- [clm_net_web_h2](docs/clm_net_web_h2.md) — TLS-required HTTP/2-only web-server facade with strict `h2` ALPN negotiation and no HTTP/1.1 fallback.
+- [clm_net_web_h3](docs/clm_net_web_h3.md) — Optional HTTP/3-only UDP/QUIC server adapter sharing `clm_net_web` routes, middleware, and response APIs.
 
 ### Text, data formats and web utilities
 
