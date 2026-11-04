@@ -1,11 +1,13 @@
 # CLM Async Pool
 
-> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
 
 ## Dependencies
 
-- **CLM modules (C reference):** [clm_async](clm_async.md).
-- **External libraries / platform facilities (C reference):** TinyCThread (optional C11-threads compatibility backend; `CLM_USE_TINYCTHREAD`).
+- **CLM modules (current C reference):** [clm_async](clm_async.md)
+- **External libraries / platform facilities (C reference):** Native thread support or optional TinyCThread shim for portability in the C reference.
+
+**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
 
 ## Purpose
 
@@ -32,24 +34,9 @@ Each worker owns a scheduler and can admit tasks until its configured task limit
 
 Workers execute callbacks. An ordinary blocking callback still occupies its worker, even when scheduled through the pool. For many active idle connections, event-driven I/O that yields until readiness is more scalable than blocking read loops in each worker.
 
-## C threading portability
+## Threading portability
 
-The CMake build checks whether the compiler and runtime provide C11
-`<threads.h>`. If not (for example, on macOS or older MinGW runtimes), it
-fetches a pinned, zlib-licensed TinyCThread implementation backed by POSIX
-threads (including MinGW's winpthreads). Configuration fails explicitly if
-neither native C11 threads nor POSIX threads are available. The legacy
-TinyCThread Win32 backend is not used. Its original license notice is retained in the
-downloaded sources. Network access is required for the initial dependency fetch.
-
-CLM modules and tests include `clm/thread.h` rather than `<threads.h>` directly.
-The library and C examples share the detection in
-[`ClmThreads.cmake`](../src/c/cmake/ClmThreads.cmake).
-Link consumers to the `clm` CMake target so its threading headers, backend
-definition, and link dependencies remain consistent. Non-CMake builds without
-native C11 threads must also compile TinyCThread and define
-`CLM_USE_TINYCTHREAD`, `_TTHREAD_PLATFORM_DEFINED_`, and `_TTHREAD_POSIX_`
-consistently for the library and all consumers, and link POSIX threads.
+The observable contract is cooperative task execution on worker threads, bounded scheduling, cancellation and correct completion. The current C port uses its own thread abstraction, optionally backed by TinyCThread where native C threading support is missing. CMake-specific build paths and compiler flags belong in the C implementation repository, not the language-neutral module specification.
 
 ## Shared behavioral contract
 

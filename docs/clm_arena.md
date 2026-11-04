@@ -2,10 +2,10 @@
 
 ## Dependencies
 
-- **CLM modules (C reference):** [clm_base](clm_base.md).
-- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+- **CLM modules (current C reference):** [clm_base](clm_base.md)
+- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
 
-**Current C consumer:** [clm_bpa](clm_bpa.md) uses arena-backed, pinned slab storage for its small-object pools.
+**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
 
 ## Purpose
 

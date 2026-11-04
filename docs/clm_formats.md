@@ -1,5 +1,7 @@
 # CLM Formats — Historical Name
 
+> **Historical / compatibility entry** · Not counted as a current module.
+
 > **Not a current module.** This page is retained only to keep historical links useful.
 
 ## Migration

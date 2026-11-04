@@ -1,11 +1,13 @@
 # CLM Gen
 
-> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
 
 ## Dependencies
 
-- **CLM modules (C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md).
-- **External libraries / platform facilities (C reference):** OS random source: Windows BCrypt or `/dev/urandom` on Unix-like systems (platform facilities, not third-party packages).
+- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_math](clm_math.md), [clm_string](clm_string.md)
+- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+
+**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
 
 ## Purpose
 

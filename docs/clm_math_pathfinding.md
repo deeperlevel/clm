@@ -1,30 +1,10 @@
-# CLM Math Pathfinding
+# CLM Math Pathfinding (Historical umbrella entry)
 
-> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+> **Historical documentation** · The current catalog has separate dimensional modules.
 
-## Dependencies
+The previous `clm_math_pathfinding` entry has been superseded by:
 
-- **CLM modules (C reference):** [clm_math_core](clm_math_core.md).
-- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+- [clm_math_pathfinding2d](clm_math_pathfinding2d.md) — A* pathfinding in two-dimensional traversal models.
+- [clm_math_pathfinding3d](clm_math_pathfinding3d.md) — A* pathfinding in three-dimensional traversal models.
 
-## Purpose
-
-A* shortest-path search over application-provided graph neighbors.
-
-## Capabilities and operations
-
-- Visit graph nodes through supplied neighbor and cost callbacks.
-- Use a supplied heuristic to guide the search.
-- Return path results with explicit failure/no-path outcomes.
-- Correctness depends on sensible, nonnegative edge costs and an appropriate heuristic.
-
-## Shared behavioral contract
-
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-
-## Example use cases
-
-Find a route between nodes in an application-defined grid or graph.
+This historical file remains for link and migration purposes, not as a current independent module.

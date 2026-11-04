@@ -1,11 +1,13 @@
 # CLM Url
 
-> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
 
 ## Dependencies
 
-- **CLM modules (C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_path](clm_path.md), [clm_platform](clm_platform.md), [clm_string](clm_string.md).
-- **External libraries / platform facilities (C reference):** uriparser (URI processing); libidn2 (non-Windows IDNA); native Windows IDN APIs on Windows.
+- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_path](clm_path.md), [clm_platform](clm_platform.md), [clm_string](clm_string.md)
+- **External libraries / platform facilities (C reference):** uriparser and optionally libidn2 for URL/IDN handling in the current C reference.
+
+**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
 
 ## Purpose
 

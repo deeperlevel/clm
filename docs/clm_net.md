@@ -1,11 +1,15 @@
 # CLM Net
 
-> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
 
 ## Dependencies
 
-- **CLM modules (C reference):** [clm_base](clm_base.md), [clm_string](clm_string.md).
-- **External libraries / platform facilities (C reference):** Native Windows Winsock2 or POSIX sockets; TinyCThread is an optional C11-threads compatibility backend (`CLM_USE_TINYCTHREAD`).
+- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_string](clm_string.md)
+- **External libraries / platform facilities (C reference):** Platform socket APIs (POSIX/WinSock), without imposing a cross-language socket library.
+
+**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+**Current protocol composition:** Raw transport remains separate from HTTP server/client facades, WebSocket codecs and QUIC connection handling. `clm_net_quic` takes datagram I/O supplied by an external event loop rather than owning sockets.
 
 ## Purpose
 
@@ -161,7 +165,7 @@ In languages with native asynchronous sockets, use those capabilities while matc
 
 ## 9. Explicitly excluded high-level concerns
 
-`clm_net` does **not** implement: HTTP parsing, HTTP/2 frames, WebSocket upgrade or framing, TLS, certificate validation, connection pooling, URL interpretation, proxy negotiation, automatic reconnect, service discovery, DNS caching, IP filtering, host-to-host authentication, or application framing. These belong to future modules such as `clm_net_web` or future HTTP client and request modules, or dedicated security/event-loop libraries.
+`clm_net` does **not** implement: HTTP parsing, HTTP/2 frames, WebSocket upgrade or framing, TLS, certificate validation, connection pooling, URL interpretation, proxy negotiation, automatic reconnect, service discovery, DNS caching, IP filtering, host-to-host authentication, or application framing. These belong to separate current CLM modules such as `clm_net_web`, `clm_net_web_client`, `clm_net_websocket`, `clm_tls`, `clm_url` and `clm_net_quic`, or to other explicitly scoped facilities.
 
 HTTP server and client implementations should impose their own maximum header/body/message sizes, I/O deadlines, and security policies. These policies are not implied by opening a TCP socket.
 

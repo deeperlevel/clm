@@ -1,11 +1,13 @@
 # CLM Compress
 
-> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
 
 ## Dependencies
 
-- **CLM modules (C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_bytes](clm_bytes.md), [clm_stream](clm_stream.md), [clm_string](clm_string.md).
-- **External libraries / platform facilities (C reference):** miniz (DEFLATE, zlib, gzip and ZIP), LZ4 (frame codec), and Brotli (encoder/decoder); included from `ext/` in the C reference.
+- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_bytes](clm_bytes.md), [clm_stream](clm_stream.md)
+- **External libraries / platform facilities (C reference):** Brotli, LZ4, miniz/zlib support as selected by the current C implementation; exact codec availability depends on build.
+
+**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
 
 ## Purpose
 

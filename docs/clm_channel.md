@@ -1,11 +1,13 @@
 # CLM Channel
 
-> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
 
 ## Dependencies
 
-- **CLM modules (C reference):** [clm_base](clm_base.md).
-- **External libraries / platform facilities (C reference):** TinyCThread (optional C11-threads compatibility backend; `CLM_USE_TINYCTHREAD`).
+- **CLM modules (current C reference):** [clm_base](clm_base.md)
+- **External libraries / platform facilities (C reference):** Native thread/synchronization support or optional TinyCThread shim in the C reference.
+
+**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
 
 ## Purpose
 

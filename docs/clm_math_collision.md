@@ -1,30 +1,10 @@
-# CLM Math Collision
+# CLM Math Collision (Historical umbrella entry)
 
-> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+> **Historical documentation** · The current catalog has separate dimensional modules.
 
-## Dependencies
+The previous `clm_math_collision` entry has been superseded by:
 
-- **CLM modules (C reference):** [clm_math_core](clm_math_core.md).
-- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+- [clm_math_collision2d](clm_math_collision2d.md) — points, circles, oriented/axis-aligned rectangles, rays, segments, convex polygon and swept-shape tests in 2D.
+- [clm_math_collision3d](clm_math_collision3d.md) — spheres, boxes, rays, triangles, segments and swept-shape tests in 3D.
 
-## Purpose
-
-2D shape-intersection tests for typical collision primitives.
-
-## Capabilities and operations
-
-- Test axis-aligned boxes, circles and point containment.
-- Check circle–box intersections and ray–box intersections.
-- Report intersection results separately from invalid geometry/storage failures.
-- Treat touching-boundary semantics as part of the shared behavior contract.
-
-## Shared behavioral contract
-
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-
-## Example use cases
-
-Test axis-aligned boxes, circles and point containment.
+This historical file is kept to preserve existing documentation links; it is **not** a current independent module or an alias that all implementations must provide.

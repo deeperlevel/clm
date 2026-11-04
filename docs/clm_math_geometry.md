@@ -1,11 +1,15 @@
 # CLM Math Geometry
 
-> **Current module** · Language-neutral capability and behavioral reference · Source snapshot: 2026-11-01 (55-module snapshot)
+> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
 
 ## Dependencies
 
-- **CLM modules (C reference):** [clm_math_core](clm_math_core.md).
-- **External libraries / platform facilities (C reference):** None beyond the language runtime and standard platform facilities.
+- **CLM modules (current C reference):** [clm_math](clm_math.md), [clm_math_core](clm_math_core.md), [clm_math_matrix](clm_math_matrix.md)
+- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+
+**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+**Collision modules:** Geometric primitives feed the separate [2D](clm_math_collision2d.md) and [3D](clm_math_collision3d.md) collision-query interfaces.
 
 ## Purpose
 
