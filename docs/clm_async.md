@@ -1,52 +1,66 @@
-# CLM Async
+# CLM async
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_async](async.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-A cooperative scheduler for stackless tasks. Each task performs bounded work and returns a step result instead of holding a thread while it waits.
+Cooperative task scheduling and task lifecycle notifications.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create and destroy schedulers; spawn task IDs with caller-managed continuation context.
-- Run ready tasks cooperatively; yield, wait, complete or fail after each step.
-- Wake, cancel, query and release tasks; use generation-bearing task tokens to avoid waking a reused ID.
-- Keep steps nonblocking: a blocking callback stalls the scheduler thread.
+Cooperative task scheduling and task lifecycle notifications.
 
-## Task lifecycle
+Ready queues hold runnable tasks; waiting tasks must be woken explicitly. Generation
+numbers distinguish reused task identifiers.
 
-A task is identified by an ID and has a ready/running/waiting state or a terminal completed/failed/cancelled state. In pooled scheduling, a task may also be queued before assignment to a worker. **Do not infer terminal state from the numeric ordering of states.**
+## CLM dependencies and related modules
 
-At each invocation, the task reports one of four step outcomes:
+Related CLM module interfaces used or referenced by this capability:
 
-| Outcome | Scheduler behavior |
-|---|---|
-| Yield | Place the task back into the ready work queue. |
-| Wait | Suspend until a wake or recorded pending wake. |
-| Complete | Mark the task successfully terminal. |
-| Fail | Mark the task failed and terminal. |
+- [`clm_types`](types.md)
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## Continuations and safe wakeups
+This page is the language-neutral contract for clm_async. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-This is a stackless scheduling contract: task callbacks do not preserve an implicit stack across yields. Keep continuation state in a resource the caller manages. Generation-bearing task tokens distinguish separate incarnations of a reused ID, avoiding accidental delivery of delayed wakeups to the wrong task.
+## Direct CLM dependencies
 
-**Nonblocking is behavioral, not merely threaded.** A task that performs blocking I/O defeats cooperative scheduling for the worker executing it.
+- [clm_types](types.md) - required CLM capability.
 
-## Shared behavioral contract
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-- Step callbacks are stackless; the caller must preserve continuation state.
+## Typical use
 
-## Example use cases
+Use clm_async when an application needs: Cooperative task scheduling and task lifecycle notifications.
 
-Run a stateful nonblocking task until an external operation completes, waking it through a generation-safe token.
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

@@ -1,45 +1,81 @@
-# CLM Bytes
+# CLM bytes
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_bytes](bytes.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Binary-safe, owned, growable byte buffers and non-owning byte views, independent of text encoding.
+Binary-safe, growable buffers and non-owning byte-range views. Buffer owns its storage; view borrows bytes and never frees them. A buffer may have a nonzero internal offset after consuming bytes, allowing inexpensive front removal before a later compaction or growth. The optional length limit constrains logical data, not necessarily previously reserved backing capacity. Do not retain a view across mutations that can move/reallocate storage.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create, reserve, append, insert, remove, read, consume and clear owned byte buffers.
-- Use borrowed read-only views for slicing, prefix/suffix checks, searching and comparison.
-- Apply optional capacity limits to bound growth; use explicit wiping when handling secrets.
-- Borrowed pointers/views are invalidated if their owner changes; an ordinary clear does not securely erase bytes.
+Binary-safe, growable buffers and non-owning byte-range views.
+Buffer owns its storage; view borrows bytes and never frees them. A buffer may
+have a nonzero internal offset after consuming bytes, allowing inexpensive
+front removal before a later compaction or growth. The optional length limit
+constrains logical data, not necessarily previously reserved backing capacity.
+Do not retain a view across mutations that can move/reallocate storage.
 
-## Borrowed views versus owned buffers
+Binary-safe byte views and growable byte buffers.
 
-A view is a read-only description of existing bytes and does not own memory. A buffer is a mutable owner that can grow or consume its contents. Its logical unread window can move forward without copying every remaining byte after each read.
+A view borrows memory; a buffer owns it. A buffer holds the window
+[offset, offset + length) of its allocation, so data can be appended at the
+tail (for example from clm_net_receive) and consumed from the front (for
+example after clm_net_send) without shifting bytes on every call.
+Pointers and views taken from a buffer are invalidated by any call that
+changes it. A zero-initialized clm_bytes_buffer is a valid empty buffer.
+No function treats NUL specially unless it says so.
 
-## Resource limits
+## CLM dependencies and related modules
 
-- Zero-length values are valid; binary zero bytes inside content have no special meaning.
-- Operations that grow past a configured limit fail without increasing the logical buffer size.
-- Reserving/preparing writable capacity must be paired with committing the number of bytes actually produced.
-- Views taken from a mutable buffer may become invalid when that buffer is changed.
-- Clearing a buffer is not secure wiping; explicit wipe paths exist for sensitive data.
+Related CLM module interfaces used or referenced by this capability:
 
-## Shared behavioral contract
+- [`clm_types`](types.md)
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-- Buffer storage is owned; views are borrowed. Mutations may invalidate existing views.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## Example use cases
+This page is the language-neutral contract for clm_bytes. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-Accumulate socket input, consume processed frames and retain only the unread byte window.
+## Direct CLM dependencies
+
+- [clm_types](types.md) - required CLM capability.
+
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_bytes when an application needs: Binary-safe, growable buffers and non-owning byte-range views. Buffer owns its storage; view borrows bytes and never frees them. A buffer may have a nonzero internal offset after consuming bytes, allowing inexpensive front removal before a later compaction or growth. The optional length limit constrains logical data, not necessarily previously reserved backing capacity. Do not retain a view across mutations that can move/reallocate storage.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

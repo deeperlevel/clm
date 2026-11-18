@@ -1,42 +1,73 @@
-# CLM Net Web Client
+# CLM net_web_client
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_http_utils](clm_http_utils.md), [clm_net](clm_net.md), [clm_tls](clm_tls.md)
-- **External libraries / platform facilities (C reference):** nghttp2/QUIC backend dependencies as enabled; OpenSSL or platform TLS through transport.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_net_web_client](net_web_client.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Exposes asynchronous HTTP requests with HTTP/1.1, HTTP/2 and HTTP/3 protocol selection via a common callback-and-streaming contract.
+Asynchronous HTTP request scheduling and callback delivery.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Configure a client and submit multiple requests with stable request IDs.
-- Choose a fixed protocol or an automatic setup strategy.
-- Stream an outgoing body through an upload callback.
-- Receive final response headers and body chunks through callbacks.
-- Pause/resume application upload/download, cancel requests and shut down the client.
+Asynchronous HTTP request scheduling and callback delivery.
 
-## Resource, data and ownership model
+Cancellation and resume notifications cross thread boundaries. Request completion and
+cleanup must account for retained transport state.
 
-The client owns connection management and request state. A successfully submitted request must generate exactly one completion callback, including cancellation and destruction. Callback metadata/data views are borrowed only during the callback. Request IDs are identifiers for client requests, not socket handles.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-A successful transport completion can carry any HTTP status, including 4xx/5xx. `AGAIN` from an upload/data callback indicates an application pause with zero bytes accepted for that callback. The current AUTO strategy attempts HTTP/3 for secure requests when compiled in, then negotiates HTTP/2 or HTTP/1.1; fallback is setup-only and must not follow certificate validation failures or a request already transmitted. Body transfer decoding is separate from content-encoding decompression.
+- [`clm_http_utils`](http_utils.md)
+- [`clm_net`](net.md)
+- [`clm_tls`](tls.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_net_web_client. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Submit a GET request, stream response body chunks into a file, and resume a paused consumer when the file writer is ready.
+- [clm_net](net.md) - required CLM capability.
+- [clm_tls](tls.md) - required CLM capability.
+- [clm_http_utils](http_utils.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_http_utils](clm_http_utils.md), [clm_net](clm_net.md), [clm_tls](clm_tls.md).
+## Typical use
+
+Use clm_net_web_client when an application needs: Asynchronous HTTP request scheduling and callback delivery.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

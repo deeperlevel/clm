@@ -1,10 +1,69 @@
-# CLM Math Pathfinding (Historical umbrella entry)
+# CLM math_pathfinding
 
-> **Historical documentation** · The current catalog has separate dimensional modules.
+> Language-neutral compatibility reference.
 
-The previous `clm_math_pathfinding` entry has been superseded by:
+## Relationship to the canonical contract
 
-- [clm_math_pathfinding2d](clm_math_pathfinding2d.md) — A* pathfinding in two-dimensional traversal models.
-- [clm_math_pathfinding3d](clm_math_pathfinding3d.md) — A* pathfinding in three-dimensional traversal models.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_math_pathfinding2d](math_pathfinding2d.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-This historical file remains for link and migration purposes, not as a current independent module.
+
+> Language-neutral module overview and behavioral contract.
+
+## Purpose
+
+Two-dimensional graph adaptation for A-star search.
+
+## Behavior and constraints
+
+Two-dimensional graph adaptation for A-star search.
+
+The adapter reads 2D node positions and graph edges, then delegates heap management and
+path reconstruction to the shared search implementation.
+
+## CLM dependencies and related modules
+
+Related CLM module interfaces used or referenced by this capability:
+
+- [`clm_math_core`](math_core.md)
+
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
+
+This page is the language-neutral contract for clm_math_pathfinding2d. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
+
+## Direct CLM dependencies
+
+- [clm_math_core](math_core.md) - required CLM capability.
+
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_math_pathfinding2d when an application needs: Two-dimensional graph adaptation for A-star search.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

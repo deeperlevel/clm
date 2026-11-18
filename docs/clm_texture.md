@@ -1,41 +1,69 @@
-# CLM Texture
+# CLM texture
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_image](clm_image.md), [clm_image_png](clm_image_png.md), [clm_resource](clm_resource.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_texture](texture.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Manages texture-oriented pixel data under resource IDs, which a renderer may later upload to GPU-native objects.
+Texture descriptions, image sources, and reference counts.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create a texture source from PNG-encoded file/memory data.
-- Copy pixel data from an existing CPU image.
-- Read texture dimensions, format and pixel payload.
-- Retain/release texture sources under a common resource lifecycle.
+Texture descriptions, image sources, and reference counts.
 
-## Resource, data and ownership model
+Texture resources depend on image pixel data and configuration. Resource release must
+respect references retained by consumers.
 
-The **current C reference stores texture source pixels on the CPU**, even though a renderer may use them to initialize GPU texture handles. The CLM resource ID is not itself a portable GPU handle.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-The current format is tightly packed RGBA8. Image-to-texture conversion copies pixels, so the original image can be released independently. Texture creation does not guarantee an immediate GPU allocation or a live graphics context. Any future dedicated GPU texture contract must specify ownership separately.
+- [`clm_resource`](resource.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_texture. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Create a texture source from a PNG image, release the source image, then draw it through a renderer backend that supports sprite uploads.
+- [clm_resource](resource.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_image](clm_image.md), [clm_image_png](clm_image_png.md), [clm_resource](clm_resource.md).
+## Typical use
+
+Use clm_texture when an application needs: Texture descriptions, image sources, and reference counts.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

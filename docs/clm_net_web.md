@@ -1,43 +1,96 @@
-# CLM Net Web
+# CLM net_web
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_async_pool](clm_async_pool.md), [clm_bytes](clm_bytes.md), [clm_compress](clm_compress.md), [clm_http_utils](clm_http_utils.md), [clm_multipart](clm_multipart.md), [clm_net](clm_net.md), [clm_stream](clm_stream.md), [clm_template](clm_template.md), [clm_tls](clm_tls.md), [clm_websocket](clm_websocket.md)
-- **External libraries / platform facilities (C reference):** nghttp2 for the C HTTP/2 backend when available; TLS, compression and QUIC support are provided through supporting CLM modules.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_net_web](net_web.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Shared HTTP server application layer for HTTP/1.1 and HTTP/2, with a separate HTTP/3 transport facade that reuses the same routes, middleware and handler abstractions.
+Shared web-server routing, request state, and response delivery.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create a web server, register routes and middleware, and start/stop a listener.
-- Route HTTP requests with headers, parameters, context values and parsed multipart input.
-- Produce headers, status codes, redirects, templates, streams and incremental responses.
-- Register resumable asynchronous handlers with explicit backpressure behavior.
-- Support WebSocket endpoints using HTTP/1.1 Upgrade or HTTP/2/3 extended CONNECT where applicable.
-- Use HTTP/1.1 over cleartext or TLS; negotiate HTTP/2 through TLS ALPN; run HTTP/3 through `clm_net_web_h3`.
+Shared web-server routing, request state, and response delivery.
 
-## Resource, data and ownership model
+Network polling advances connections while handlers produce responses. Partial I/O and
+asynchronous handler completion require persistent connection state.
 
-A server owns listener/reactor and worker resources. Requests and responses are scoped to a connection or stream; middleware and routes share application semantics across supported HTTP protocol engines. Context storage belongs to the request lifecycle and must not be used after completion.
+HTTP/2-first HTTPS server with HTTP/1.1 fallback, dispatched through clm_async_pool.
+Plain HTTP defaults to HTTP/1.1; require_http2 selects cleartext prior knowledge.
+The h2 facade requires HTTP/2; the h1 facade requires HTTP/1.1 exclusively.
+The separate net_web_h3 module shares application APIs over QUIC/UDP only.
+Connection tasks park while waiting for socket readiness, so idle keep-alive
+sockets do not occupy worker execution. Synchronous handlers run on pool
+workers; HTTP/1 body reads and response writes can wait under backpressure.
+HTTP/2 uses nghttp2 memory I/O on one connection task at a time and executes
+handlers on a separate bounded pool. Only the connection task accesses TLS
+until shutdown joins that task and takes over final transport closure.
 
-## Behavioral contract and protocol boundaries
+## CLM dependencies and related modules
 
-HTTP/2 over HTTPS is negotiated with ALPN; plain HTTP remains HTTP/1.1. HTTP/1.1-only and HTTP/2-only facades reject other protocol versions before route dispatch. HTTP/3 uses a distinct UDP listener. Asynchronous body read/flush operations may return an explicit `AGAIN`/yield state; handlers must preserve resumable work in request context rather than stack-local state. Slow connections and HTTP/2 sibling streams must not monopolize handler workers. WebSocket routes have separate message-codec limits and cancellation rules. Backend support and production completeness must be assessed per implementation.
+Related CLM module interfaces used or referenced by this capability:
 
-## Cross-language interoperability
+- [`clm_async_pool`](async_pool.md)
+- [`clm_bytes`](bytes.md)
+- [`clm_compress`](compress.md)
+- [`clm_http_utils`](http_utils.md)
+- [`clm_multipart`](multipart.md)
+- [`clm_stream`](stream.md)
+- [`clm_template`](template.md)
+- [`clm_tls`](tls.md)
+- [`clm_websocket`](websocket.md)
 
-Preserve protocol semantics, resource ownership, error distinctions and callback lifetime. Native concurrency, socket, cryptographic and allocation choices may differ by language. Supported protocols are implementation capabilities rather than a guarantee that every backend is present.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## Example use case
+This page is the language-neutral contract for clm_net_web. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-Implement a shared `/status` route, expose it on an HTTP/1.1 listener and an HTTP/2 HTTPS listener, and optionally launch HTTP/3 on a UDP endpoint without duplicating route logic.
+## Direct CLM dependencies
 
-## Related CLM modules
+- [clm_async_pool](async_pool.md) - required CLM capability.
+- [clm_bytes](bytes.md) - required CLM capability.
+- [clm_compress](compress.md) - required CLM capability.
+- [clm_multipart](multipart.md) - required CLM capability.
+- [clm_stream](stream.md) - required CLM capability.
+- [clm_websocket](websocket.md) - required CLM capability.
+- [clm_http_utils](http_utils.md) - required CLM capability.
+- [clm_template](template.md) - required CLM capability.
+- [clm_tls](tls.md) - required CLM capability.
 
-[clm_async_pool](clm_async_pool.md), [clm_bytes](clm_bytes.md), [clm_compress](clm_compress.md), [clm_http_utils](clm_http_utils.md), [clm_multipart](clm_multipart.md), [clm_net](clm_net.md), [clm_stream](clm_stream.md), [clm_template](clm_template.md), [clm_tls](clm_tls.md), [clm_websocket](clm_websocket.md).
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_net_web when an application needs: Shared web-server routing, request state, and response delivery.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

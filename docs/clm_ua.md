@@ -1,32 +1,71 @@
-# CLM Ua
+# CLM ua
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_string](clm_string.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_ua](ua.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Heuristic parsing of HTTP User-Agent strings.
+User-agent text classification and version extraction.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Detect likely browser and operating-system families and versions.
-- Classify desktop, tablet and mobile clients and recognize common crawlers.
-- Prioritize specific browser tokens over generic compatibility tokens.
-- Results are advisory heuristics, not trustworthy security or identity evidence.
+User-agent text classification and version extraction.
 
-## Shared behavioral contract
+Case-insensitive token matching supplies heuristic browser, OS, and device information.
+Classification does not authenticate the remote client.
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+## CLM dependencies and related modules
 
-## Example use cases
+Related CLM module interfaces used or referenced by this capability:
 
-Detect likely browser and operating-system families and versions.
+- [`clm_string`](string.md)
+- [`clm_types`](types.md)
+
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
+
+This page is the language-neutral contract for clm_ua. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
+
+## Direct CLM dependencies
+
+- [clm_types](types.md) - required CLM capability.
+- [clm_string](string.md) - required CLM capability.
+
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_ua when an application needs: User-agent text classification and version extraction.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

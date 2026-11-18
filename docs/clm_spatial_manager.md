@@ -1,42 +1,71 @@
-# CLM Spatial Manager
+# CLM spatial_manager
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_math_collision3d](clm_math_collision3d.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_spatial_manager](spatial_manager.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Manages independent collections of 3D boxes and spheres for tags, localities, ray casting, overlap and containment queries.
+Spatial shape registries, queries, and selection state.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create/destroy managers and inspect registered shapes.
-- Register shapes and attach application IDs and optional user context.
-- Tag shapes; precompute neighboring tag localities and select an active query scope.
-- Cast rays globally, by tag or against a specific shape.
-- Test containment/overlap and reflect a vector using a surface normal.
+Spatial shape registries, queries, and selection state.
 
-## Resource, data and ownership model
+Manager membership and shape IDs are tracked separately. World transforms and query
+masks control picking and overlap results.
 
-Manager IDs identify distinct spatial worlds. Box and sphere IDs share a shape namespace, and each shape belongs to one manager. Query-locality membership is a prepared snapshot; moving shapes updates geometry immediately but does not recompute membership until requested.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-The manager is independent of rendering and physics. Zero tag selects global queries. Ray results include hit/miss, distance, point, normal, face and associated object metadata. Touching counts as overlap or containment. Calls require external synchronization in the reference. Query-locality preparation is explicit and must be repeated after relevant changes.
+- [`clm_math_collision3d`](math_collision3d.md)
+- [`clm_types`](types.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_spatial_manager. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Tag interactive objects in a level, prepare nearby object localities, and ray-cast only that locality when the player points at an object.
+- [clm_types](types.md) - required CLM capability.
+- [clm_math_collision3d](math_collision3d.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_base](clm_base.md), [clm_math_collision3d](clm_math_collision3d.md).
+## Typical use
+
+Use clm_spatial_manager when an application needs: Spatial shape registries, queries, and selection state.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

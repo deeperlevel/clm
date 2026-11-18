@@ -1,42 +1,71 @@
-# CLM Renderer
+# CLM renderer
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_drawing](clm_drawing.md), [clm_panel](clm_panel.md)
-- **External libraries / platform facilities (C reference):** The selected platform graphics/runtime backend (e.g., DirectX, Metal, OpenGL/ES, Vulkan, WebGPU, terminal). Many are not yet implemented.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_renderer](renderer.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Provides a unified rendering command interface for surfaces and panels while allowing platform-specific graphics and terminal backends.
+Renderer selection, drawing targets, and backend dispatch.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Select a renderer backend and query its implemented capabilities.
-- Begin/end drawing frames, clear targets and draw geometric primitives.
-- Draw lines, shapes, sprites, sprite-atlas regions and text.
-- Offer polyline, vertex, mesh and scene-oriented draw commands where implemented.
-- Render either to an entire surface or to a panel with its own transform and clip.
+Renderer selection, drawing targets, and backend dispatch.
 
-## Resource, data and ownership model
+Public drawing operations resolve a surface or panel target before calling backend
+functions. Availability and supported operations vary by backend.
 
-A renderer consumes surfaces/panels as drawing targets and resource IDs as inputs. A surface target uses surface coordinates; a panel target uses panel-local coordinates and needs correct clipping and transforms. Resource data and backend native GPU handles are distinct.
+Central drawing API with private native GPU backends and Terminal rendering.
 
-## Behavioral contract and boundaries
+## CLM dependencies and related modules
 
-Not all enumerated backends or draw commands are currently implemented. Backend selection must not silently claim universal support. The reference includes working subsets (such as terminal panel drawing and selected GPU paths) and returns explicit not-implemented or not-supported states for absent paths. Drawing is intended to occur during appropriate redraw callbacks; operations should preserve target-local clipping.
+Related CLM module interfaces used or referenced by this capability:
 
-## Cross-language interoperability
+- [`clm_panel`](panel.md)
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## Example use case
+This page is the language-neutral contract for clm_renderer. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-Render a sprite and text overlay to a panel using a selected supported backend, while keeping application logic independent of backend APIs.
+## Direct CLM dependencies
 
-## Related CLM modules
+- [clm_panel](panel.md) - required CLM capability.
 
-[clm_drawing](clm_drawing.md), [clm_panel](clm_panel.md).
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_renderer when an application needs: Renderer selection, drawing targets, and backend dispatch.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

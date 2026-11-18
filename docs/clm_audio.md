@@ -1,41 +1,69 @@
-# CLM Audio
+# CLM audio
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md)
-- **External libraries / platform facilities (C reference):** miniaudio is the current C playback/codec backend (not a cross-language requirement); platform audio device.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_audio](audio.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Provides a playback engine and independently controllable audio playback instances for files and decoded sound sources supported by an implementation.
+Audio decoding, device playback, and playback controls.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Initialize and shut down an audio engine tied to an output device.
-- Create and dispose individual playback instances without requiring one engine per file.
-- Start, stop, pause and resume playback; query current position, duration and play state.
-- Adjust gain, playback rate and seek position; configure repeated playback and scheduled delays.
+Audio decoding, device playback, and playback controls.
 
-## Resource, data and ownership model
+Decoded sample storage and playback devices have separate lifetimes. Backend callbacks
+consume samples while control operations update playback state.
 
-An engine owns the output-device connection and outlives every playback instance created through it. The current interface models engine/playback objects rather than registry-addressed resource IDs. A playback instance owns its decoder/play state; it does not own the engine.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-Gain is a nonnegative linear multiplier. Playback speed is positive and also alters pitch; it is not time-stretching. Repeats count *additional* plays after the initial one; negative-one denotes indefinite repetition. Loop scheduling that relies on delays or finite repeats requires an update/pump step. Initialization, invalid states, active dependents, and device failures must be distinguishable. The current C implementation accepts WAV, MP3, FLAC and Ogg Vorbis through miniaudio; that codec/backend choice is not imposed on every language.
+- [`clm_types`](types.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_audio. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Initialize an engine, load two audio files as distinct playback instances, set their volumes and loops separately, periodically update the engine, dispose both instances, then shut down the engine.
+- [clm_types](types.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_base](clm_base.md).
+## Typical use
+
+Use clm_audio when an application needs: Audio decoding, device playback, and playback controls.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

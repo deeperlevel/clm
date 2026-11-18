@@ -1,40 +1,69 @@
-# CLM Net Web Client HTTP/3
+# CLM net_web_client_h3
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_net_quic](clm_net_quic.md), [clm_net_web_client](clm_net_web_client.md)
-- **External libraries / platform facilities (C reference):** QUIC/HTTP3 native libraries through the shared client when enabled.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_net_web_client_h3](net_web_client_h3.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Forces the common HTTP client lifecycle over HTTP/3 using QUIC/TLS with no TCP fallback.
+HTTP/3 client facade over the shared asynchronous client.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Initialize HTTP/3-only configuration.
-- Submit requests using the shared callback model.
-- Cancel, resume and destroy HTTP/3 client requests.
+HTTP/3 client facade over the shared asynchronous client.
 
-## Resource, data and ownership model
+The facade selects a protocol while preserving common request, cancellation, and
+callback contracts.
 
-The application-facing request shape follows the common client; stream and connection management use QUIC as transport.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-HTTP/3 must be enabled and supported by the implementation. If absent, the operation returns not-supported rather than silently using HTTP/2. There is no implicit retry via another protocol.
+- [`clm_net_web_client`](net_web_client.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_net_web_client_h3. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Use HTTP/3-only client mode when testing QUIC behavior and performance or connecting to an HTTP/3-restricted endpoint.
+- [clm_net_web_client](net_web_client.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_net_quic](clm_net_quic.md), [clm_net_web_client](clm_net_web_client.md).
+## Typical use
+
+Use clm_net_web_client_h3 when an application needs: HTTP/3 client facade over the shared asynchronous client.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

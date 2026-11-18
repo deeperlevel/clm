@@ -1,39 +1,69 @@
-# CLM Math Core
+# CLM math_core
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_math_core](math_core.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Shared math result codes and storage-adapter contract for ID-addressed numeric arrays.
+Shared mathematical value types and storage adapters.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Install a backend adapter to count, read and replace double-precision or signed 64-bit arrays by ID.
-- Validate vector dimensions and storage shapes consistently.
-- Distinguish storage, dimension, invalid-value, domain, singularity and allocation failures.
-- Higher math modules use these adapters instead of requiring one global object-storage implementation.
+Shared mathematical value types and storage adapters.
 
-## Numeric adapter
+Value APIs use ordinary scalar records. Storage adapters bridge numeric algorithms to
+ID-addressed CLM data.
 
-The shared adapter reads/writes numeric sequences by CLM resource ID. It provides double-precision and signed 64-bit integer array operations, plus element counts. A math implementation reads into working arrays and writes results back via the adapter.
+## CLM dependencies and related modules
 
-Supported vector helpers require the expected dimension; unrelated object types and mismatched sizes produce storage/dimension errors. Adapters should account for input and output IDs referring to the same resource.
+Related CLM module interfaces used or referenced by this capability:
 
-## Shared behavioral contract
+- [`clm_types`](types.md)
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-- This module defines the shared storage-adapter contract; the port may choose its own backing numeric storage.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## Example use cases
+This page is the language-neutral contract for clm_math_core. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-Bind math operations to an ID-managed numeric-array store implemented in the host language.
+## Direct CLM dependencies
+
+- [clm_types](types.md) - required CLM capability.
+
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_math_core when an application needs: Shared mathematical value types and storage adapters.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

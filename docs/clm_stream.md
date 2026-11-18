@@ -1,43 +1,91 @@
-# CLM Stream
+# CLM stream
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_bytes](clm_bytes.md), [clm_file](clm_file.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_stream](stream.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Reusable source/sink adapters and incremental data pumps for transferring binary data.
+Byte sources, sinks, adapters, and incremental copying.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Read from memory, byte buffers, files, sockets or concatenated sources.
-- Write to buffers, files, sockets, discard sinks and chunked-transfer wrappers.
-- Advance transfers in bounded pump steps; report which side is waiting for readiness.
-- Treat would-block distinctly from end-of-stream and failure; endpoints borrow the resources they wrap.
+Byte sources, sinks, adapters, and incremental copying.
 
-## Source and sink contracts
+A pump retains bytes not yet accepted by its sink. END, AGAIN, and successful partial
+transfer represent different progress states.
 
-A source produces bytes and eventually reports end-of-input; a sink accepts bytes, possibly only part of what is offered. Either side may report **would block**, which means to retry when ready—not end-of-stream.
+Incremental, bounded data transfer between a source and a sink.
 
-- Sources: memory, byte buffer, file, network socket and concatenated sources.
-- Sinks: mutable byte buffer, file, socket, discard target and HTTP-style chunked wrapper.
-- A pump transfers in bounded steps and reports whether to wait for reading or writing readiness.
-- Endpoint wrappers borrow referenced buffers, sockets and file resources. Keep those resources alive for the entire transfer.
+A source produces bytes and a sink consumes them. A pump moves bytes from
+one to the other through a fixed-size staging buffer, one bounded step at a
+time, so it works with blocking endpoints (files, memory) and nonblocking
+ones (sockets) alike: a step that cannot progress returns WOULD_BLOCK and
+reports which side to wait for. Memory use is bounded by the buffer size,
+never by the amount transferred.
 
-When using this with [clm_net](clm_net.md), readiness loops can avoid holding a thread while the network is idle.
+Endpoint contract:
+read  - SUCCESS transfers at least one byte; END means no more data;
+WOULD_BLOCK means none is available yet; anything else is an error.
+write - SUCCESS accepts at least one byte and may accept fewer than given;
+WOULD_BLOCK accepts none now; anything else is an error.
+finish - signals end of data to a sink; may return WOULD_BLOCK and is then
+called again. It is optional.
+Endpoints do not own what they point at (ids, buffers, other endpoints); do
+not move or free those while a pump uses the endpoint. Built-in endpoints
+keep their state inside the struct, so initialize one per transfer.
 
-## Shared behavioral contract
+## CLM dependencies and related modules
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+Related CLM module interfaces used or referenced by this capability:
 
-## Example use cases
+- [`clm_bytes`](bytes.md)
+- [`clm_types`](types.md)
 
-Copy data incrementally from a file source to a socket sink, returning to the reactor on would-block.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
+
+This page is the language-neutral contract for clm_stream. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
+
+## Direct CLM dependencies
+
+- [clm_types](types.md) - required CLM capability.
+- [clm_bytes](bytes.md) - required CLM capability.
+
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_stream when an application needs: Byte sources, sinks, adapters, and incremental copying.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

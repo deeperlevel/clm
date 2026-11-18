@@ -1,42 +1,69 @@
-# CLM Net QUIC
+# CLM net_quic
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_net](clm_net.md)
-- **External libraries / platform facilities (C reference):** ngtcp2 (>= 1.25) with its OpenSSL crypto integration and OpenSSL (>= 3.5), when QUIC is enabled.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_net_quic](net_quic.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Provides a bounded, event-driven QUIC transport connection that processes UDP datagrams supplied by a caller and produces datagrams to send.
+QUIC connection state and caller-driven UDP transport.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Configure and accept an incoming QUIC connection from the first UDP datagram.
-- Feed received datagrams and monotonic time into the connection state machine.
-- Produce outgoing UDP packets and track the next expiry deadline.
-- Send and consume stream data, open server unidirectional streams, shut down streams and initiate connection close.
-- Receive handshake, data, acknowledgement, reset and stream-closure callbacks.
+QUIC connection state and caller-driven UDP transport.
 
-## Resource, data and ownership model
+Timers, outgoing datagrams, and stream callbacks advance the protocol. UDP packet
+ownership is distinct from retained stream data.
 
-The QUIC engine owns per-connection state but neither sockets nor threads. The calling event loop owns UDP I/O, clock input and packet dispatch. Connection state and callbacks are per peer, with a bounded send queue and receive credit accounting.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-A write yields at most one complete datagram; packet bytes must be sent unchanged. `AGAIN` means no packet currently available, not necessarily an error. Stream data pointers are borrowed during callbacks; consumption grants flow-control credit. All calls for a connection are serialized. No 0-RTT, Retry or path migration is promised by this reference interface. The current C backend requires ngtcp2 and OpenSSL QUIC support; no unsupported-mode fallback is promised.
+- [`clm_net`](net.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_net_quic. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Accept a UDP Initial packet, drive receive/write/expiry from an event loop, and feed application HTTP/3 streams through the QUIC connection.
+- [clm_net](net.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_net](clm_net.md).
+## Typical use
+
+Use clm_net_quic when an application needs: QUIC connection state and caller-driven UDP transport.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

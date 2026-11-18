@@ -1,41 +1,71 @@
-# CLM Box
+# CLM box
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_spatial_manager](clm_spatial_manager.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_box](box.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Defines bounded 3D box shapes that are registered in an invisible spatial manager for queries and association with application objects.
+Oriented box shapes registered with a spatial manager.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create/destroy a box belonging to a spatial manager.
-- Read or replace its center, dimensions, orientation and mobility/association metadata.
-- Move, rotate and scale existing geometry while updating query caches.
-- Control which box faces are eligible for picking/hit reporting.
+Oriented box shapes registered with a spatial manager.
 
-## Resource, data and ownership model
+Shape configuration supplies geometry; the manager handles registration, queries, and
+selection metadata.
 
-A box has one shape ID in a shared 3D shape namespace and belongs to exactly one manager. A box is a geometric/query resource rather than a rendered mesh. Orientation is represented by a quaternion, and its dimensions are positive.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-The spatial manager computes hit results and owns cached query structures. Transform changes update geometry immediately, but precomputed tag-locality memberships must be explicitly prepared again where relevant. Face selection affects picking, not the shape being a solid for other geometric operations.
+- [`clm_spatial_manager`](spatial_manager.md)
+- [`clm_types`](types.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_box. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Register an oriented box in a room manager, associate it with an application object ID, then perform a ray cast to determine which face was selected.
+- [clm_spatial_manager](spatial_manager.md) - required CLM capability.
+- [clm_types](types.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_spatial_manager](clm_spatial_manager.md).
+## Typical use
+
+Use clm_box when an application needs: Oriented box shapes registered with a spatial manager.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

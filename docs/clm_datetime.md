@@ -1,42 +1,69 @@
-# CLM Datetime
+# CLM datetime
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_datetime](datetime.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Handles validated calendar dates, clock times and combined datetime values under CLM resource identifiers, plus conversion and comparison utilities.
+Civil date conversion, timestamps, durations, and formatting.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Validate calendar dates, clock times and combined representations.
-- Set, query, delete and copy values addressed by IDs.
-- Parse and format standardized textual date/time forms, including CLM string resources.
-- Read current system date/time; derive leap years, month lengths, weekdays and day of year.
-- Compare values, compute millisecond differences and perform date/time arithmetic.
+Civil date conversion, timestamps, durations, and formatting.
 
-## Resource, data and ownership model
+Calendar calculations are kept separate from platform clock and timezone queries. Units
+and representable ranges matter at conversion boundaries.
 
-Date, time and datetime are distinct semantic value kinds. A date has calendar fields; a time has wall-clock fields; a combined datetime has both. The ID registry preserves value kind so misuse can be rejected instead of silently interpreting the wrong type.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-Uses Gregorian years 0001–9999 and strict ISO-style calendar, wall-clock and combined date/time text. Time fields may carry a fixed UTC offset; a timezone database, named time zones or daylight-saving rules are not provided. Invalid calendar dates, leap seconds, 24:00, malformed offsets, unsupported formats and arithmetic overflow must be distinguished. Storage retains the value kind (date, time or combined datetime), and operations must reject a mismatching kind.
+- [`clm_types`](types.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_datetime. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Parse two datetimes, compare their order, compute an elapsed duration and format the result for display.
+- [clm_types](types.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_base](clm_base.md).
+## Typical use
+
+Use clm_datetime when an application needs: Civil date conversion, timestamps, durations, and formatting.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

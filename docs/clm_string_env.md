@@ -1,75 +1,73 @@
-# CLM String Env
+# CLM string_env
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_file](clm_file.md), [clm_string_format](clm_string_format.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_string_env](string_env.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
 
-## Purpose
-
-Reads and writes environment-file-style key/value text into CLM structured data.
-
-## Capabilities and operations
-
-- Parse line-based key/value assignments and common quoting/comment conventions.
-- Serialize the supported subset back to environment-style text.
-- Expose file and text-based entry points.
-- File parsing is not equivalent to automatically changing the host process environment.
-
-## Detailed module contract
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-`clm_string_env` reads line-oriented environment assignments into a `clm_tree`
-object. It does not read or modify the process environment.
+Environment-style key/value parsing and generation.
 
-## Supported input
+## Behavior and constraints
 
-- Blank lines and full-line `#` comments.
-- `NAME=VALUE` assignments, with an optional leading `export` keyword.
-- Names beginning with an ASCII letter or underscore, followed by ASCII
-  letters, digits, or underscores.
-- Unquoted values and single- or double-quoted values. Double quotes use CLM
-  string escape decoding. Values, including text that resembles numbers or
-  booleans, are stored as strings.
-- UTF-8 input.
+Environment-style key/value parsing and generation.
 
-Names must already be registered in `clm_id`. Duplicate names, invalid names,
-malformed quoted values, and lines without `=` fail. A failed parse removes its
-partial tree.
+Parsing separates names, values, quoting, and line boundaries before storing values in
+CLM containers.
 
-## Serialization
+## CLM dependencies and related modules
 
-The serializer emits one assignment per root string leaf and quotes/escapes
-values. It does not preserve comments, source whitespace, or whether `export`
-was present.
+Related CLM module interfaces used or referenced by this capability:
 
-## Operations
+- [`clm_file`](file.md)
+- [`clm_string_format`](string_format.md)
+- [`clm_types`](types.md)
 
-`loads` parses an existing CLM string ID, and `load` reads a file named by a
-CLM string ID. `dumps` writes to an existing CLM string ID, and `dump` writes
-to a file named by a CLM string ID. There are no raw C-string, caller-buffer,
-or raw-path codec entry points. Text is stored internally as UTF-8; CLM string
-blocks carry their preferred external encoding. File codecs currently read
-and write UTF-8. Operations return CLM success/failure statuses.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## Language-neutral contract
+This page is the language-neutral contract for clm_string_env. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-The result is a root object of UTF-8 string values keyed by registered numeric
-IDs. Keep environment values as text; this codec never performs shell
-expansion, interpolation, type inference, or process-environment updates.
+## Direct CLM dependencies
 
-## Shared behavioral contract
+- [clm_types](types.md) - required CLM capability.
+- [clm_string_format](string_format.md) - required CLM capability.
+- [clm_file](file.md) - required CLM capability.
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-## Example use cases
+## Typical use
 
-Parse line-based key/value assignments and common quoting/comment conventions.
+Use clm_string_env when an application needs: Environment-style key/value parsing and generation.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

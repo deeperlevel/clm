@@ -1,174 +1,73 @@
-# CLM Table
+# CLM table
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_bpa](clm_bpa.md), [clm_id](clm_id.md), [clm_string](clm_string.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_table](table.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-ID-based mutable tabular collection with rows, columns and string-valued cells.
+ID-keyed tabular rows, columns, and cell values.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create tables and define or query their columns.
-- Add, update, retrieve and remove rows or cell values.
-- Move between DSV text and the table representation via clm_string_dsv.
-- Treat missing values and column ordering according to the module’s schema rules.
+ID-keyed tabular rows, columns, and cell values.
 
-## Detailed module contract
+Column lookup and row dictionaries separate table structure from stored values. Internal
+allocation IDs must remain distinct from caller IDs.
 
-## 1. Purpose
+## CLM dependencies and related modules
 
-`clm_table` is an ID-addressed, dynamically sized table for string-valued data.
-It is intended for configuration records, CSV rows, and other data with named
-columns and ordered rows. Column names resolve through `clm_id`; row positions
-are zero-based indexes.
+Related CLM module interfaces used or referenced by this capability:
 
-This is not the same abstraction as [CLM Storage](./clm_storage.md). Storage is
-a fixed-dimension grid of fixed-width values. A table owns variable-length text
-cells and supports adding and removing rows and columns.
+- [`clm_bpa`](bpa.md)
+- [`clm_id`](id.md)
+- [`clm_string`](string.md)
 
-Use [CLM Tree](./clm_tree.md) for nested objects and typed BPA leaf values; a
-table is for ordered records with a shared named-column schema.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## 2. Data model
+This page is the language-neutral contract for clm_table. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-A table has an ordered column schema and an ordered sequence of rows:
+## Direct CLM dependencies
 
-```text
-Table
-    columns : ordered sequence of (column_id, retained_column_name)
-    rows    : ordered sequence of rows
+- [clm_bpa](bpa.md) - required CLM capability.
+- [clm_id](id.md) - required CLM capability.
+- [clm_string](string.md) - required CLM capability.
 
-Row
-    cells   : zero or one string value per declared column
-```
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-Each column ID is a `clm_id` obtained by resolving a previously registered
-column name. A table retains the name spelling supplied when the column is
-added. This permits later serialization without relying on reverse lookup,
-which `clm_id` does not guarantee and which would be ambiguous when aliases
-exist.
+## Typical use
 
-Column IDs must be unique within a table. Two different names that map to the
-same ID cannot both be columns in that table. The table does not generate or
-register column IDs; applications or parsers manage those mappings through
-`clm_id`.
+Use clm_table when an application needs: ID-keyed tabular rows, columns, and cell values.
 
-## 3. Cell values and missing cells
+A conforming workflow is conceptually:
 
-Every cell value is a Unicode string stored internally as UTF-8. Numeric-looking,
-boolean-looking, and null-looking text is not converted:
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
 
-```text
-"1234"  remains the string "1234"
-"true"  remains the string "true"
-"null"  remains the string "null"
-```
+## Language-neutral boundaries
 
-Cell values are copied into table-owned storage. Updating or deleting the source
-string does not affect a table cell. Empty text is valid and different from a
-missing cell. Newly added rows have missing cells; adding a column to a table
-with existing rows also leaves those cells missing. Use `cell_contains` to
-distinguish a missing value from an empty string. Reading a missing cell fails.
-
-## 4. Schema and row behavior
-
-- Columns are appended in declaration order. Removing a column removes its
-  cells and compacts the remaining column positions without changing row order.
-- Rows are appended or inserted in order. Insertion and removal shift later row
-  indexes; row indexes are not stable identifiers.
-- Removing a row deletes its cells. Clearing rows preserves the schema.
-- Setting a cell requires an existing row and declared column. Setting replaces
-  the current value or fills a missing cell.
-- Removing a cell makes it missing again; it does not remove its row or column.
-
-Tables may be sparse: a row need not have a value for every declared column.
-Implementations must not silently replace a missing value with an empty string.
-
-## 5. Public operations
-
-Exact signatures are defined by each language binding. The language-neutral operations are:
-
-| Operation | Behavior |
-|---|---|
-| `clm_table_new(table_id)` | Creates an empty table. |
-| `clm_table_delete(table_id)` | Deletes the table and all owned cells. |
-| `clm_table_add_column(table_id, column_name)` | Resolves a registered name, stores its ID and spelling, and appends the column. |
-| `clm_table_remove_column(table_id, column_id)` | Removes a column and all cells in it. |
-| `clm_table_column_count(table_id)` | Returns the number of columns. |
-| `clm_table_column_id_at(table_id, index, &column_id)` | Retrieves the mapped ID at a schema position. |
-| `clm_table_column_name_to(table_id, index, buffer, capacity)` | Copies the retained UTF-8 name; returns byte length excluding NUL. |
-| `clm_table_row_count(table_id)` | Returns the number of rows. |
-| `clm_table_append_row(table_id)` | Appends an empty row and returns its index. |
-| `clm_table_insert_row(table_id, index)` | Inserts an empty row before an index; the current row count appends. |
-| `clm_table_remove_row(table_id, index)` | Deletes a row and compacts later row indexes. |
-| `clm_table_clear_rows(table_id)` | Removes all rows while retaining columns. |
-| `clm_table_cell_contains(table_id, row, column_id)` | Checks whether the cell has a value. |
-| `clm_table_set_from(table_id, row, column_id, text)` | Copies valid NUL-terminated UTF-8 text into a cell. |
-| `clm_table_set(table_id, row, column_id, source_string_id)` | Copies text from an existing CLM string block. |
-| `clm_table_get(table_id, row, column_id, destination_string_id)` | Copies a present cell into an existing CLM string block. |
-| `clm_table_remove_cell(table_id, row, column_id)` | Makes a cell missing without changing its row or column. |
-
-### Results
-
-Creation, deletion, row/column mutation, and cell removal return the common CLM
-BPA success or failure status. Setting returns `CLM_BPA_SET_SUCCESS` or
-`CLM_BPA_FAILURE`; retrieval returns `CLM_BPA_GET_SUCCESS` or
-`CLM_BPA_FAILURE`. Row append/insert return the resulting zero-based row index
-or `CLM_BPA_FAILURE`. Count operations return a nonnegative `clm_int` or
-`CLM_BPA_FAILURE`. `cell_contains` returns a boolean.
-
-An operation must fail without partially changing the table if validation or
-allocation fails. Invalid table IDs, undeclared columns, out-of-range row
-indexes, invalid UTF-8, and incompatible string resources are errors.
-
-## 6. Example
-
-```text
-clm_id_register("host", 101)
-clm_id_register("port", 102)
-
-clm_table_new(CONFIG)
-clm_table_add_column(CONFIG, "host")
-clm_table_add_column(CONFIG, "port")
-row = clm_table_append_row(CONFIG)          // 0
-clm_table_set_from(CONFIG, row, 101, "Server111")
-clm_table_set_from(CONFIG, row, 102, "1234")
-```
-
-A parser can add columns from a header row or from a known schema, append rows,
-and set cells by their resolved column IDs. A headerless delimited format may
-instead use an ordered row representation, since it has no names to map.
-
-Retaining column names also supports serialization. A format serializer can
-emit a header using the stored names and then output each row in order. It must
-apply that format's quoting and escaping rules; the table itself does not define
-CSV or other file syntax.
-
-## 7. Ownership and concurrency
-
-The table owns its column metadata and copies each cell's text. Callers retain
-ownership of source buffers and source CLM string blocks. Deleting a table
-releases all internal resources and invalidates its ID. As with other CLM
-registries, implementations must document their concurrency behavior; the reference behavior does not promise implicit synchronization.
-
-## 8. Storage and mutation semantics
-
-The table preserves an ordered column schema and ordered rows. Present cells own copies of their text; missing cells are distinct from present empty strings. Column IDs must be registered before use, and aliases mapping to an already-present column are not added twice. Deleting the table releases its owned data. These guarantees are behavioral; backing collection types are not prescribed across languages.
-
-## Shared behavioral contract
-
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-
-## Example use cases
-
-Create tables and define or query their columns.
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

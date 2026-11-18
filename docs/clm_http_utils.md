@@ -1,43 +1,82 @@
-# CLM HTTP Utils
+# CLM http_utils
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_http_utils](http_utils.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Transport-independent HTTP message and framing utilities, including HTTP/1.x syntax, chunked coding, QUIC variable-length integers and normalized decoded HTTP/3 headers.
+HTTP message parsing, framing, and serialization.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Parse and serialize HTTP/1.x request/response lines and headers.
-- Determine body framing, connection reuse and Expect/100-continue handling.
-- Encode/decode chunked transfer bodies; validate chunk extensions and trailers.
-- Validate method/header tokens and content-length values.
-- Decode and encode QUIC variable-length integer representations and parse HTTP/3 frame headers.
-- Validate normalized HTTP/3 field names/values and pseudo-header ordering after QPACK decoding.
+HTTP message parsing, framing, and serialization.
 
-## Resource, data and ownership model
+Header syntax and message framing are validated independently of application routing.
+Parsed spans can borrow the input buffer.
 
-Inputs and header spans may be borrowed from application-owned buffers. The utility module owns no network socket, TLS session, HTTP/2 encoder or QPACK state; it interprets already available bytes or decoded HTTP/3 header fields.
+HTTP utilities: HTTP/1.x parsing/serialization/chunked coding (RFC 9112),
+QUIC variable-length integers and decoded HTTP/3 field normalization.
 
-## Behavioral contract and protocol boundaries
+Parsing is zero-copy and allocation-free: a parsed message holds spans that
+point into the input and header entries stored in caller-owned memory. The
+spans stay valid only while the input is unchanged. Parsing is strict:
+CRLF line endings only, no obsolete line folding, no whitespace before the
+header colon, and conflicting framing (Content-Length with Transfer-Encoding,
+or repeated Content-Length values) is rejected to prevent request smuggling.
+For simplicity and predictable framing, Transfer-Encoding supports only a
+single 'chunked' field; other transfer codings are rejected. HTTP/1.1
+requests require exactly one nonempty Host field.
 
-HTTP/1 parser input must follow strict CRLF and header framing rules. Distinguish incomplete input from malformed syntax and size limits. For HTTP/3, the API validates already decoded field sequences; it does not implement QPACK. QUIC stream FIN is not TCP connection close. HTTP/3 requests are normalized into the shared HTTP message model with the correct scheme/authority and pseudo-field requirements.
+## CLM dependencies and related modules
 
-## Cross-language interoperability
+Related CLM module interfaces used or referenced by this capability:
 
-Preserve protocol semantics, resource ownership, error distinctions and callback lifetime. Native concurrency, socket, cryptographic and allocation choices may differ by language. Supported protocols are implementation capabilities rather than a guarantee that every backend is present.
+- [`clm_types`](types.md)
 
-## Example use case
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Parse an HTTP/1.1 request, validate a chunked trailer, or normalize QPACK-decoded HTTP/3 fields before dispatching an application route.
+This page is the language-neutral contract for clm_http_utils. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Related CLM modules
+## Direct CLM dependencies
 
-[clm_base](clm_base.md).
+- [clm_types](types.md) - required CLM capability.
+
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_http_utils when an application needs: HTTP message parsing, framing, and serialization.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

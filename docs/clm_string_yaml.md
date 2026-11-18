@@ -1,79 +1,73 @@
-# CLM String Yaml
+# CLM string_yaml
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_file](clm_file.md), [clm_string_format](clm_string_format.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_string_yaml](string_yaml.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
 
-## Purpose
-
-YAML text parsing and serialization into CLM trees.
-
-## Capabilities and operations
-
-- Parse an indentation-oriented subset of YAML collections and scalar values.
-- Serialize compatible CLM trees to YAML.
-- Provide text/file adapters and preserve nested relationships.
-- This is a documented YAML subset, not an unrestricted YAML 1.2 engine with every advanced feature.
-
-## Detailed module contract
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-`clm_string_yaml` supports a small indentation-based YAML subset backed by
-`clm_tree`. It is not a general YAML 1.2 parser.
+YAML document parsing and generation.
 
-## Supported input
+## Behavior and constraints
 
-- Root and nested block mappings and block sequences.
-- Space indentation; tabs used for indentation are rejected.
-- `#` comments outside quoted values, plus optional `---` and `...` document
-  markers.
-- Plain, single-quoted, and double-quoted scalar values. Recognized `true`,
-  `false`, `null`, and supported numeric forms become typed tree leaves;
-  other plain values become strings.
-- UTF-8 input.
+YAML document parsing and generation.
 
-Mapping names must already resolve through `clm_id`. Duplicate keys,
-inconsistent indentation, malformed quoting, flow collections (`[]`/`{}`),
-anchors, aliases, tags, merge keys, complex keys, and block scalar styles are
-unsupported and fail. A failed parse removes the partial tree.
+Indentation and scalar quoting determine structure. The supported subset and its
+conversion rules are described by the public interface.
 
-## Serialization
+## CLM dependencies and related modules
 
-Mappings and sequences are emitted as block structures. Keys and all scalar
-leaves are quoted; typed numbers, booleans, and null markers are represented as
-quoted text. This is readable YAML but reparses those leaves as strings. Array
-order is retained. Comments and original formatting are not retained.
+Related CLM module interfaces used or referenced by this capability:
 
-## Operations
+- [`clm_file`](file.md)
+- [`clm_string_format`](string_format.md)
+- [`clm_types`](types.md)
 
-`loads` parses an existing CLM string ID, and `load` reads a file named by a
-CLM string ID. `dumps` writes to an existing CLM string ID, and `dump` writes
-to a file named by a CLM string ID. There are no raw C-string, caller-buffer,
-or raw-path codec entry points. Text is stored internally as UTF-8; CLM string
-blocks carry their preferred external encoding. File codecs currently read
-and write UTF-8. Parsing creates a new owned object or array tree; operations
-return CLM success/failure statuses.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## Language-neutral contract
+This page is the language-neutral contract for clm_string_yaml. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-Represent mappings with registered numeric field IDs, sequences with ordered
-array nodes, and resolved scalar types with the corresponding tree leaf type.
-Keep unsupported YAML features explicit; do not treat successful parsing of
-this subset as general YAML conformance.
+## Direct CLM dependencies
 
-## Shared behavioral contract
+- [clm_types](types.md) - required CLM capability.
+- [clm_string_format](string_format.md) - required CLM capability.
+- [clm_file](file.md) - required CLM capability.
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-## Example use cases
+## Typical use
 
-Parse an indentation-oriented subset of YAML collections and scalar values.
+Use clm_string_yaml when an application needs: YAML document parsing and generation.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

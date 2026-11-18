@@ -1,47 +1,71 @@
-# CLM Managed
+# CLM managed
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** None.
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_managed](managed.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-A policy-driven coordinator for housekeeping and resource cleanup through configurable subsystem hooks.
+Optional coordinator for application-owned deferred cleanup routines. This module does not discover or garbage-collect arbitrary application memory. Callers register subsystem hooks; a cycle invokes those hooks in dependency, container, then storage order. Scheduling may be manual, interval, threshold or hybrid, and runs either in caller-driven polls or in a coordinator worker thread. Callbacks run under the coordinator lock and must not call back into it.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Configure manual, interval-based, threshold-based or hybrid collection policies.
-- Choose caller-driven polling or a coordinator-owned worker mode where supported.
-- Run configurable sweeps in ordered phases and retrieve counters/failure statistics.
-- Hooks are supplied by the application: the coordinator does not implicitly discover and delete all resources.
+Optional coordinator for application-owned deferred cleanup routines.
+This module does not discover or garbage-collect arbitrary application memory. Callers
+register subsystem hooks; a cycle invokes those hooks in dependency, container,
+then storage order. Scheduling may be manual, interval, threshold or hybrid,
+and runs either in caller-driven polls or in a coordinator worker thread.
+Callbacks run under the coordinator lock and must not call back into it.
 
-## Collection policies
+## CLM dependencies and related modules
 
-| Policy | When collection is due |
-|---|---|
-| Manual | Only after an explicit collection request. |
-| Interval | When the configured time period elapses. |
-| Threshold | When combined pending-item counts reach the configured threshold. |
-| Hybrid | When either interval or threshold triggers. |
+Related CLM module interfaces used or referenced by this capability:
 
-Collection can run through caller-initiated polling or an optional coordinator worker. Configurable hooks expose both a **pending count** and a **sweep** action. Collection statistics report cycles, disposed transients, containers and storages, failures and the last error.
+- [`clm_types`](types.md)
 
-## Hook contract
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Hooks, not the coordinator, perform actual resource deletion. Hook ordering is controlled by the coordinator's subsystem phases, and an error can terminate the current cycle. Avoid re-entering the coordinator from a callback. This module does not automatically act as a garbage collector for arbitrary host-language objects.
+This page is the language-neutral contract for clm_managed. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Shared behavioral contract
+## Direct CLM dependencies
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+- [clm_types](types.md) - required CLM capability.
 
-## Example use cases
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-Run housekeeping when pending resource counts exceed a configured threshold.
+## Typical use
+
+Use clm_managed when an application needs: Optional coordinator for application-owned deferred cleanup routines. This module does not discover or garbage-collect arbitrary application memory. Callers register subsystem hooks; a cycle invokes those hooks in dependency, container, then storage order. Scheduling may be manual, interval, threshold or hybrid, and runs either in caller-driven polls or in a coordinator worker thread. Callbacks run under the coordinator lock and must not call back into it.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

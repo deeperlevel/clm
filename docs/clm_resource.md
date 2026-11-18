@@ -1,41 +1,71 @@
-# CLM Resource
+# CLM resource
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_resource](resource.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Defines a common identity, kind taxonomy and lifetime operations for reusable assets such as images, fonts and graphical resource descriptions.
+Shared resource statuses and resource-lifecycle entry points.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Query a resource’s ID, kind and CPU payload size.
-- Retain and release supported resources.
-- Delete a supported resource explicitly.
-- Distinguish invalid, unknown, unsupported and type-mismatched resources.
+Shared resource statuses and resource-lifecycle entry points.
 
-## Resource, data and ownership model
+Resource interfaces separate numeric identity from native allocation. Unsupported or
+unfinished operations report their explicit status.
 
-Resource identity is an ID plus a recognized resource kind. Retain/release semantics apply only where a concrete resource implementation supports them. CPU payload byte counts are not GPU device memory measurements.
+ID-based managed resource lifecycle.
 
-## Behavioral contract and boundaries
+## CLM dependencies and related modules
 
-The reference implementation currently supports generic lifecycle operations for BPA-backed images, fonts and CPU-side texture sources; other named kinds are planned or partial. A listed resource-kind enumeration does not imply every kind is allocatable or renderable.
+Related CLM module interfaces used or referenced by this capability:
 
-## Cross-language interoperability
+- [`clm_types`](types.md)
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## Example use case
+This page is the language-neutral contract for clm_resource. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-Hold a font resource across multiple render operations, release it after all consumers finish, and inspect resource metadata for diagnostics.
+## Direct CLM dependencies
 
-## Related CLM modules
+- [clm_types](types.md) - required CLM capability.
 
-[clm_base](clm_base.md).
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_resource when an application needs: Shared resource statuses and resource-lifecycle entry points.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

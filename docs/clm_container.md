@@ -1,55 +1,69 @@
-# CLM Container
+# CLM container
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_container](container.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-ID-based service registration and resolution, with explicit dependency validation and instance lifetimes.
+Explicit service registration, resolution, and scoped instances.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Register services by numeric ID with constructor, declared dependency IDs and a lifetime policy.
-- Resolve eager singletons and per-resolution transients, or use scoped/intern cached instances.
-- Begin/end the process-wide scope and intern frames; invoke callbacks after validating dependency registrations.
-- Dependencies are validated but not automatically injected; constructors resolve required services themselves.
-- The container owns singleton and frame instances. The caller owns transient instances and must release them.
+Explicit service registration, resolution, and scoped instances.
 
-## Service lifecycle model
+Registrations describe construction and lifetime policy. Resolving dependencies follows
+those registrations rather than discovering types through reflection.
 
-| Lifetime | Resolution behavior | Ownership |
-|---|---|---|
-| **Singleton** | Created eagerly during successful registration; later resolutions share the instance. | Container owns the instance until unregister. |
-| **Transient** | A fresh instance is constructed on every resolution. | Resolving caller owns and releases the instance. |
-| **Scoped** | One cached instance per active scope frame, created at scope start. | Container owns the instance until the scope ends. |
-| **Intern** | One cached instance per active intern frame, created at intern start. | Container owns the instance until the intern frame ends. |
+## CLM dependencies and related modules
 
-## Registration and invocation
+Related CLM module interfaces used or referenced by this capability:
 
-- A service registration carries a numeric service ID, a constructor, a lifetime, a context ID and a list of required service IDs.
-- Required service IDs must already be registered; the list is checked rather than used for implicit constructor-parameter injection.
-- Constructors explicitly resolve their own dependencies. A failed constructor must clean up any partially created resources.
-- Dependency-validated invocation executes a supplied operation once after verifying the required services.
-- A singleton cannot recursively resolve itself while still being constructed; this is reported as busy.
+- [`clm_types`](types.md)
 
-## Scope and concurrency
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-The current contract defines explicit process-wide **begin/end scope** and **begin/end intern** transitions. Overlapping or repeated frame transitions can report busy. Unregistering an active service can fail while it is in use. Once a container-owned instance is released, clients must not retain and reuse its ID. This module is service management; it does not replace [clm_dictionary](clm_dictionary.md) or [clm_table](clm_table.md).
+This page is the language-neutral contract for clm_container. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Shared behavioral contract
+## Direct CLM dependencies
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-- Singleton lifetime is eager; scoped and intern lifetimes use explicit process-wide frames; transient is per-resolution.
+- [clm_types](types.md) - required CLM capability.
 
-## Example use cases
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-Register a database service with its dependencies, then resolve it within a controlled lifetime.
+## Typical use
+
+Use clm_container when an application needs: Explicit service registration, resolution, and scoped instances.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

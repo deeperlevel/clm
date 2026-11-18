@@ -1,41 +1,75 @@
-# CLM Net WebSocket
+# CLM net_websocket
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_net](clm_net.md), [clm_tls](clm_tls.md), [clm_websocket](clm_websocket.md)
-- **External libraries / platform facilities (C reference):** TLS and QUIC/HTTP2 libraries transitively through the selected transport.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_net_websocket](net_websocket.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Establishes and operates WebSocket sessions over HTTP/1.1 upgrades or HTTP/2/3 extended CONNECT with explicit protocol selection.
+WebSocket connection lifecycle and network transport.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create a WebSocket client with host, path, optional subprotocol and headers.
-- Complete the selected WebSocket handshake, then exchange messages and fragments.
-- Read parsed WebSocket events and close the session cooperatively.
-- Support plain or secure HTTP/1.1; require secure transport for HTTP/2/3.
+WebSocket connection lifecycle and network transport.
 
-## Resource, data and ownership model
+HTTP upgrade, frame processing, and close-handshake state are separate phases. Outgoing
+queues preserve partial writes across socket readiness events.
 
-The HTTP transport and WebSocket frame codec are separate layers. `clm_net_websocket` handles connection and handshake ownership; `clm_websocket` handles frame/message-level semantics.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-Protocol selection is explicit: no automatic fallback. For HTTP/1.1 require a valid switching-protocols handshake; for HTTP/2/3 use successful extended CONNECT. TLS verification is enabled by default. Custom handshake headers cannot override reserved WebSocket/HTTP transport fields.
+- [`clm_net`](net.md)
+- [`clm_tls`](tls.md)
+- [`clm_types`](types.md)
+- [`clm_websocket`](websocket.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_net_websocket. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Connect to a secure WebSocket endpoint, send an application message and process incoming events.
+- [clm_types](types.md) - required CLM capability.
+- [clm_net](net.md) - required CLM capability.
+- [clm_tls](tls.md) - required CLM capability.
+- [clm_websocket](websocket.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_net](clm_net.md), [clm_tls](clm_tls.md), [clm_websocket](clm_websocket.md).
+## Typical use
+
+Use clm_net_websocket when an application needs: WebSocket connection lifecycle and network transport.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

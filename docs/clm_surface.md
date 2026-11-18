@@ -1,42 +1,76 @@
-# CLM Surface
+# CLM surface
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_drawing](clm_drawing.md), [clm_platform](clm_platform.md)
-- **External libraries / platform facilities (C reference):** Native window/event backends on the target OS or platform (such as X11, Wayland, Win32, Cocoa, browser canvas, or terminal).
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_surface](surface.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Creates native or abstract rendering surfaces, manages their geometry and visibility, and routes operating-system input and lifecycle events.
+Portable surfaces and lifecycle/event dispatch.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create/destroy a surface; set title, size, visibility and state.
-- Poll native events and request redraw.
-- Listen to pointer, keyboard, timing and surface lifecycle callbacks.
-- Pause/resume event categories and support specific native event requests.
-- Expose platform integration hooks where required by an implementation.
+Portable surfaces and lifecycle/event dispatch.
 
-## Resource, data and ownership model
+The selected platform backend owns native window state. Public and internal callbacks
+coordinate application events with panel and renderer behavior.
 
-A surface owns native window/view/terminal/canvas integration as appropriate; panels and renderers use its ID without owning the surface. Event payloads are borrowed for callback scope. A surface may exist on platforms without a conventional desktop window.
+Surface lifecycle, native event normalization, and handler delivery.
+This module does not know about panels, widgets, or rendering APIs.
 
-## Behavioral contract and boundaries
+## CLM dependencies and related modules
 
-Backend support is platform-specific and may be incomplete. Failure to create a requested backend must be explicit. Callback entry and native UI-thread requirements are implementation concerns that ports must document. `clm_surface_events` is a supporting event-data header, not an independent subsystem.
+Related CLM module interfaces used or referenced by this capability:
 
-## Cross-language interoperability
+- [`clm_drawing`](drawing.md)
+- [`clm_platform`](platform.md)
+- [`clm_types`](types.md)
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## Example use case
+This page is the language-neutral contract for clm_surface. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-Create a window or terminal surface, register mouse and resize callbacks, and request redraws for an associated renderer.
+## Direct CLM dependencies
 
-## Related CLM modules
+- [clm_types](types.md) - required CLM capability.
+- [clm_platform](platform.md) - required CLM capability.
+- [clm_drawing](drawing.md) - required CLM capability.
 
-[clm_base](clm_base.md), [clm_drawing](clm_drawing.md), [clm_platform](clm_platform.md).
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_surface when an application needs: Portable surfaces and lifecycle/event dispatch.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

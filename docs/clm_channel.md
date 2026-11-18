@@ -1,43 +1,69 @@
-# CLM Channel
+# CLM channel
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md)
-- **External libraries / platform facilities (C reference):** Native thread/synchronization support or optional TinyCThread shim in the C reference.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_channel](channel.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Bounded concurrent message channels for exchanging integer IDs between producers and consumers.
+Concurrent ID channels with buffered and rendezvous transfers.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create FIFO channels with positive buffering capacity or zero-capacity rendezvous semantics.
-- Send/receive with immediate, blocking and timeout operations; close and inspect channel state.
-- After close, existing buffered messages can still be received, and new sends are rejected.
-- Channels transport ID values, not payload copies or ownership: protect referenced data separately.
+Concurrent ID channels with buffered and rendezvous transfers.
 
-## Delivery and ownership
+A channel mutex protects its ring buffer and waiter queues. Zero-capacity channels pair
+senders with receivers without buffering messages.
 
-- A successful send delivers one integer ID to exactly one receiver, not a broadcast to all listeners.
-- A positive capacity buffers messages in FIFO order; capacity zero pairs a sender directly with a receiver.
-- Blocking, nonblocking and timed send/receive operations are distinct.
-- Close rejects new sends, wakes blocked operations and permits remaining queued messages to drain.
-- Destroy discards queued IDs but never deletes the resources to which the IDs refer. Application code must first stop other users.
+## CLM dependencies and related modules
 
-A channel does not make an ID-addressed payload safe for concurrent mutation. Synchronization and ownership transfer of referenced resources are separate concerns.
+Related CLM module interfaces used or referenced by this capability:
 
-## Shared behavioral contract
+- [`clm_types`](types.md)
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-- For a zero-capacity channel, a sender and receiver rendezvous directly. A successful receive removes one FIFO message.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## Example use cases
+This page is the language-neutral contract for clm_channel. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-Route chat-message IDs from a networking loop to a message processor.
+## Direct CLM dependencies
+
+- [clm_types](types.md) - required CLM capability.
+
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_channel when an application needs: Concurrent ID channels with buffered and rendezvous transfers.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

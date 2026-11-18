@@ -1,77 +1,73 @@
-# CLM String Ini
+# CLM string_ini
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_file](clm_file.md), [clm_string_format](clm_string_format.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_string_ini](string_ini.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
 
-## Purpose
-
-INI text parsing and serialization into CLM trees.
-
-## Capabilities and operations
-
-- Parse sections, keys and supported value syntax from text or files.
-- Serialize supported tree data into INI form.
-- Keep the documented subset and duplicate-key behavior consistent.
-- Uses structured CLM nodes rather than an ad hoc key/value runtime.
-
-## Detailed module contract
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-`clm_string_ini` parses a practical INI subset into a `clm_tree` object and
-serializes supported trees back to text. This is a deliberately small codec,
-not a complete implementation of every INI dialect.
+INI sections and key/value parsing and generation.
 
-## Supported input
+## Behavior and constraints
 
-- Blank lines and full-line comments beginning with `#` or `;`.
-- Root-level assignments and one-level `[section]` headers.
-- `=` and `:` assignment separators.
-- Unquoted, single-quoted, and double-quoted string values. Double-quoted
-  values use CLM string escape decoding; single-quoted values support doubled
-  quote characters.
-- UTF-8 input. Values are always stored as string leaves.
+INI sections and key/value parsing and generation.
 
-Duplicate keys, duplicate sections, nested sections, malformed quotes, and
-unregistered names fail parsing. Section names and assignment names resolve
-through the application's `clm_id` registry. A failed parse removes its partial
-tree.
+Section state determines where a key is stored. Whitespace, comments, and delimiters are
+interpreted by the parser rather than by the storage layer.
 
-## Serialization
+## CLM dependencies and related modules
 
-Root-level keys are emitted before sections. Values are quoted and escaped;
-section names and keys use their registered names. Comments and original
-whitespace are not retained. The output is normalized and uses LF line endings.
+Related CLM module interfaces used or referenced by this capability:
 
-## Operations
+- [`clm_file`](file.md)
+- [`clm_string_format`](string_format.md)
+- [`clm_types`](types.md)
 
-`loads` parses an existing CLM string ID, and `load` reads a file named by a
-CLM string ID. `dumps` writes to an existing CLM string ID, and `dump` writes
-to a file named by a CLM string ID. There are no raw C-string, caller-buffer,
-or raw-path codec entry points. Text is stored internally as UTF-8; CLM string
-blocks carry their preferred external encoding. File codecs currently read
-and write UTF-8. Operations return CLM success/failure statuses.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## Language-neutral contract
+This page is the language-neutral contract for clm_string_ini. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-Treat the parsed root as an object. Each source key must already map to a
-unique numeric field ID within its containing object. Preserve string values,
-section structure, and insertion order. Do not promise source comments or
-formatting on round trip.
+## Direct CLM dependencies
 
-## Shared behavioral contract
+- [clm_types](types.md) - required CLM capability.
+- [clm_string_format](string_format.md) - required CLM capability.
+- [clm_file](file.md) - required CLM capability.
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-## Example use cases
+## Typical use
 
-Parse sections, keys and supported value syntax from text or files.
+Use clm_string_ini when an application needs: INI sections and key/value parsing and generation.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

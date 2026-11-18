@@ -1,41 +1,71 @@
-# CLM Net Web HTTP/3
+# CLM net_web_h3
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_net_quic](clm_net_quic.md), [clm_net_web](clm_net_web.md)
-- **External libraries / platform facilities (C reference):** ngtcp2 / nghttp3 / OpenSSL QUIC through enabled QUIC and HTTP/3 backend.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_net_web_h3](net_web_h3.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Runs the CLM web application routing and handler model over HTTP/3 using QUIC and UDP.
+HTTP/3 stream processing and QUIC server integration.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Initialize HTTP/3 config with PEM credentials and transport/stream limits.
-- Create a server and register shared CLM web routes or middleware.
-- Bind/start an HTTP/3 UDP listener; inspect its local address.
-- Stop gracefully with a GOAWAY/drain policy and destroy resources.
+HTTP/3 stream processing and QUIC server integration.
 
-## Resource, data and ownership model
+HTTP stream callbacks are layered over QUIC transport state. Connection shutdown must
+release stream and transport resources in the right order.
 
-The HTTP/3 facade reuses the web request/response abstractions but runs an independent UDP/QUIC reactor. It is not a TLS-wrapped TCP listener. Request bodies are bounded and buffered before ordinary route dispatch; WebSocket CONNECT tunnels have a separate incremental path.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-Requires QUIC support and valid credentials. There is no HTTP/1 fallback, TCP listener, server push or 0-RTT in the reference. Stop semantics rely on cooperative callback return and a bounded drain period. A backend lacking QUIC must explicitly report unsupported behavior.
+- [`clm_net_quic`](net_quic.md)
+- [`clm_net_web`](net_web.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_net_web_h3. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Expose the same application routes over HTTP/3 alongside a separately bound HTTP/1.1 or HTTP/2 service.
+- [clm_net_quic](net_quic.md) - required CLM capability.
+- [clm_net_web](net_web.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_net_quic](clm_net_quic.md), [clm_net_web](clm_net_web.md).
+## Typical use
+
+Use clm_net_web_h3 when an application needs: HTTP/3 stream processing and QUIC server integration.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

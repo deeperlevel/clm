@@ -1,42 +1,69 @@
-# CLM Font
+# CLM font
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_compress](clm_compress.md), [clm_resource](clm_resource.md)
-- **External libraries / platform facilities (C reference):** WOFF 1.0 compressed table decoding uses clm_compress in the C reference (transitive codec dependency).
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_font](font.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Loads font container data and selected face metadata into reusable resource IDs without assuming a particular shaping or rasterization library.
+Font loading, glyph metrics, and reference-counted font storage.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Load a font from memory or a file.
-- Select a face from a standalone font or collection.
-- Inspect selected face and stored source size.
-- Read the normalized/stored source data.
-- Retain and release a font resource through reference operations.
+Font loading, glyph metrics, and reference-counted font storage.
 
-## Resource, data and ownership model
+Font data must remain available while glyph operations use it. Native font-library
+handles are released when their CLM resource lifetime ends.
 
-A font resource stores font source bytes and selected-face identity. It is not a shaped text run, glyph atlas or GPU font cache. The C snapshot stores selected source material through CLM resource/BPA services.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-The current reference accepts SFNT TrueType/OpenType and TTC/OTC collections. WOFF 1.0 is decoded to SFNT; only face 0 is accepted for WOFF. WOFF2 is **not** supported in this snapshot. Validation covers container and table-directory bounds, not a complete glyph-program audit. Shaping, glyph rasterization, fallback fonts and metrics are outside the loader contract.
+- [`clm_resource`](resource.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_font. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Load a bundled font, inspect its face metadata, then pass the font resource ID to an appropriate text-rendering backend.
+- [clm_resource](resource.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_compress](clm_compress.md), [clm_resource](clm_resource.md).
+## Typical use
+
+Use clm_font when an application needs: Font loading, glyph metrics, and reference-counted font storage.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

@@ -1,40 +1,69 @@
-# CLM Net Web HTTP/1.1
+# CLM net_web_h1
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_net_web](clm_net_web.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_net_web_h1](net_web_h1.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Offers a constrained server entry point that accepts HTTP/1.1 requests and shares the main CLM web server routing/middleware interfaces.
+HTTP/1 server facade over shared web-server state.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Configure a server restricted to HTTP/1.1.
-- Create, bind, start, stop and destroy its listener.
-- Retrieve the bound address and use common routes, middleware and handlers.
+HTTP/1 server facade over shared web-server state.
 
-## Resource, data and ownership model
+Protocol selection is delegated to the common web engine; routing, request callbacks,
+and server lifetime remain shared.
 
-The facade uses the same server, request, response and route concepts as `clm_net_web`. It adds a protocol restriction, not an incompatible request model.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-HTTP/1.1 is required. If TLS is configured, the advertised protocol is `http/1.1`; clients that send an incompatible version are rejected before route dispatch. Plain HTTP is supported.
+- [`clm_net_web`](net_web.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_net_web_h1. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Create an HTTP/1.1 service that serves one landing page over plain HTTP or HTTPS.
+- [clm_net_web](net_web.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_net_web](clm_net_web.md).
+## Typical use
+
+Use clm_net_web_h1 when an application needs: HTTP/1 server facade over shared web-server state.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

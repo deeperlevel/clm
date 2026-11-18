@@ -1,92 +1,77 @@
-# CLM String Dsv
+# CLM string_dsv
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_bpa](clm_bpa.md), [clm_file](clm_file.md), [clm_string](clm_string.md), [clm_table](clm_table.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_string_dsv](string_dsv.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
 
-## Purpose
-
-Delimited-separated-value parsing and serialization into CLM tables.
-
-## Capabilities and operations
-
-- Parse CSV or related delimited records with configurable delimiters and quoting rules.
-- Populate tabular data and serialize tables back to text.
-- Treat delimiter, newline, escaping and empty-cell behavior consistently.
-- Uses text tables, not a schema-inferencing typed database.
-
-## Detailed module contract
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-`clm_string_dsv` reads delimited records into a `clm_table` and serializes a
-table back to delimited text. CSV is the default profile: comma-separated
-fields. This is a practical CLM format, not a claim of full RFC 4180
-conformance.
+Delimited-record parsing and generation.
 
-## Schema and records
+## Behavior and constraints
 
-By default, the first record defines the table columns. Each header name is
-looked up in the field-ID registry; unknown names are auto-registered with a
-collision-free ID. Existing mappings are reused. Duplicate names or distinct
-names that resolve to the same ID fail. Registrations created by a successful
-parse remain in the registry; registrations created by a failed parse are
-rolled back.
+Delimited-record parsing and generation.
 
-With `has_header` disabled, every record is data. The first record determines
-the column count; columns are named `column_1`, `column_2`, and so on, and each
-name is registered through `clm_id` using the same collision-safe policy.
-Every field value is retained. Serialization in this mode omits the header
-record and emits all rows as data.
+Quoted fields can contain delimiters and line breaks. Parser state distinguishes
+structural separators from escaped field content.
 
-When a header is present, each data record must have exactly the header's field
-count. Values are stored as strings. An empty file produces an empty table;
-blank records and trailing separators represent empty fields.
+## CLM dependencies and related modules
 
-## Separators and quoting
+Related CLM module interfaces used or referenced by this capability:
 
-The default separator is comma. An option may instead name a CLM string
-containing one or two ASCII bytes, such as `||`. Quotes and record-ending CR or
-LF are not valid separator bytes.
+- [`clm_bpa`](bpa.md)
+- [`clm_file`](file.md)
+- [`clm_string`](string.md)
+- [`clm_table`](table.md)
+- [`clm_types`](types.md)
 
-Fields may be unquoted, single-quoted, or double-quoted. Double-quoted fields
-support exactly these escapes: `\\`, `\"`, `\n`, and `\t`. Single-quoted
-fields represent an apostrophe by doubling it (`''`); backslashes have no
-special meaning in single-quoted fields. Unsupported escapes, unterminated
-quotes, or physical CR/LF inside a quoted field fail. Use the `\n` escape for
-a newline value.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Serialization emits every field as a double-quoted value, escaping backslash,
-double quote, newline, and tab. A cell containing carriage return cannot be
-serialized by this subset. Missing cells serialize as empty quoted fields, so a
-missing cell and a present empty string become indistinguishable after a
-round-trip. Output records use LF line endings.
+This page is the language-neutral contract for clm_string_dsv. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Operations and encoding
+## Direct CLM dependencies
 
-`loads` parses an existing CLM string ID into a new table; `load` reads from a
-file named by a CLM string ID. `dumps` writes to an existing CLM string ID;
-`dump` writes to a file named by a CLM string ID. Options variants accept a
-separator string ID and header setting. There are no raw C-string, caller
-buffer, or raw-path codec entry points.
+- [clm_types](types.md) - required CLM capability.
+- [clm_bpa](bpa.md) - required CLM capability.
+- [clm_string](string.md) - required CLM capability.
+- [clm_table](table.md) - required CLM capability.
+- [clm_file](file.md) - required CLM capability.
 
-CLM strings store validated Unicode as UTF-8 internally. File input and output
-use UTF-8. A new CLM string gets the current preferred external encoding from
-`clm_string`; updating an existing string preserves its encoding preference.
-Operations return CLM BPA success/failure statuses.
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-## Shared behavioral contract
+## Typical use
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+Use clm_string_dsv when an application needs: Delimited-record parsing and generation.
 
-## Example use cases
+A conforming workflow is conceptually:
 
-Parse CSV or related delimited records with configurable delimiters and quoting rules.
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

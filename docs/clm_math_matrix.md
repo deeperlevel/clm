@@ -1,32 +1,69 @@
-# CLM Math Matrix
+# CLM math_matrix
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_math](clm_math.md), [clm_math_core](clm_math_core.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_math_matrix](math_matrix.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Matrix operations and practical 2D transforms using numeric storage IDs.
+Matrix arithmetic, elimination, and affine projection.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Build identity, rotation, translation and scale matrices.
-- Multiply and transpose matrices; transform vectors.
-- Calculate determinants and inverses, reporting singular matrices.
-- Specify element layout and dimensions consistently between language implementations.
+Matrix arithmetic, elimination, and affine projection.
 
-## Shared behavioral contract
+Matrix dimensions are validated before indexing. Pivot selection and singularity checks
+control inversion and elimination failures.
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+## CLM dependencies and related modules
 
-## Example use cases
+Related CLM module interfaces used or referenced by this capability:
 
-Build identity, rotation, translation and scale matrices.
+- [`clm_math_core`](math_core.md)
+
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
+
+This page is the language-neutral contract for clm_math_matrix. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
+
+## Direct CLM dependencies
+
+- [clm_math_core](math_core.md) - required CLM capability.
+
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_math_matrix when an application needs: Matrix arithmetic, elimination, and affine projection.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

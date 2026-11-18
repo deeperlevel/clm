@@ -1,6 +1,6 @@
 # clm_widget_accordion
 
-> Language-neutral module documentation. Derived from the supplied C implementation; equivalent APIs in other languages may differ.
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
@@ -54,8 +54,50 @@ committed active state and exclusive visibility, with mutations forbidden.
 No-op changes are silent. Sprite/font requirements follow the existing
 button/list renderers; root rendering errors are also reported by get_info.
 
-## Integration
+## CLM dependencies and related modules
 
-- C reference: [**clm_widget_accordion**](../c/widget_accordion.md).
-- Related CLM declarations in this archive: `clm_widget_button`, `clm_widget_list`.
-- Portability note: module behavior is derived from the supplied implementation. Platform/backend coverage should be verified in each language port.
+Related CLM module interfaces used or referenced by this capability:
+
+- [`clm_widget_button`](widget_button.md)
+- [`clm_widget_list`](widget_list.md)
+
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
+
+This page is the language-neutral contract for clm_widget_accordion. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
+
+## Direct CLM dependencies
+
+- [clm_widget_button](widget_button.md) - required CLM capability.
+- [clm_widget_list](widget_list.md) - required CLM capability.
+
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_widget_accordion when an application needs: Vertical stack of headers with exactly one owned clm_widget_list open. The section array is copied at creation; at least one section is required. Lists start empty: retrieve their IDs and attach clm_widget_list_item children. List selection, overflow scrolling and styling use the existing list APIs.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

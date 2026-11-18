@@ -1,45 +1,69 @@
-# CLM Scene
+# CLM scene
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_resource](clm_resource.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_scene](scene.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Defines a current minimal ID-based scene description for cameras, lighting sets and meshes. This is an **early implementation stub**, not the final language-neutral CLM scene-management contract.
+Scene configuration and scene-resource entry points.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create and delete a scene description.
-- Reference a camera and lighting collection by ID.
-- Associate and remove mesh IDs.
-- Inspect the scene’s referenced resources.
+Scene configuration and scene-resource entry points.
 
-## Resource, data and ownership model
+Configuration initialization is available; resource operations report NOT_IMPLEMENTED
+where scene storage is not yet supplied.
 
-The current graphical scene description stores *references* to resource IDs; it does not own those assets. Scene destruction therefore must not destroy referenced cameras, lights or meshes.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-CLM’s planned language-neutral `clm_scene` has a **broader scope**: general game scene management, potentially including 2D/3D game states, introduction screens, tutorials, menus and gameplay transitions. No lifecycle, transition, stacking or activation API should be assumed from this graphics-only stub until it is formally specified.
+- [`clm_resource`](resource.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_scene. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-In the current stub, associate a camera and light set with a mesh collection for a scene draw call. A separate future scene-management contract may represent the game’s Main Menu and Gameplay scenes.
+- [clm_resource](resource.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_resource](clm_resource.md).
+## Typical use
 
+Use clm_scene when an application needs: Scene configuration and scene-resource entry points.
 
+A conforming workflow is conceptually:
 
-**Specification status:** provisional. Do not infer a final shared scene-management API from the reference `scene.h` alone.
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

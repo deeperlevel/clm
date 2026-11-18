@@ -1,41 +1,69 @@
-# CLM Sphere
+# CLM sphere
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_spatial_manager](clm_spatial_manager.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_sphere](sphere.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Creates spherical query shapes managed by `clm_spatial_manager` without requiring a drawable scene or physics engine.
+Sphere shapes registered with a spatial manager.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create/destroy a sphere in a manager.
-- Read its center and radius.
-- Move, reposition or resize a sphere.
-- Associate sphere identity with application objects and tags through the manager.
+Sphere shapes registered with a spatial manager.
 
-## Resource, data and ownership model
+Sphere configuration supplies center and radius. Manager membership and picking metadata
+are separate from the geometric values.
 
-A sphere is a solid world-space query shape, not a rendered mesh or dynamic rigid body. Its radius must remain positive and finite.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-Transform updates refresh cached geometry, but prepared tag-localities retain snapshot membership until rebuilt. Shapes share a common ID namespace with boxes, so ID reuse across the two kinds is not independent.
+- [`clm_spatial_manager`](spatial_manager.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_sphere. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Represent a spherical interaction volume around an object and ray-cast against it to determine selection.
+- [clm_spatial_manager](spatial_manager.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_spatial_manager](clm_spatial_manager.md).
+## Typical use
+
+Use clm_sphere when an application needs: Sphere shapes registered with a spatial manager.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

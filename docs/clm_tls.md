@@ -1,51 +1,84 @@
-# CLM Tls
+# CLM tls
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_net](clm_net.md)
-- **External libraries / platform facilities (C reference):** OpenSSL on supported non-Windows paths; Schannel/SSPI on Windows.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_tls](tls.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
 
-**Current protocol use:** `clm_net_web` uses TLS ALPN for HTTP/2 selection, and `clm_net_web_h3` uses QUIC’s own cryptographic integration rather than a TCP TLS session.
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-TLS-encrypted client/server sessions layered over connected TCP sockets.
+TLS session state and encrypted socket I/O.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Establish a verified client handshake with server-name identity checks.
-- Accept a server-side handshake with configured certificate credentials.
-- Read decrypted bytes and write plaintext through the authenticated session.
-- Distinguish authenticated close from truncated TCP EOF; the original socket remains owned by its caller.
+TLS session state and encrypted socket I/O.
 
-## TLS session lifecycle
+Encrypted input, decrypted application data, and pending output are distinct buffers.
+Partial native handshakes and socket writes retain state until the next readiness event.
 
-A TLS client opens a session on an already connected TCP socket and verifies the peer identity using the requested server name. A server opens a session with configured certificate material. After handshaking, reads return decrypted data and writes accept plaintext for encryption.
+TLS 1.2+ client and server sessions over registered CLM TCP sockets.
+Client sessions verify the peer certificate and hostname by default.
+Sessions keep a reference to their socket; dispose the TLS session before
+closing the underlying clm_net socket. A session serializes access to itself.
 
-## Nonblocking mode
+Two I/O modes exist per session:
+- Blocking (the default, and what the *_open functions use): calls wait on the
+socket through clm_net, with timeout_ms applied to each readiness wait.
+- Nonblocking (clm_tls_set_nonblocking): calls never wait. When the socket cannot
+make progress they return CLM_TLS_WANT_READ or CLM_TLS_WANT_WRITE; the caller
+waits for that socket event (for example by parking on a poller) and repeats
+the same call. Timeouts are then the caller's responsibility.
+TLS can need the opposite event from the operation: a read may need to write and a
+write may need to read, so always honour the event that is requested.
 
-`clm_tls_client_new`/`clm_tls_server_new` create a session without handshaking; the `*_open` functions are the same plus a blocking handshake. After `clm_tls_set_nonblocking(session, true)`, `clm_tls_handshake`, `clm_tls_read` and `clm_tls_write` never wait: they return `CLM_TLS_WANT_READ` or `CLM_TLS_WANT_WRITE` and the caller retries once the socket is ready for that event (the handshake can need either, and so can reads and writes). A write that returns success only means the bytes were accepted; encrypted bytes the socket has not taken yet stay queued in the session until `clm_tls_flush` returns success. On WANT_* nothing was consumed or accepted. Closing a nonblocking session sends `close_notify` once, best effort, and never waits.
+## CLM dependencies and related modules
 
-`insecure_skip_verify` (client only) disables certificate and name checks. It exists for tests against throwaway certificates and must not be used for real traffic.
+Related CLM module interfaces used or referenced by this capability:
 
-## Closure and ownership
+- [`clm_net`](net.md)
 
-- An authenticated TLS `close_notify` is distinct from an unclean transport EOF, which is reported as truncated.
-- Session closure releases TLS resources but does not itself close the caller-owned registered socket.
-- Key/certificate configuration and credential storage may differ across platforms, while certificate verification and closure semantics remain part of the cross-language contract.
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-## Shared behavioral contract
+This page is the language-neutral contract for clm_tls. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-- The TLS layer does not transfer ownership of the underlying registered network socket.
+## Direct CLM dependencies
 
-## Example use cases
+- [clm_net](net.md) - required CLM capability.
 
-Verify a server certificate when opening an encrypted TCP connection.
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_tls when an application needs: TLS session state and encrypted socket I/O.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

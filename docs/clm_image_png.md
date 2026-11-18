@@ -1,41 +1,71 @@
-# CLM Image PNG
+# CLM image_png
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_bytes](clm_bytes.md), [clm_image](clm_image.md)
-- **External libraries / platform facilities (C reference):** PNG lossless compression backend through the CLM codec implementation (library choice is implementation-specific).
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_image_png](image_png.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Converts between PNG-encoded data and CLM CPU-resident image resources.
+PNG parsing, image conversion, and PNG serialization.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Decode PNG from an in-memory byte buffer or file into an image ID.
-- Encode an existing image as PNG into memory or a file.
-- Accept or emit Base64-encoded PNG text, including CLM string resources.
-- Keep image identity and pixel storage separate from the encoded representation.
+PNG parsing, image conversion, and PNG serialization.
 
-## Resource, data and ownership model
+Chunk lengths and image dimensions are validated before allocating pixel storage.
+Filtering and compression belong to the PNG representation, not the image registry.
 
-The PNG format adapter reads an encoded stream and creates a decoded `clm_image`, or takes a pre-existing image and serializes its pixels. Output bytes are owned by the receiving buffer/string or caller as specified by the binding.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-PNG data validity, image dimensions, buffer limits and unsupported pixel representations must produce distinguishable outcomes. The portable contract is PNG interoperation, not a mandate to use the same compression engine or Base64 algorithm in every implementation.
+- [`clm_bytes`](bytes.md)
+- [`clm_image`](image.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_image_png. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Decode a PNG file into `clm_image`, transform its pixels, and save it as a new PNG.
+- [clm_image](image.md) - required CLM capability.
+- [clm_bytes](bytes.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_bytes](clm_bytes.md), [clm_image](clm_image.md).
+## Typical use
+
+Use clm_image_png when an application needs: PNG parsing, image conversion, and PNG serialization.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

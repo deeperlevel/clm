@@ -1,6 +1,6 @@
 # clm_widget_text
 
-> Language-neutral module documentation. Derived from the supplied C implementation; equivalent APIs in other languages may differ.
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
@@ -37,8 +37,52 @@ inline-format edits, without typing coalescing. Restores plain text, inline
 styles and selection. Creation starts with no history; new edits discard redo.
 Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes, respecting readonly.
 
-## Integration
+## CLM dependencies and related modules
 
-- C reference: [**clm_widget_text**](../c/widget_text.md).
-- Related CLM declarations in this archive: `clm_platform`, `clm_renderer`, `clm_widget_manager`.
-- Portability note: module behavior is derived from the supplied implementation. Platform/backend coverage should be verified in each language port.
+Related CLM module interfaces used or referenced by this capability:
+
+- [`clm_platform`](platform.md)
+- [`clm_renderer`](renderer.md)
+- [`clm_widget_manager`](widget_manager.md)
+
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
+
+This page is the language-neutral contract for clm_widget_text. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
+
+## Direct CLM dependencies
+
+- [clm_platform](platform.md) - required CLM capability.
+- [clm_renderer](renderer.md) - required CLM capability.
+- [clm_widget_manager](widget_manager.md) - required CLM capability.
+
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_widget_text when an application needs: Editable UTF-8 text with color tags, word wrapping and optional logical line numbers. Reuses input caret/selection/clipboard and Enter/Ctrl+Enter behavior. Multiline and wrapping default on; line numbers default off. Offsets refer to plain UTF-8 text at codepoint boundaries, not markup or grapheme clusters.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

@@ -1,40 +1,69 @@
-# CLM Math Pathfinding 3D
+# CLM math_pathfinding3d
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_math_core](clm_math_core.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_math_pathfinding3d](math_pathfinding3d.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Provides shortest-path A* search on a dense voxel grid with six axis-aligned neighbors and unit movement cost.
+Three-dimensional graph adaptation for A-star search.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Search voxel grids with six-way (no diagonal) adjacency.
-- Treat each blocked voxel as untraversable with uniform step cost for all free neighbors.
-- Return a path including the start and goal or an explicit not-found result.
+Three-dimensional graph adaptation for A-star search.
 
-## Resource, data and ownership model
+The adapter supplies 3D distance estimates to the shared graph search. Result paths
+contain node indices rather than copied positions.
 
-The grid has width, height and depth and an optional row-major blocked-voxel mask. Coordinates are zero-based integer cell locations. Returned path storage is owned by the caller and must be released explicitly.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-Uses the Manhattan heuristic and treats X, Y and Z uniformly: it models free 3D movement rather than grounded jumping or gravity. This is a dense voxel search, not an arbitrary weighted graph or navigation-mesh algorithm. Blocked/unreachable endpoints are successful no-path outcomes; malformed dimensions, overflow and allocation failure are errors.
+- [`clm_math_core`](math_core.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_math_pathfinding3d. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Find a route for a flying entity among traversable 3D grid cells.
+- [clm_math_core](math_core.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_math_core](clm_math_core.md).
+## Typical use
+
+Use clm_math_pathfinding3d when an application needs: Three-dimensional graph adaptation for A-star search.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

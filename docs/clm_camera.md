@@ -1,41 +1,69 @@
-# CLM Camera
+# CLM camera
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_resource](clm_resource.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_camera](camera.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Represents camera settings as named/ID-addressed resources that can be referenced by scene descriptions and render operations.
+Camera view and projection configuration.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Create a camera from configuration values.
-- Update or read the configuration of an existing camera.
-- Delete camera resources through an explicit lifecycle.
-- Associate a camera ID with a scene without transferring ownership.
+Camera view and projection configuration.
 
-## Resource, data and ownership model
+Configuration validation rejects nonfinite geometry and invalid clipping ranges.
+Resource operations currently report NOT_IMPLEMENTED after argument validation.
 
-The resource is a camera description, not a window or a GPU buffer. A consumer interprets projection and view settings while composing a scene.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-Creation must not silently overwrite existing IDs. Invalid or unsupported configurations should report errors. Deleting a camera does not implicitly delete scenes that reference it; consumers must handle missing references.
+- [`clm_resource`](resource.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_camera. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Create a perspective camera, bind its ID to a scene, and update the camera configuration as the player moves.
+- [clm_resource](resource.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_resource](clm_resource.md).
+## Typical use
+
+Use clm_camera when an application needs: Camera view and projection configuration.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

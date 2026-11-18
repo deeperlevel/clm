@@ -1,40 +1,69 @@
-# CLM Shader
+# CLM shader
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_resource](clm_resource.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_shader](shader.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Loads shader data into reusable CLM resource IDs with explicit format and stage metadata, leaving compilation and GPU pipeline creation to backends.
+Shader descriptions and shader-resource entry points.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Load shader assets from memory or file.
-- Identify shader format and stage.
-- Query stored shader metadata and source/binary size.
+Shader descriptions and shader-resource entry points.
 
-## Resource, data and ownership model
+The interface describes shader inputs independently of a graphics API. Unimplemented
+resource operations return an explicit status.
 
-A shader asset is data. It is not automatically an initialized GPU program, pipeline, linked shader set or binding layout.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-Formats and stages must be validated, and unsupported formats reported without assuming runtime compilation support. Renderer-specific shader language, compilation diagnostics and device lifetime are separate concerns.
+- [`clm_resource`](resource.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_shader. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Store a vertex shader asset and pass its ID to a future renderer pipeline builder.
+- [clm_resource](resource.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_resource](clm_resource.md).
+## Typical use
+
+Use clm_shader when an application needs: Shader descriptions and shader-resource entry points.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

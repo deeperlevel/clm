@@ -1,40 +1,77 @@
-# CLM Multipart
+# CLM multipart
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_bytes](clm_bytes.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_multipart](multipart.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Parses and generates MIME multipart bodies with explicit boundary handling.
+MIME multipart boundary parsing and generation.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Validate multipart boundary syntax and extract boundary values from Content-Type.
-- Parse parts, headers, preamble and epilogue; generate a complete multipart body.
-- Use zero-copy spans into the input; callers must keep source bytes alive while accessing parsed data.
-- Require CRLF framing; reject malformed boundaries and header folding; return capacity errors explicitly.
+MIME multipart boundary parsing and generation.
 
-## Parsing contract
+Parsed parts borrow spans from the supplied message. Boundary recognition must
+distinguish delimiter lines from matching bytes inside content.
 
-Multipart boundaries are validated, including length and allowed characters. Parsing separates preamble, part headers, part bodies and epilogue into borrowed spans referencing the caller's input. The caller supplies capacity for part/header lists; exceeding that capacity is a distinct error.
+MIME multipart body parsing and generation.
 
-The parser accepts CRLF multipart framing and rejects malformed delimiter lines and folded headers. Multipart body generation appends to a destination buffer while preserving the destination on failure.
+Parsing is zero-copy: part bodies and header spans borrow the input bytes.
+The caller supplies storage for parts and headers. Only CRLF framing is
+accepted; header folding and malformed delimiter lines are rejected.
 
-**Keep the original body alive** until all parsed spans are no longer used.
+## CLM dependencies and related modules
 
-## Shared behavioral contract
+Related CLM module interfaces used or referenced by this capability:
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
+- [`clm_bytes`](bytes.md)
+- [`clm_types`](types.md)
 
-## Example use cases
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Extract uploaded form parts from a request body while retaining the raw body until parsing is finished.
+This page is the language-neutral contract for clm_multipart. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
+
+## Direct CLM dependencies
+
+- [clm_types](types.md) - required CLM capability.
+- [clm_bytes](bytes.md) - required CLM capability.
+
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_multipart when an application needs: MIME multipart boundary parsing and generation.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

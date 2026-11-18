@@ -1,46 +1,69 @@
-# CLM Drawing
+# CLM drawing
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_drawing](drawing.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Provides drawing value types and color manipulation independent of a particular canvas, surface or rendering backend.
+Drawing colors, color conversion, and drawing value helpers.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Construct and compare RGBA colors.
-- Change alpha, interpolate colors and compose one straight-alpha color over another.
-- Parse color strings and format display/web color representations.
-- Manage color resources by ID where that form is convenient.
-- Supply commonly used named color constants.
+Drawing colors, color conversion, and drawing value helpers.
 
-## Resource, data and ownership model
+Color representations have explicit channel ranges and serialization formats. Validation
+precedes conversion to renderer-facing values.
 
-A color is a value. Parsing/formatting and optional registry operations operate on the same underlying color model. Unlike rendering commands, the module does not own a surface or graphics context.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-The reference color model is 8-bit straight-alpha RGBA. Alpha blending and interpolation require well-defined rounding/clamping. Web-facing color names and strings must not be mistaken for an HTML/CSS layout engine.
+- [`clm_types`](types.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_drawing. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Parse a design color, blend it over a background color, and pass the resulting value to a renderer.
+- [clm_types](types.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_base](clm_base.md).
+## Typical use
 
+Use clm_drawing when an application needs: Drawing colors, color conversion, and drawing value helpers.
 
+A conforming workflow is conceptually:
 
-This is drawing data, distinct from `clm_renderer`, which issues drawing commands.
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

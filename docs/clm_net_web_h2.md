@@ -1,40 +1,69 @@
-# CLM Net Web HTTP/2
+# CLM net_web_h2
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_net_web](clm_net_web.md)
-- **External libraries / platform facilities (C reference):** nghttp2 through the shared server implementation when enabled; TLS backend through clm_tls.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_net_web_h2](net_web_h2.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Requires HTTP/2 over TLS while preserving the shared CLM web server routing and middleware model.
+HTTP/2 stream processing and server integration.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Initialize HTTP/2-only server configuration.
-- Create and start a TLS-bound server that requires ALPN `h2`.
-- Register common routes and middleware; stop/destroy with configured drain behavior.
+HTTP/2 stream processing and server integration.
 
-## Resource, data and ownership model
+Connection-level HTTP/2 framing is mapped to per-stream requests. Flow control and
+asynchronous response state outlive individual frame callbacks.
 
-The facade constrains protocol selection of the shared server rather than defining a separate request/response contract.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-TLS is mandatory. Connections that omit or fail negotiation for `h2` do not fall back to HTTP/1.1. Cleartext h2c is outside scope.
+- [`clm_net_web`](net_web.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_net_web_h2. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Host an API that requires multiplexed HTTP/2 streams over HTTPS.
+- [clm_net_web](net_web.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_net_web](clm_net_web.md).
+## Typical use
+
+Use clm_net_web_h2 when an application needs: HTTP/2 stream processing and server integration.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

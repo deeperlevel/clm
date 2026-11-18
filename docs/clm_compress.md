@@ -1,50 +1,89 @@
-# CLM Compress
+# CLM compress
 
-> **Current interface reference** · Language-neutral capability and behavioral description · C header snapshot 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_base](clm_base.md), [clm_bytes](clm_bytes.md), [clm_stream](clm_stream.md)
-- **External libraries / platform facilities (C reference):** Brotli, LZ4, miniz/zlib support as selected by the current C implementation; exact codec availability depends on build.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_compress](compress.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Compression and decompression of bytes, streams and in-memory ZIP archives using interoperable standard encodings.
+Compression codecs, incremental transforms, and ZIP helpers.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Encode or decode raw DEFLATE, zlib, gzip, LZ4 frames and Brotli data.
-- Convert content-coding names to algorithms and recognize selected stream signatures.
-- Provide one-shot and incremental codecs and source/sink adapters; inspect ZIP archive entries.
-- Bound decompression output and distinguish truncated, corrupt, unsupported and output-limit failures.
+Compression codecs, incremental transforms, and ZIP helpers.
 
-## Encodings
+Codebinding-specific state is adapted to common buffer and stream interfaces. Callers must
+distinguish output exhaustion from completed input.
 
-| Format | Typical use |
-|---|---|
-| Raw DEFLATE | Raw compressed blocks |
-| Zlib | Wrapped DEFLATE; also used for HTTP `deflate` |
-| Gzip | File and HTTP compression |
-| LZ4 frame | Fast framed compression |
-| Brotli | Web content coding `br` |
-| ZIP archive | Multiple named entries in one archive |
+Compression for bytes, strings, streams and ZIP archives.
 
-## Decode safety
+Formats (vendored libraries under ext/):
+RAW_DEFLATE, ZLIB, GZIP   miniz     HTTP "deflate" is ZLIB, "gzip" is GZIP
+LZ4                       lz4       LZ4 frame format (with content checksum)
+BROTLI                    brotli    HTTP "br"
+ZIP archives              miniz     in memory, see clm_compress_zip_*
+Output is the standard format of each library, so it interoperates with other
+tools. memlz and uzlib are not used: memlz is marked beta and uzlib duplicates
+what miniz already provides.
 
-Decoders report corrupt input, unexpected truncation, unsupported formats and output-size-limit violations as distinct results. The reference snapshot includes a nonzero default decoded-output cap. Incremental adapters allow bounded progress and integration with [clm_stream](clm_stream.md).
+Decoding treats its input as hostile: output is capped (max_output) so a tiny
+input cannot expand without bound, corrupt, truncated and trailing data are
+reported, and nothing is written past the cap. The incremental codec and the
+stream adapters work in bounded steps, so they suit nonblocking transfers.
 
-ZIP helpers can write, enumerate, find and extract entries; archive entry names should be validated before using them as filesystem paths.
+## CLM dependencies and related modules
 
-## Shared behavioral contract
+Related CLM module interfaces used or referenced by this capability:
 
-- CLM resource IDs are identifiers, not automatic lifetime management. The implementation or caller owns resources as described by the relevant module.
-- Expose observable outcomes consistently: successful operations, invalid arguments, unsupported functionality and recoverable states must remain distinguishable.
-- Use the host language’s native types and error mechanisms where appropriate, while preserving the data model and documented behavior across language ports.
-- These descriptions define module-level behavior; binding-specific signatures, allocation mechanics and build instructions belong to each language implementation.
-- Default decompression size caps protect against decompression bombs; callers can request an explicit limit.
+- [`clm_bytes`](bytes.md)
+- [`clm_stream`](stream.md)
+- [`clm_types`](types.md)
 
-## Example use cases
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Stream-decompress a bounded HTTP body using the content coding named by the response.
+This page is the language-neutral contract for clm_compress. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
+
+## Direct CLM dependencies
+
+- [clm_bytes](bytes.md) - required CLM capability.
+- [clm_stream](stream.md) - required CLM capability.
+- [clm_types](types.md) - required CLM capability.
+
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
+
+## Typical use
+
+Use clm_compress when an application needs: Compression codecs, incremental transforms, and ZIP helpers.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->

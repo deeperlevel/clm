@@ -1,42 +1,71 @@
-# CLM Math Collision 3D
+# CLM math_collision3d
 
-> **Current interface reference** · Language-neutral contract draft · Based on C headers supplied 2026-11-05
+> Language-neutral compatibility reference.
 
-## Dependencies
+## Relationship to the canonical contract
 
-- **CLM modules (current C reference):** [clm_math_core](clm_math_core.md), [clm_math_geometry](clm_math_geometry.md)
-- **External libraries / platform facilities (C reference):** No mandatory third-party library identified for this module; host-language/platform facilities may be used.
+This legacy-prefixed document is retained for existing links. The canonical
+contract is [clm_math_collision3d](math_collision3d.md).
+Implementations must follow that language-neutral behavior and dependency model.
 
-**Portability rule:** The listed C dependencies describe the reference implementation. A language port may use native libraries or an equivalent design as long as it preserves the language-neutral observable contract.
+
+> Language-neutral module overview and behavioral contract.
 
 ## Purpose
 
-Supplies collision tests for 3D volumes and geometric primitives, complementing the separate 2D collision module.
+Three-dimensional overlap, ray, segment, and sweep tests.
 
-## Capabilities and operations
+## Behavior and constraints
 
-- Test points against spheres and axis-aligned/oriented boxes.
-- Test sphere/sphere, box/box and box/sphere overlap.
-- Intersect rays against spheres, boxes and triangles.
-- Intersect line segments with supported volumes.
-- Perform supported 3D swept-sphere and swept-AABB tests.
+Three-dimensional overlap, ray, segment, and sweep tests.
 
-## Resource, data and ownership model
+Slab intervals and separating-axis tests reject disjoint shapes. Degenerate geometry and
+initial overlap require explicit handling.
 
-Inputs are geometric values such as 3D vectors, rays, spheres, triangles, AABBs and OBBs. Results are query outcomes, not mutable colliders with their own lifecycle.
+## CLM dependencies and related modules
 
-## Behavioral contract and boundaries
+Related CLM module interfaces used or referenced by this capability:
 
-Contact detection is separate from physics response. Different tests have different output detail, so language ports should preserve observable hit/miss and parameter meaning rather than force a universal hit record.
+- [`clm_math_core`](math_core.md)
+- [`clm_math_geometry3d`](math_geometry3d.md)
 
-## Cross-language interoperability
+## Integration
+- Availability and backend support may vary by language implementation and platform.
+<!-- CLM-DOC-NEUTRAL-SCOPE:BEGIN -->
+## What this document defines
 
-Language ports should preserve data meaning, resource lifetime, successful outcomes and distinguishable failure conditions. Native type systems, threading primitives, platform libraries, error conventions and allocation strategies are not required to match the C implementation. An API name shown in the C reference is evidence of a capability; it is not a mandatory signature in other languages.
+This page is the language-neutral contract for clm_math_collision3d. It explains
+the module's responsibility, observable behavior, ownership and failure
+semantics, and relationships to other CLM modules. It intentionally does not
+prescribe a source language, memory representation, exception model, native
+library, operating system API, or build system.
 
-## Example use case
+## Direct CLM dependencies
 
-Determine which scene object a camera ray intersects before the renderer draws a selection highlight.
+- [clm_math_core](math_core.md) - required CLM capability.
+- [clm_math_geometry3d](math_geometry3d.md) - required CLM capability.
 
-## Related CLM modules
+Dependencies are capability relationships: an implementation may satisfy them
+with native facilities, another CLM module, or an equivalent library, provided
+the linked module's observable contract is preserved.
 
-[clm_math_core](clm_math_core.md), [clm_math_geometry](clm_math_geometry.md).
+## Typical use
+
+Use clm_math_collision3d when an application needs: Three-dimensional overlap, ray, segment, and sweep tests.
+
+A conforming workflow is conceptually:
+
+1. Configure or acquire the module's inputs.
+2. Perform an operation defined by this module and inspect its outcome.
+3. Observe ownership, lifetime, ordering, and concurrency rules while using
+   dependent CLM resources.
+4. Release or reset owned state through the documented lifecycle operation.
+
+## Language-neutral boundaries
+
+Implementations may choose native types, allocation, error reporting, callbacks,
+threads, and platform integrations. They must preserve the documented data
+meaning, distinguishable outcomes, lifetime rules, synchronization contract,
+and dependency relationships. Implementation availability and platform
+support must be reported rather than silently substituted.
+<!-- CLM-DOC-NEUTRAL-SCOPE:END -->
