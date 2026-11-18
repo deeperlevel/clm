@@ -2,14 +2,15 @@
 
 **Reusable, composable foundational modules with consistent observable capabilities across programming languages.**
 
-CLM is designed as a language-neutral collection of building blocks for applications, services, tools, and games. Implementations may use native language facilities, platform APIs, and memory-management strategies while preserving the documented behavior of each module.
-
-> **Development status:** CLM is currently an internal TST technology. This documentation is a technical working reference, not a public release or availability announcement.
+CLM provides reusable building blocks for applications, services, tools, and
+games. Each module defines a capability and its observable behavior; an
+implementation may use the facilities that fit its language, platform, and
+memory model.
 
 ## Design principles
 
 - **Clear module boundaries:** Each capability has a defined responsibility and explicit dependencies.
-- **Cross-language parity:** Behavioral contracts and observable results matter more than identical syntax or internal representations.
+- **Consistent capabilities:** Observable behavior matters more than identical syntax or internal representations.
 - **Identifiers where useful:** Resource-oriented modules may use IDs with documented ownership and lifetime rules; other modules need not.
 - **Implementation independence:** Graphics, networking, storage, cryptography, and platform integration may vary between implementations.
 - **Explicit capability status:** An interface definition does not guarantee support in every language or on every platform.
@@ -17,9 +18,8 @@ CLM is designed as a language-neutral collection of building blocks for applicat
 
 ## Documentation
 
-- [Module index and language-neutral overviews](docs/modules/README.md) — purposes, capabilities, and intended behavior.
-- [Implementation-specific references](docs/IMPLEMENTATIONS.md) — links to language bindings and their API documentation.
-- [Documentation audit](docs/DOCUMENTATION_AUDIT.md) — snapshot coverage and qualifications.
+- [Module index](docs/README.md) — purposes, capabilities, dependencies, and intended behavior.
+- [C implementation](https://github.com/deeperlevel/clm-c) — concrete C types, functions, build integration, and platform support.
 
 ## Module catalog
 
@@ -61,7 +61,7 @@ The catalog lists documented CLM capabilities based on the current reference-imp
 
 | Module | Responsibility |
 |---|---|
-| [`clm_directory`](docs/modus/directory.md) | Directory creation, traversal, inspection, copying, and removal. |
+| [`clm_directory`](docs/directory.md) | Directory creation, traversal, inspection, copying, and removal. |
 | [`clm_file`](docs/file.md) | Path IDs reference UTF-8 BPA strings; open-file IDs identify independent native resources. _as accepts raw UTF-8 paths, _to exports caller-owned data, and _from consumes caller-owned. |
 | [`clm_hash`](docs/hash.md) | Deterministic message digests, HMAC and digest-to-text utilities. |
 | [`clm_path`](docs/path.md) | Filesystem-path API using UTF-8 strings referenced by CLM IDs. |
@@ -205,15 +205,21 @@ The catalog lists documented CLM capabilities based on the current reference-imp
 | [`clm_console`](docs/console.md) | Portable terminal I/O, styling, and console inspection. |
 | [`clm_datetime`](docs/datetime.md) | Civil date conversion, timestamps, durations, and formatting. |
 
-## Cross-language compatibility
+## Implementing CLM modules
 
-Module documentation describes intended capabilities and behavioral expectations. Language-specific implementations may differ in their data types, call signatures, error handling, resource representations, and available platform integrations. Each implementation should document those differences and clearly identify experimental or unavailable features.
+Module documentation describes capabilities and observable behavior.
+Implementations may use different data types, call signatures, error handling,
+resource representations, and platform integrations. Each implementation
+should document those differences and identify experimental or unavailable
+features.
 
 ## Implementation references
 
-Implementation details do not define the language-neutral CLM contract. Consult the relevant implementation reference for concrete types, function declarations, build instructions, and platform requirements.
+The module contracts define required behavior; implementation documentation
+defines concrete types, declarations, build instructions, and platform
+requirements.
 
-- [Available implementation documentation](docs/IMPLEMENTATIONS.md)
+- [C implementation](https://github.com/deeperlevel/clm-c)
 
 ## Development and distribution
 
