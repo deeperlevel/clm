@@ -78,7 +78,7 @@ The catalog lists documented CLM capabilities based on the current reference-imp
 | [`clm_string_yaml`](docs/modules/string_yaml.md) | YAML document parsing and generation. |
 | [`clm_stringtify`](docs/modules/stringtify.md) | Human-readable formatting of CLM values and collections. |
 | [`clm_template`](docs/modules/template.md) | Template parsing, expression evaluation, and rendering. |
-| [`clm_url`](docs/modules/url.md) | The archive provides declarations for this module; consult the C interface and header comments for its supported behavior. |
+| [`clm_url`](docs/modules/url.md) | URL/URI/IRI parsing, normalization, resolution, and component manipulation. |
 | [`clm_uuid`](docs/modules/uuid.md) | UUID generation, parsing, formatting, and field inspection. |
 
 ### Math and geometry (28)
@@ -86,16 +86,16 @@ The catalog lists documented CLM capabilities based on the current reference-imp
 | Module | Responsibility |
 |---|---|
 | [`clm_camera`](docs/modules/camera.md) | Camera view and projection configuration. |
-| [`clm_geometry2d`](docs/modules/geometry2d.md) | The archive provides declarations for this module; consult the C interface and header comments for its supported behavior. |
-| [`clm_geometry3d`](docs/modules/geometry3d.md) | The archive provides declarations for this module; consult the C interface and header comments for its supported behavior. |
+| [`clm_geometry2d`](docs/modules/geometry2d.md) | Local/world coordinate conversion and boundary conventions affect geometric queries. |
+| [`clm_geometry3d`](docs/modules/geometry3d.md) | Local/world coordinate conversion and boundary conventions affect geometric queries. |
 | [`clm_math`](docs/modules/math.md) | Scalar mathematical convenience functions. |
 | [`clm_math_calculus`](docs/modules/math_calculus.md) | Finite-difference derivatives, quadrature, and ODE steps. |
 | [`clm_math_collision2d`](docs/modules/math_collision2d.md) | Two-dimensional overlap, ray, segment, and sweep tests. |
 | [`clm_math_collision3d`](docs/modules/math_collision3d.md) | Three-dimensional overlap, ray, segment, and sweep tests. |
 | [`clm_math_core`](docs/modules/math_core.md) | Shared mathematical value types and storage adapters. |
-| [`clm_math_geometry2d`](docs/modules/math_geometry2d.md) | Two-dimensional geometric measurements, bounds, and transforms. |
-| [`clm_math_geometry3d`](docs/modules/math_geometry3d.md) | Three-dimensional geometric measurements, bounds, and transforms. |
-| [`clm_math_geometry_common`](docs/modules/math_geometry_common.md) | The archive provides declarations for this module; consult the C interface and header comments for its supported behavior. |
+| [`clm_math_geometry2d`](docs/modules/math_geometry2d.md) | Two-dimensional geometric shapes, measurements, bounds, and transforms. |
+| [`clm_math_geometry3d`](docs/modules/math_geometry3d.md) | Three-dimensional geometric shapes, measurements, bounds, and transforms. |
+| [`clm_math_geometry_common`](docs/modules/math_geometry_common.md) | Shared geometric comparison and numeric boundary policy for multidimensional geometry. |
 | [`clm_math_image`](docs/modules/math_image.md) | Allocation-free color, reconstruction and image-coordinate mathematics. |
 | [`clm_math_interpolation`](docs/modules/math_interpolation.md) | Interpolation factors and easing curves. |
 | [`clm_math_matrix`](docs/modules/math_matrix.md) | Matrix arithmetic, elimination, and affine projection. |
@@ -136,7 +136,7 @@ The catalog lists documented CLM capabilities based on the current reference-imp
 | [`clm_net_web_h3`](docs/modules/net_web_h3.md) | HTTP/3 stream processing and QUIC server integration. |
 | [`clm_net_websocket`](docs/modules/net_websocket.md) | WebSocket connection lifecycle and network transport. |
 | [`clm_tls`](docs/modules/tls.md) | TLS session state and encrypted socket I/O. |
-| [`clm_tls_quic`](docs/modules/tls_quic.md) | The archive provides declarations for this module; consult the C interface and header comments for its supported behavior. |
+| [`clm_tls_quic`](docs/modules/tls_quic.md) | Recordless TLS 1.3 handshake support designed specifically for QUIC transports. |
 | [`clm_ua`](docs/modules/ua.md) | User-agent text classification and version extraction. |
 | [`clm_websocket`](docs/modules/websocket.md) | Incremental WebSocket frame parsing and serialization. |
 
@@ -185,15 +185,15 @@ The catalog lists documented CLM capabilities based on the current reference-imp
 | [`clm_widget_list`](docs/modules/widget_list.md) | A single-selection, top-to-bottom list. |
 | [`clm_widget_list_item`](docs/modules/widget_list_item.md) | A text row with independently optional left/right image icons. |
 | [`clm_widget_manager`](docs/modules/widget_manager.md) | Per-surface widget event routing and virtual tree layout. |
-| [`clm_widget_menu`](docs/modules/widget_menu.md) | The archive provides declarations for this module; consult the C interface and header comments for its supported behavior. |
-| [`clm_widget_popover`](docs/modules/widget_popover.md) | The archive provides declarations for this module; consult the C interface and header comments for its supported behavior. |
+| [`clm_widget_menu`](docs/modules/widget_menu.md) | Surface-top menu strip supporting conventional dropdown menus and ribbon-style toolbars. |
+| [`clm_widget_popover`](docs/modules/widget_popover.md) | Surface-bound overlay controller for dialog-style content and contextual popups. |
 | [`clm_widget_progress`](docs/modules/widget_progress.md) | Integer progress/HP/mana bar. |
 | [`clm_widget_scroller`](docs/modules/widget_scroller.md) | Scrollbar with a proportional, minimum-sized thumb. |
 | [`clm_widget_slider`](docs/modules/widget_slider.md) | Horizontal integer slider: minimum 0, maximum 1..INT32_MAX (default 100). |
 | [`clm_widget_span`](docs/modules/widget_span.md) | Plain UTF-8 text label. |
 | [`clm_widget_tab`](docs/modules/widget_tab.md) | Horizontal tab strip with borrowed page widget IDs on the same surface. |
 | [`clm_widget_text`](docs/modules/widget_text.md) | Editable UTF-8 text with color tags, word wrapping and optional logical line numbers. |
-| [`clm_widget_toast`](docs/modules/widget_toast.md) | The archive provides declarations for this module; consult the C interface and header comments for its supported behavior. |
+| [`clm_widget_toast`](docs/modules/widget_toast.md) | Noninteractive, temporary notification overlay for application and game surfaces. |
 | [`clm_widget_toggle`](docs/modules/widget_toggle.md) | Checkbox with an optional owned span label. |
 | [`clm_widget_toolbar`](docs/modules/widget_toolbar.md) | Toolbar with 1-8 equal-width, owned container columns. |
 

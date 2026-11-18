@@ -1,17 +1,19 @@
 # clm_url
 
-> Language-neutral module documentation. Derived from the supplied C implementation; equivalent APIs in other languages may differ.
+> Language-neutral capability overview. C implementation details are documented separately.
 
 ## Purpose
 
-The archive provides declarations for this module; consult the C interface and header comments for its supported behavior.
+URL/URI/IRI parsing, normalization, resolution, and component manipulation.
 
 ## Behavior and constraints
 
-The interface-specific documentation and inline source comments define the available operations, prerequisites, and error behavior. No additional cross-language guarantee is implied.
+Provides URL-specific string operations analogous in spirit to filesystem operations in the path module, but following URL/URI syntax instead of filesystem conventions. Functions include parsing and validation; reading, replacing and joining URL components; resolving relative references; working with path segments and query parameters; percent/form encoding; and converting file URLs to and from filesystem paths.
+
+The supplied C implementation targets RFC 3986 syntax and resolution rather than implicitly following browser WHATWG URL behavior. These operations manipulate URL text and do **not** perform network requests or DNS lookups. The language implementation determines how the URL text and parsed components are represented.
 
 ## Integration
 
-- C reference: [**clm_url**](../c/url.md).
-- Related CLM declarations in this archive: `clm_bpa`, `clm_path`, `clm_platform`, `clm_string`, `clm_types`.
-- Portability note: module behavior is derived from the supplied implementation. Platform/backend coverage should be verified in each language port.
+- Related capabilities: text/string operations, URI parsing, optional IDNA support.
+- [C reference](../c/url.md) — signatures, concrete types, backend requirements, and error codes for one implementation.
+- Capability availability can vary by language implementation and platform.

@@ -1,20 +1,19 @@
 # clm_math_geometry2d
 
-> Language-neutral module documentation. Derived from the supplied C implementation; equivalent APIs in other languages may differ.
+> Language-neutral capability overview. C implementation details are documented separately.
 
 ## Purpose
 
-Two-dimensional geometric measurements, bounds, and transforms.
+Two-dimensional geometric shapes, measurements, bounds, and transforms.
 
 ## Behavior and constraints
 
-Two-dimensional geometric measurements, bounds, and transforms.
+Supports geometric calculations involving rectangles, oriented boxes, lines, segments, triangles, polygons, ellipses, clipping regions, and transformed geometry. Operations include distance and intersection helpers, point containment, polygon area, and coordinate/layout calculations.
 
-Local/world coordinate conversion and boundary conventions affect geometric queries.
-Value helpers are kept separate from storage-based adapters.
+Several operations are pure calculations on values rather than stored resources. Their input contracts include finite coordinates and defined coordinate and boundary conventions. Some 2D array-based helpers integrate with numeric storage adapters. This module provides geometry calculations; it is not a physics simulation engine.
 
 ## Integration
 
-- C reference: [**clm_math_geometry2d**](../c/math_geometry2d.md).
-- Related CLM declarations in this archive: `clm_math_core`, `clm_math_matrix`.
-- Portability note: module behavior is derived from the supplied implementation. Platform/backend coverage should be verified in each language port.
+- Related capabilities: math core, matrices, 2D numeric representations.
+- [C reference](../c/math_geometry2d.md) — signatures, concrete types, backend requirements, and error codes for one implementation.
+- Capability availability can vary by language implementation and platform.

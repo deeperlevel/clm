@@ -1,19 +1,19 @@
 # clm_math_geometry_common
 
-> Language-neutral module documentation. Derived from the supplied C implementation; equivalent APIs in other languages may differ.
+> Language-neutral capability overview. C implementation details are documented separately.
 
 ## Purpose
 
-The archive provides declarations for this module; consult the C interface and header comments for its supported behavior.
+Shared geometric comparison and numeric boundary policy for multidimensional geometry.
 
 ## Behavior and constraints
 
-The interface-specific documentation and inline source comments define the available operations, prerequisites, and error behavior. No additional cross-language guarantee is implied.
+Provides common numeric rules used to keep containment and overlap decisions consistent across geometry routines. The C reference includes an inclusive, relative-roundoff-aware comparison for finite floating-point values.
+
+This is a **shared support capability** for geometry modules rather than a full independent set of 2D or 3D shape operations.
 
 ## Integration
 
-- C reference: [**clm_math_geometry_common**](../c/math_geometry_common.md).
-- Related CLM declarations in this archive: `clm_math_core`.
-- Portability note: module behavior is derived from the supplied implementation. Platform/backend coverage should be verified in each language port.
-
-> **Scope:** This appears to be a support/internal or shared header; do not assume it is independently usable without its owning modules.
+- Related capabilities: math core, 2D and 3D geometry.
+- [C reference](../c/math_geometry_common.md) — signatures, concrete types, backend requirements, and error codes for one implementation.
+- Capability availability can vary by language implementation and platform.

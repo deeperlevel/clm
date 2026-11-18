@@ -1,20 +1,19 @@
 # clm_math_geometry3d
 
-> Language-neutral module documentation. Derived from the supplied C implementation; equivalent APIs in other languages may differ.
+> Language-neutral capability overview. C implementation details are documented separately.
 
 ## Purpose
 
-Three-dimensional geometric measurements, bounds, and transforms.
+Three-dimensional geometric shapes, measurements, bounds, and transforms.
 
 ## Behavior and constraints
 
-Three-dimensional geometric measurements, bounds, and transforms.
+Provides allocation-free operations for common 3D geometric primitives including axis-aligned boxes, oriented boxes, and sphere bounds. Examples include constructing an oriented box from a unit rotation, converting points into box-local coordinates, combining bounds, finding distances, and producing conservative bounds for spatial queries.
 
-Local/world coordinate conversion and boundary conventions affect geometric queries.
-Value helpers are kept separate from storage-based adapters.
+The C reference requires valid finite coordinates, positive dimensions where applicable, and orthonormal box axes. The module performs geometry calculations and can support higher-level collision or spatial systems; it does not itself implement a physics world.
 
 ## Integration
 
-- C reference: [**clm_math_geometry3d**](../c/math_geometry3d.md).
-- Related CLM declarations in this archive: `clm_math_core`, `clm_math_geometry_common`, `clm_math_matrix`.
-- Portability note: module behavior is derived from the supplied implementation. Platform/backend coverage should be verified in each language port.
+- Related capabilities: math core, matrices, common geometric comparisons.
+- [C reference](../c/math_geometry3d.md) — signatures, concrete types, backend requirements, and error codes for one implementation.
+- Capability availability can vary by language implementation and platform.
