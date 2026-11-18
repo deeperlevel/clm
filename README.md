@@ -16,11 +16,6 @@ memory model.
 - **Explicit capability status:** An interface definition does not guarantee support in every language or on every platform.
 - **Composable foundations:** Applications can select only the capabilities they need without adopting an entire application framework or game engine.
 
-## Documentation
-
-- [Module index](docs/README.md) — purposes, capabilities, dependencies, and intended behavior.
-- [C implementation](https://github.com/deeperlevel/clm-c) — concrete C types, functions, build integration, and platform support.
-
 ## Module catalog
 
 The catalog lists documented CLM capabilities based on the current reference-implementation snapshot. A listed interface is not necessarily a separately distributable or universally implemented module. Consult each module overview for its contract and status.
@@ -219,8 +214,4 @@ The module contracts define required behavior; implementation documentation
 defines concrete types, declarations, build instructions, and platform
 requirements.
 
-- [C implementation](https://github.com/deeperlevel/clm-c)
-
-## Development and distribution
-
-CLM is maintained as an internal TST technology at this stage. Distribution, source availability, and licensing announcements are controlled separately from these technical documents. Third-party components and assets retain their respective license obligations.
+- [CLM - C implementation](https://github.com/deeperlevel/clm-c)
